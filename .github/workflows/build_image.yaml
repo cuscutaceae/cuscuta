@@ -41,12 +41,12 @@ jobs:
           cargo_toml="${{ matrix.image }}/Cargo.toml"
 
           version="$(python3 - "$cargo_toml" <<'PY'
-      import sys, tomllib
-      with open(sys.argv[1], "rb") as f:
-          obj = tomllib.load(f)
-      print(obj["package"]["version"])
-      PY
-      )"
+          import sys, tomllib
+          with open(sys.argv[1], "rb") as f:
+              obj = tomllib.load(f)
+          print(obj["package"]["version"])
+          PY
+          )"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
