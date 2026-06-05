@@ -40,12 +40,6 @@ jobs:
           set -euo pipefail
           cargo_toml="${{ matrix.image }}/Cargo.toml"
 
-          if [ ! -r "$cargo_toml" ]; then
-            echo "Cargo.toml not readable: $cargo_toml" >&2
-            ls -la "${{ matrix.image }}" >&2
-            exit 1
-          fi
-
           version="$(python3 - "$cargo_toml" <<'PY'
           import sys, pathlib, tomllib
           p = pathlib.Path(sys.argv[1])
@@ -53,9 +47,7 @@ jobs:
           print(obj["package"]["version"])
           PY
           )"
-
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Resolved version for ${{ matrix.image }}: $version"
 
       - name: Build and push
         uses: docker/build-push-action@v6
