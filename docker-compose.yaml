@@ -1,0 +1,149 @@
+version: "3.8"
+
+services:
+  # Optional
+  #
+  # redis-commander:
+  #   container_name: redis-commander
+  #   hostname: redis-commander
+  #   image: ghcr.io/joeferner/redis-commander:latest
+  #   restart: always
+  #   environment:
+  #     - REDIS_HOSTS=local:redis:6379
+  #   ports:
+  #     - "8081:8081"
+  #   user: redis
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - "./tmp/_postgresql:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - "./tmp/_redis:/data"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  test-chilo:
+    # image: ghcr.io/cuscutaceae/cuscuta-chilo:latest
+    build:
+      context: .
+      dockerfile: ./cuscuta-chilo/Dockerfile
+    ports:
+      - "8082:8080"
+    environment:
+      # Log
+      RUST_LOG: debug
+      # Config
+      BIN_C1: "0000000000000000000000000000000000000000000000000000000000000000"
+      BIN_C2: "0000000000000000000000000000000000000000000000000000000000000000"
+      BIN_LOGIN_C31: "00000000000000000000"
+      BIN_LOGIN_C32: "00000000000000000000"
+    restart: no
+
+  test-mock:
+    # image: ghcr.io/cuscutaceae/cuscuta-mock:latest
+    build:
+      context: .
+      dockerfile: ./cuscuta-mock/Dockerfile
+    ports:
+      - "3399:8080"
+    environment:
+      # Log
+      RUST_LOG: info
+    restart: no
+
+  test-worker:
+    # image: ghcr.io/cuscutaceae/cuscuta-worker:latest
+    build:
+      context: .
+      dockerfile: ./cuscuta-worker/Dockerfile
+    deploy:
+      replicas: 5
+    environment:
+      # Log
+      RUST_LOG: info
+      # DB
+      ACCOUNTS_SQL_ADDR: "postgresql://myuser:mypassword@postgres:5432/mydb"
+      REDIS_ADDR: "redis://redis:6379/0"
+      # Data
+      GITHUB_BUNDLE_REPOSITORY: cuscutaceae/scales
+      GITHUB_BUNDLE_PATH: bundle.json
+      GITHUB_BUNDLE_TOKEN: "DummyToken"
+      GITHUB_SONG_REPOSITORY: cuscutaceae/scales
+      GITHUB_SONG_PATH: songs/songlist
+      GITHUB_SONG_TOKEN: "DummyToken"
+      # API
+      API_CHILO: "http://test-chilo:8080/generate"
+      API_LOGIN: "http://test-mock:8080/auth/login"
+      API_LIST_FRIENDS: "http://test-mock:8080/friend/me"
+      API_ADD_FRIENDS: "http://test-mock:8080/friend/me/add"
+      API_DELETE_FRIENDS: "http://test-mock:8080/friend/me/delete"
+      API_GET_RANK: "http://test-mock:8080/score/song/friend"
+      # Config
+      WORKER_MAX_JOBS: 3
+      WORKER_MAX_RETRIES: 10
+      WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS: 100
+      WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER: 2
+      WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS: 1000
+      WORKER_ACCOUNT_LEASE_TIME_SECS: 120
+      WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS: 30
+      REDIS_STREAM_REFRESH_TTL: 300
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: no
+
+  test-entry:
+    # image: ghcr.io/cuscutaceae/cuscuta-entry:latest
+    build:
+      context: .
+      dockerfile: ./cuscuta-entry/Dockerfile
+    environment:
+      # Log
+      RUST_LOG: info
+      # DB
+      ACCOUNTS_SQL_ADDR: "postgresql://myuser:mypassword@postgres:5432/mydb"
+      REDIS_ADDR: "redis://redis:6379/0"
+      # Data
+      GITHUB_BUNDLE_REPOSITORY: cuscutaceae/scales
+      GITHUB_BUNDLE_PATH: bundle.json
+      GITHUB_BUNDLE_TOKEN: "DummyToken"
+      GITHUB_SONG_REPOSITORY: cuscutaceae/scales
+      GITHUB_SONG_PATH: songs/songlist
+      GITHUB_SONG_TOKEN: "DummyToken"
+      # Config
+      REDIS_STREAM_REFRESH_TTL: 300
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: no
+
+volumes:
+  postgres_data:
+  redis_data:

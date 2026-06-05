@@ -1,0 +1,62 @@
+name: build-and-push-images
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  ORG: ${{ github.repository_owner }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [cuscuta-chilo, cuscuta-worker, cuscuta-entry, cuscuta-mock]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read version from Cargo.toml
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_toml="${{ matrix.image }}/Cargo.toml"
+          version="$(python3 - <<'PY'
+          import sys, pathlib
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text(encoding="utf-8")
+          import tomllib
+          obj = tomllib.loads(s.encode() if isinstance(s, str) else s)  # tomllib wants bytes
+          print(obj["package"]["version"])
+          PY
+          "$cargo_toml")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Resolved version for ${{ matrix.image }}: $version"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.image }}
+          file: ./${{ matrix.image }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.image }}:${{ steps.ver.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.image }}:sha-${{ github.sha }}
