@@ -1,7 +1,7 @@
 FROM rust:1.94 AS builder
 WORKDIR /app
-COPY cuscuta-chilo/Cargo.toml cuscuta-chilo/Cargo.lock ./
-COPY cuscuta-chilo/src ./src
+COPY ./cuscuta-chilo/Cargo.toml ./cuscuta-chilo/Cargo.lock ./
+COPY ./cuscuta-chilo/src ./src
 RUN apt-get update && apt-get install -y ca-certificates clang cmake pkg-config
 RUN cargo test
 RUN cargo build --release
