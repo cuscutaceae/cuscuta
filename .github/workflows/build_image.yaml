@@ -39,15 +39,21 @@ jobs:
         run: |
           set -euo pipefail
           cargo_toml="${{ matrix.image }}/Cargo.toml"
-          version="$(python3 - <<'PY'
-          import sys, pathlib
+
+          if [ ! -r "$cargo_toml" ]; then
+            echo "Cargo.toml not readable: $cargo_toml" >&2
+            ls -la "${{ matrix.image }}" >&2
+            exit 1
+          fi
+
+          version="$(python3 - "$cargo_toml" <<'PY'
+          import sys, pathlib, tomllib
           p = pathlib.Path(sys.argv[1])
-          s = p.read_text(encoding="utf-8")
-          import tomllib
-          obj = tomllib.loads(s.encode() if isinstance(s, str) else s)  # tomllib wants bytes
+          obj = tomllib.loads(p.read_bytes())
           print(obj["package"]["version"])
           PY
-          "$cargo_toml")"
+          )"
+
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Resolved version for ${{ matrix.image }}: $version"
 
