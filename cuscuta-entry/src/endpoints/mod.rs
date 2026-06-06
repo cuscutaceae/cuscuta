@@ -15,7 +15,7 @@ enum ErrorType {
     FailedScanRedis = -301,
     FailedEnqueueRedis = -302,
 
-    NoWorker = -400,
+    InternalNoWorker = -400,
 
     BadRequestBase64 = -500,
     BadRequestTokenCheckFailed = -501
@@ -34,7 +34,7 @@ enum Error {
     #[error("service unavailable: 0x021")]
     RedisExtend(ErrorType, cuscuta_common::db::job::Error),
     #[error("service unavailable: 0x000")]
-    NoWorker(ErrorType),
+    Internal(ErrorType),
     #[error("bad request")]
     BadRequest(ErrorType),
 }
@@ -47,7 +47,7 @@ impl Error {
             | Error::DbExtend(error_type, _)
             | Error::Redis(error_type, _)
             | Error::RedisExtend(error_type, _)
-            | Error::NoWorker(error_type)
+            | Error::Internal(error_type)
             | Error::BadRequest(error_type) => *error_type,
         }
     }
@@ -59,7 +59,7 @@ impl Error {
             | Error::DbExtend(_, _)
             | Error::Redis(_, _)
             | Error::RedisExtend(_, _) => StatusCode::INTERNAL_SERVER_ERROR,
-            Error::NoWorker(_) => StatusCode::IM_A_TEAPOT,
+            Error::Internal(_) => StatusCode::IM_A_TEAPOT,
             Error::BadRequest(_) => StatusCode::BAD_REQUEST,
         }
     }
