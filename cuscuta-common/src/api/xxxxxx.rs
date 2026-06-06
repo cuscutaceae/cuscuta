@@ -343,7 +343,7 @@ pub enum FriendDelta {
 /// （TODO：计划重构来改善错误处理）
 ///
 /// # Panics
-/// 所有可能的panic的代码来自于`set.iter().next().unwrap()`，而根据条件，这些set的长度在执行它之前均为1，故本函数理论上永远不会panic
+/// 所有可能的panic的代码来自于`set.iter().next().expect(...)`，而根据条件，这些set的长度在执行它之前均为1，故本函数理论上永远不会panic
 pub fn calc_friend_delta(
     before: &[FriendInfo],
     after: &[FriendInfo],
@@ -353,7 +353,11 @@ pub fn calc_friend_delta(
     let delta_add: HashSet<_> = after.difference(&before).collect();
     if delta_add.len() == 1 {
         return Ok(FriendDelta::Add(
-            (**delta_add.iter().next().unwrap()).clone(),
+            (**delta_add
+                .iter()
+                .next()
+                .expect("first element of delta_add is None when len==1, this should not happen"))
+            .clone(),
         ));
     }
     if !delta_add.is_empty() {
@@ -362,7 +366,11 @@ pub fn calc_friend_delta(
     let delta_rem: HashSet<_> = before.difference(&after).collect();
     if delta_rem.len() == 1 {
         return Ok(FriendDelta::Remove(
-            (**delta_rem.iter().next().unwrap()).clone(),
+            (**delta_rem
+                .iter()
+                .next()
+                .expect("first element of delta_rem is None when len==1, this should not happen"))
+            .clone(),
         ));
     }
     if !delta_rem.is_empty() {

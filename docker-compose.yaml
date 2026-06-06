@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # Optional
   #
@@ -109,6 +107,8 @@ services:
       WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS: 30
       REDIS_STREAM_REFRESH_TTL: 300
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -138,11 +138,27 @@ services:
     ports:
       - "8081:8081"
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: no
+
+  migrate:
+    image: migrate/migrate
+    volumes:
+      - ./migrations:/migrations
+    command:
+      [
+        "-path=/migrations",
+        "-database=postgresql://myuser:mypassword@postgres:5432/mydb?sslmode=disable",
+        "up",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

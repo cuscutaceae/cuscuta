@@ -1,4 +1,4 @@
-use std::{thread::sleep, time::Duration};
+use std::time::Duration;
 
 use cuscuta_common::{
     api::{
@@ -16,6 +16,7 @@ use cuscuta_common::{
     quick_fetch::QuickFetch,
 };
 use redis::{Client, TypedCommands};
+use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -85,7 +86,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
             let Some((jobs, sub_queue)) =
                 discover_sub_queue(current_jobs, &config, redis_client, random, &sub_queues)?
             else {
-                sleep(Duration::from_secs(1));
+                sleep(Duration::from_secs(1)).await;
                 return Ok(());
             };
             *cursor = sub_queue.segment.start;
@@ -99,7 +100,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
         }
         if current_jobs.is_empty() {
             log::debug!("no jobs, skip");
-            sleep(Duration::from_secs(2));
+            sleep(Duration::from_secs(2)).await;
             return Ok(());
         }
         try_add_friends(
@@ -161,7 +162,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
                 }
             }
             log::warn!("worker loop failed: {e}");
-            sleep(Duration::from_secs(10));
+            sleep(Duration::from_secs(10)).await;
         }
     }
     WorkerResult {

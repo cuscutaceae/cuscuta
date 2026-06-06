@@ -59,9 +59,9 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
             .await
             .map_err(|e| Error::Db(ErrorType::FailedCountDb, e))?;
         if active_account_count == 0 {
-            return Err(Error::NoWorker(ErrorType::NoWorker));
+            return Err(Error::Internal(ErrorType::InternalNoWorker));
         }
-        let ranges = split_weighted_ranges(&song_list_len, active_account_count);
+        let ranges = split_weighted_ranges(&song_list_len, active_account_count)?;
         let queues = scan_sub_queue(redis_client)
             .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
         let timestamp = Utc::now().timestamp().to_string();
@@ -127,24 +127,94 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
     }
 }
 
-#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
-fn split_weighted_ranges(arr: &[usize], count: usize) -> Vec<Range<usize>> {
-    let total_weights = arr.iter().sum::<usize>() as f64;
-    let avg_weights = total_weights / (count - 1) as f64;
-    let mut ws = 0f64;
-    let mut last_i = 0usize;
-    let mut ranges = Vec::new();
-    for (i, it) in arr.iter().enumerate() {
-        let current_weight = *it as f64;
-        ws += current_weight;
-        if ws >= avg_weights {
-            ranges.push(last_i..i);
+fn split_weighted_ranges(weights: &[usize], count: usize) -> Result<Vec<Range<usize>>, Error> {
+    let t = split_weighted_ranges_min(weights, count)?;
+    let iter = weights.iter().copied().enumerate();
+    let mut tot = 0;
+    let mut last_i = 0;
+    let mut out = Vec::new();
+    for (i, this) in iter {
+        if tot + this > t {
+            out.push(last_i..i);
+            tot = tot + this - t;
             last_i = i;
-            ws -= avg_weights;
+        } else {
+            tot += this;
         }
     }
-    if last_i < arr.len() {
-        ranges.push(last_i..arr.len());
+    if last_i != weights.len() {
+        out.push(last_i..weights.len());
     }
-    ranges
+    Ok(out)
+}
+
+/// 感谢 Hoyoak 大佬提供的题解！
+/// [题解链接](https://www.cnblogs.com/Hoyoak/p/11354580.html)
+fn split_weighted_ranges_min(num: &[usize], m: usize) -> Result<usize, Error> {
+    fn check(d: usize, num: &[usize], m: usize) -> bool {
+        let mut cnt = 0;
+        let mut sum = 0;
+        for n in num {
+            if sum + n <= d {
+                sum += n;
+            } else {
+                sum = *n;
+                cnt += 1;
+            }
+        }
+        cnt < m
+    }
+    let mut l = num
+        .iter()
+        .max()
+        .copied()
+        .ok_or(Error::NotReady(ErrorType::SongListNotReady))?;
+    let mut r: usize = num.iter().sum();
+    while l <= r {
+        let mid = (l + r) >> 1;
+        if check(mid, num, m) {
+            r = mid - 1;
+        } else {
+            l = mid + 1;
+        }
+    }
+    Ok(l)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::endpoints::enqueue::{split_weighted_ranges, split_weighted_ranges_min};
+
+    #[test]
+    fn test_split_weighted_ranges_1() {
+        let a = &[4, 2, 4, 5, 1];
+        let n = 3;
+        println!(
+            "{}:{:?}",
+            split_weighted_ranges_min(a, n).unwrap(),
+            split_weighted_ranges(a, n).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_split_weighted_ranges_2() {
+        let a = &[7, 2, 5, 4, 10, 8];
+        let n = 3;
+        println!(
+            "{}:{:?}",
+            split_weighted_ranges_min(a, n).unwrap(),
+            split_weighted_ranges(a, n).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_split_weighted_ranges_3() {
+        let a = &[4, 3, 3, 3, 3, 4, 4, 4, 3, 3, 3, 3, 4, 3];
+        let n = 6;
+        println!(
+            "{}:{:?}",
+            split_weighted_ranges_min(a, n).unwrap(),
+            split_weighted_ranges(a, n).unwrap()
+        );
+    }
 }
