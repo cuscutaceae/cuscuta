@@ -71,3 +71,11 @@ cuscuta不能独立工作，它依赖一些其它组件和外部服务工作：
 ### 设计
 
 关于cuscuta的设计，参见[cuscuta的草稿 - 4](https://blog.nofyso.cc/2026/05/27/cuscuta-4/)
+
+### 致谢
+
+感谢[@qianmo2233](https://github.com/qianmo2233)对架构设计的支持！
+
+感谢[@Hoyoak](https://www.cnblogs.com/Hoyoak)提供的题解！
+
+Development of _cuscutaceae_ is made possible by contributors like you!
