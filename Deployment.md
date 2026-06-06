@@ -17,8 +17,8 @@ cuscuta使用Dockerfile进行构建，cuscuta包含4个镜像（`cuscuta-entry`,
 ```shell
 git clone https://github.com/cuscutaceae/cuscuta
 cd cuscuta
-docker-compose create
-# 或 nerdctl compose create
+docker-compose build
+# 或 nerdctl compose build
 ```
 
 #### 构建为可执行文件（并不推荐）
@@ -29,11 +29,11 @@ docker-compose create
 > 
 > 其中，由于`cuscuta-chilo`依赖[chilo](https://github.com/cuscutaceae/chilo)，所以需要安装`clang`, `cmake`, `pkg-config`作为构建依赖，如果您处于Windows环境下，可以考虑在Visual Studio安装相应组件后，使用`Developer Command Prompt for VS xxxx`命令行进行构建
 
+### 部署
+
 > [!IMPORTANT]
 >
-> 出于某些原因，cuscuta并不包含对应资源的token、目标API地址，以及chilo所需的关键常量，若您持有这些资源，请自行配置
-
-### 部署
+> 出于某些原因，cuscuta并**不包含**对应资源的token、目标API地址，以及chilo所需的关键常量，虽然两种部署方式均配置了数据库迁移任务，但cuscuta**不包含**任何数据库数据，数据库内数据的来源由部署者自行解决，若您持有这些资源，请自行配置
 
 cuscuta有两种部署方式：本地测试用的docker-compose方式，和部署在Kubernetes集群上的helm方式；由于cuscuta的启动需要配置环境变量作为参数 ，并且docker-compose环境缺乏KEDA(Kubernetes-based Event-Driven Autoscaler)支持的动态扩容，为统一化管理，推荐使用helm部署方式；docker-compose部署方式较为便捷，适合本地快速验证
 
@@ -74,7 +74,7 @@ cuscuta统一使用环境变量注入配置，具体如下表：
 
 #### docker-compose
 
-使用docker-compose部署时，建议使用本地构建方式，您可以先根据上文使用`docker-compose create`提前构建，也可以使用`docker-compose up -d`直接启动，缺失的构建将会在启动时进行
+使用docker-compose部署时，建议使用本地构建方式，您可以先根据上文使用`docker-compose build`提前构建，也可以使用`docker-compose up -d`直接启动，缺失的构建将会在启动时进行
 
 cuscuta的docker-compose.yaml默认使用本地构建的镜像，您也可以使用在ghcr.io上的镜像在docker-compose环境下部署cuscuta，对于这种情况，请自行修改docker-compose.yaml：
 

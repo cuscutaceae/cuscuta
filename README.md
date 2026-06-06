@@ -68,6 +68,16 @@ cuscuta不能独立工作，它依赖一些其它组件和外部服务工作：
 - [x] docker compose
 - [ ] helm
 
+#### cuscutactl（什）
+
+- [ ] 功能
+  - [ ] 查询队列状态
+  - [ ] 基本数据库CRUD
+  - [ ] 查询chilo状态
+- [ ] 多连接模式
+  - [ ] 数据库直连模式
+  - [ ] Kubernetes代理模式
+
 ### 设计
 
 关于cuscuta的设计，参见[cuscuta的草稿 - 4](https://blog.nofyso.cc/2026/05/27/cuscuta-4/)
