@@ -1,4 +1,4 @@
-﻿use clap::{Args, ValueEnum};
+use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 /// Database connection configuration.
@@ -28,7 +28,11 @@ pub struct Kubernetes {
     pub secret: String,
 
     /// Secret key for `PostgreSQL` URL
-    #[arg(long, name = "kube_postgresql_key", default_value = "ACCOUNTS_SQL_ADDR")]
+    #[arg(
+        long,
+        name = "kube_postgresql_key",
+        default_value = "ACCOUNTS_SQL_ADDR"
+    )]
     pub postgresql_key: String,
 
     /// Secret key for Redis URL

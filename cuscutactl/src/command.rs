@@ -1,4 +1,4 @@
-﻿use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 use crate::config::Config;
 
@@ -74,7 +74,7 @@ pub enum SubCommandJobs {
 pub enum SubCommandAccounts {
     /// Show account overview
     #[command(visible_alias = "stat")]
-    Status{
+    Status {
         /// Max count of account
         #[arg(long, short, default_value_t = 100)]
         max_count: usize,

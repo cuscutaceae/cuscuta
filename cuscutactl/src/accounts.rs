@@ -1,4 +1,4 @@
-﻿use std::io::{self, BufRead};
+use std::io::{self, BufRead};
 
 use comfy_table::{ContentArrangement, Table};
 use cuscuta_common::db::account::AccountRow;
@@ -80,7 +80,10 @@ pub async fn status(pg_url: &str, max_count: usize) -> anyhow::Result<()> {
         }
         println!("{table}");
         if total.cast_unsigned() as usize > max_count {
-            println!("... and {} more", total.cast_unsigned() as usize - max_count);
+            println!(
+                "... and {} more",
+                total.cast_unsigned() as usize - max_count
+            );
         }
     }
     pool.close().await;

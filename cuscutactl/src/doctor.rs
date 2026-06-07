@@ -1,5 +1,4 @@
-﻿use std::time::Instant;
-
+use std::time::Instant;
 
 use redis::{ScanOptions, TypedCommands};
 use sqlx::postgres::PgPoolOptions;
@@ -228,4 +227,3 @@ fn check_streams(redis_url: &str) -> anyhow::Result<String> {
     parts.push(format!("({elapsed:.1?})"));
     Ok(parts.join(" | "))
 }
-

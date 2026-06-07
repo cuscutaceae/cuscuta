@@ -1,4 +1,4 @@
-﻿//! **This crate is mostly AI-generated**
+//! **This crate is mostly AI-generated**
 //!
 //! CLI management tool for [cuscuta](https://github.com/cuscutaceae/cuscuta) clusters.
 //!
@@ -135,4 +135,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-

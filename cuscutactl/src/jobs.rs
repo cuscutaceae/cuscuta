@@ -1,4 +1,4 @@
-﻿use cuscuta_common::db::job::JobTag;
+use cuscuta_common::db::job::JobTag;
 
 use redis::{ScanOptions, TypedCommands};
 
@@ -166,4 +166,3 @@ pub fn result(
     println!("\n{total} result(s) total.");
     Ok(())
 }
-
