@@ -31,8 +31,7 @@ pub fn status(redis_url: &str, max_count: usize) -> anyhow::Result<()> {
         let len: usize = con.xlen(key).unwrap_or(0);
         let pending: usize = con
             .xpending(key, "default_group")
-            .map(|it| it.count())
-            .unwrap_or(0);
+            .map_or(0, |it| it.count());
         let xinfo_result = con
             .xinfo_consumers(key, "default_group")
             .unwrap_or_default();
