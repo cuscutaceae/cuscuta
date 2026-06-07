@@ -1,0 +1,41 @@
+name: pr-check
+
+on:
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install native deps (chilo)
+        run: sudo apt-get update && sudo apt-get install -y clang cmake pkg-config
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Install native deps (chilo)
+        run: sudo apt-get update && sudo apt-get install -y clang cmake pkg-config
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace -- -D warnings
