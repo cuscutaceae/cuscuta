@@ -133,6 +133,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
             &user_id,
             &token,
             &account_row,
+            &config,
         )
         .await?;
         *cursor += 1;
@@ -173,6 +174,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn clean_jobs(
     jobs: &mut Vec<Job>,
     friends: &mut Vec<FriendInfo>,
@@ -181,6 +183,7 @@ async fn clean_jobs(
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
+    config: &Config,
 ) -> Result<(), Error> {
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     for finished_job in jobs.iter_mut().filter(|it| it.finished && !it.cleaned) {
@@ -203,8 +206,9 @@ async fn clean_jobs(
         })
         .map_err(|e| Error::BadState(format!("failed to serialize data to json: {e}")))?;
         connection
-            .lpush(output_list_key, &json)
+            .lpush(output_list_key.clone(), &json)
             .map_err(Error::Redis)?;
+        let _ = connection.expire(output_list_key, config.redis_stream_refresh_ttl);
         if let Some(friend_id) = &finished_job.friend_user_id {
             api_delete_friend(
                 bundle_data,

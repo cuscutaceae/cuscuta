@@ -1,8 +1,6 @@
 use sqlx::{Postgres, Transaction};
 
-pub async fn count_active_account(
-    mut tx: Transaction<'_, Postgres>,
-) -> Result<usize, sqlx::Error> {
+pub async fn count_active_account(mut tx: Transaction<'_, Postgres>) -> Result<usize, sqlx::Error> {
     let row: i64 = sqlx::query_scalar(
         r"
         SELECT COUNT(*) 

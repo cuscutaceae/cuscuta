@@ -186,7 +186,7 @@ pub fn write_job(
     job_essential: &JobEssential,
     key: String,
     recreate_group: bool,
-    expire_time: i64
+    expire_time: i64,
 ) -> Result<String, redis::RedisError> {
     let mut connection = redis_client.get_connection()?;
     if let Err(e) = connection.xgroup_create_mkstream(key.clone(), "default_group", "0-0")
@@ -212,7 +212,7 @@ pub fn write_job(
 }
 
 /// 不保证同步性，搜索工作队列分片
-/// 
+///
 /// # Errors
 /// 这个函数产生的错误来自Redis的错误，以及读取内容不符合预期的错误，参见[`crate::db::job::Error`]
 pub fn scan_sub_queue(redis_client: &Client) -> Result<Vec<SubQueue>, Error> {
@@ -264,9 +264,9 @@ pub fn scan_sub_queue(redis_client: &Client) -> Result<Vec<SubQueue>, Error> {
 }
 
 /// 不保证同步性，搜索任务的index
-/// 
+///
 /// 这个函数被用于确认任务完成情况
-/// 
+///
 /// # Errors
 /// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
 pub fn scan_fragment(redis_client: &Client, key: &str) -> Result<Vec<JobTag>, Error> {
@@ -284,7 +284,7 @@ pub fn scan_fragment(redis_client: &Client, key: &str) -> Result<Vec<JobTag>, Er
 }
 
 /// 不保证同步性，获取任务的执行结果
-/// 
+///
 /// # Errors
 /// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
 pub fn fetch_result(redis_client: &Client, key: &str) -> Result<Vec<SongScore>, Error> {

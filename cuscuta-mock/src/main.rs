@@ -1,5 +1,5 @@
 //! cuscuta的mock应用
-//! 
+//!
 //! 出于某些历史原因，它并不依赖`cuscuta-common`
 
 mod data;

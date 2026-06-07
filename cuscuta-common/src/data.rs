@@ -1,4 +1,3 @@
-
 use serde::Deserialize;
 
 /// xxxxxx的数据版本信息
@@ -25,7 +24,6 @@ pub struct Difficulty {
     pub rating: i32,
 }
 
-
 /// 曲目的适配数据模型，其`difficulties`可能为`None`
 #[derive(Debug, Deserialize)]
 pub struct SongRaw {
@@ -47,7 +45,7 @@ pub struct SongRaw {
 pub struct Song {
     /// 曲目的数字id
     pub idx: i32,
-    
+
     /// 曲目的字符串id
     pub id: String,
 

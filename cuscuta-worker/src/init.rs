@@ -107,6 +107,9 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
             .await
             .map_err(|e| (Level::Halt, format!("failed to clean friends: {e}")))?;
         }
+        ACCOUNT_ROW
+            .try_write(|_| Some(account_row.clone()))
+            .map_err(|e| (Level::Retry, format!("failed to write ACCOUNT_ROW: {e}")))?;
         Ok(())
     }
     async fn try_failed_resume() -> Result<(), Error> {
