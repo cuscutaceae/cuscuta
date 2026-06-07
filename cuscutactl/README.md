@@ -1,4 +1,4 @@
-﻿# cuscutactl
+# cuscutactl
 
 **This crate is mostly AI=generated**
 
