@@ -1,4 +1,4 @@
-﻿FROM rust:1.94 AS builder
+FROM rust:1.94 AS builder
 WORKDIR /app
 # Copy workspace manifest and all member manifests
 COPY Cargo.toml ./
