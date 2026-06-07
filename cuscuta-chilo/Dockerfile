@@ -1,10 +1,28 @@
-FROM rust:1.94 AS builder
+﻿FROM rust:1.94 AS builder
 WORKDIR /app
-COPY ./cuscuta-chilo/Cargo.toml ./cuscuta-chilo/Cargo.lock ./
-COPY ./cuscuta-chilo/src ./src
+# Copy workspace manifest and all member manifests
+COPY Cargo.toml ./
+COPY cuscuta-common/Cargo.toml cuscuta-common/
+COPY cuscuta-entry/Cargo.toml cuscuta-entry/
+COPY cuscuta-worker/Cargo.toml cuscuta-worker/
+COPY cuscuta-chilo/Cargo.toml cuscuta-chilo/
+COPY cuscuta-mock/Cargo.toml cuscuta-mock/
+COPY cuscutactl/Cargo.toml cuscutactl/
+# Dummy sources for unused members (allows dep caching)
+RUN mkdir -p cuscuta-common/src && echo "" > cuscuta-common/src/lib.rs
+RUN mkdir -p cuscuta-entry/src && echo "fn main() {}" > cuscuta-entry/src/main.rs
+RUN mkdir -p cuscuta-worker/src && echo "fn main() {}" > cuscuta-worker/src/main.rs
+RUN mkdir -p cuscuta-chilo/src && echo "fn main() {}" > cuscuta-chilo/src/main.rs
+RUN mkdir -p cuscuta-mock/src && echo "fn main() {}" > cuscuta-mock/src/main.rs
+RUN mkdir -p cuscutactl/src && echo "fn main() {}" > cuscutactl/src/main.rs
 RUN apt-get update && apt-get install -y ca-certificates clang cmake pkg-config
+# Pre-build to cache dependencies
 RUN cargo test
-RUN cargo build --release
+RUN cargo build --release -p cuscuta-chilo
+# Copy real source and rebuild
+COPY cuscuta-chilo/src cuscuta-chilo/src
+RUN touch cuscuta-chilo/src/main.rs
+RUN cargo build --release -p cuscuta-chilo
 FROM debian:trixie-slim
 WORKDIR /app
 COPY --from=builder /app/target/release/cuscuta-chilo /usr/local/bin/nofyso-exe

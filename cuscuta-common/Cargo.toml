@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "cuscuta-common"
 version = "0.1.0"
 edition = "2024"
@@ -6,19 +6,15 @@ edition = "2024"
 [lib]
 
 [dependencies]
-base64 = "0.22.1"
-chrono = { version = "0.4.44", features = ["serde"] }
-redis = { version = "1.2.0", features = ["streams"] }
-reqwest = { version = "0.13.2", features = ["json", "query", "form"] }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-sha2 = "0.11.0"
-sqlx = { version = "0.8.6", features = ["postgres", "chrono", "runtime-tokio"] }
-thiserror = "2.0.18"
-tokio = { version = "1.51.1", features = [
-    "rt-multi-thread",
-    "signal",
-    "macros",
-] }
-tokio-util = "0.7.18"
-hex = "0.4.3"
+base64 = { workspace = true }
+chrono = { workspace = true }
+hex = { workspace = true }
+redis = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["signal", "macros"] }
+tokio-util = { workspace = true }

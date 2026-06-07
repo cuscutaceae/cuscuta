@@ -18,7 +18,7 @@ enum ErrorType {
     InternalNoWorker = -400,
 
     BadRequestBase64 = -500,
-    BadRequestTokenCheckFailed = -501
+    BadRequestTokenCheckFailed = -501,
 }
 
 #[derive(Debug, thiserror::Error)]

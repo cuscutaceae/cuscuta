@@ -1,14 +1,30 @@
-FROM rust:1.94 AS builder
-WORKDIR /app/cuscuta-common
-COPY ./cuscuta-common/Cargo.toml ./cuscuta-common/Cargo.lock ./
-COPY ./cuscuta-common/src ./src
-WORKDIR /app/worker
-COPY ./cuscuta-worker/Cargo.toml ./cuscuta-worker/Cargo.lock ./
-COPY ./cuscuta-worker/src ./src
-RUN cargo build --release
+﻿FROM rust:1.94 AS builder
+WORKDIR /app
+# Copy workspace manifest and all member manifests
+COPY Cargo.toml ./
+COPY cuscuta-common/Cargo.toml cuscuta-common/
+COPY cuscuta-entry/Cargo.toml cuscuta-entry/
+COPY cuscuta-worker/Cargo.toml cuscuta-worker/
+COPY cuscuta-chilo/Cargo.toml cuscuta-chilo/
+COPY cuscuta-mock/Cargo.toml cuscuta-mock/
+COPY cuscutactl/Cargo.toml cuscutactl/
+# Dummy sources for unused members (allows dep caching)
+RUN mkdir -p cuscuta-common/src && echo "" > cuscuta-common/src/lib.rs
+RUN mkdir -p cuscuta-entry/src && echo "fn main() {}" > cuscuta-entry/src/main.rs
+RUN mkdir -p cuscuta-worker/src && echo "fn main() {}" > cuscuta-worker/src/main.rs
+RUN mkdir -p cuscuta-chilo/src && echo "fn main() {}" > cuscuta-chilo/src/main.rs
+RUN mkdir -p cuscuta-mock/src && echo "fn main() {}" > cuscuta-mock/src/main.rs
+RUN mkdir -p cuscutactl/src && echo "fn main() {}" > cuscutactl/src/main.rs
+# Pre-build to cache dependencies
+RUN cargo build --release -p cuscuta-worker
+# Copy real source and rebuild
+COPY cuscuta-common/src cuscuta-common/src
+COPY cuscuta-worker/src cuscuta-worker/src
+RUN touch cuscuta-common/src/lib.rs cuscuta-worker/src/main.rs
+RUN cargo build --release -p cuscuta-worker
 FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y ca-certificates
 WORKDIR /app
-COPY --from=builder /app/worker/target/release/cuscuta-worker /usr/local/bin/nofyso-exe
+COPY --from=builder /app/target/release/cuscuta-worker /usr/local/bin/nofyso-exe
 EXPOSE 8080
 CMD ["nofyso-exe"]
