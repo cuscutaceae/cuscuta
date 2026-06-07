@@ -1,0 +1,1 @@
+ALTER TABLE account_table ALTER COLUMN user_id TYPE INTEGER;
