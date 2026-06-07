@@ -1,0 +1,18 @@
+{{- if .Values.worker.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "cuscuta.fullname" . }}-worker-scaledobject
+spec:
+  scaleTargetRef:
+    name: {{ include "cuscuta.fullname" . }}-worker
+  pollingInterval: {{ .Values.worker.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.worker.keda.cooldownPeriod }}
+  maxReplicaCount: {{ .Values.worker.keda.maxReplicaCount }}
+  triggers:
+    - type: postgresql
+      metadata:
+        connectionFromEnv: ACCOUNTS_SQL_ADDR
+        query: "SELECT COUNT(*) FROM account_table WHERE state='Using';"
+        targetQueryValue: {{ .Values.worker.keda.targetQueryValue | quote }}
+{{- end }}

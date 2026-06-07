@@ -1,0 +1,58 @@
+{{- if .Values.chilo.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cuscuta.fullname" . }}-chilo
+  labels:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "chilo") | nindent 4 }}
+spec:
+  replicas: {{ .Values.chilo.replicas }}
+  selector:
+    matchLabels:
+      {{- include "cuscuta.componentLabels" (dict "root" . "component" "chilo") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cuscuta.componentLabels" (dict "root" . "component" "chilo") | nindent 8 }}
+    spec:
+      containers:
+        - name: chilo
+          image: {{ include "cuscuta.image" (dict "root" . "component" "cuscuta-chilo") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.chilo.port }}
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: {{ .Values.rustLog | quote }}
+            - name: BIN_C1
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: BIN_C1
+            - name: BIN_C2
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: BIN_C2
+            - name: BIN_LOGIN_C31
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: BIN_LOGIN_C31
+            - name: BIN_LOGIN_C32
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: BIN_LOGIN_C32
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.chilo.port }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: {{ .Values.chilo.port }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}

@@ -149,7 +149,7 @@ services:
   migrate:
     image: migrate/migrate
     volumes:
-      - ./migrations:/migrations
+      - ./helm/files/migrations:/migrations
     command:
       [
         "-path=/migrations",

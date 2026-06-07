@@ -1,0 +1,36 @@
+# Minimal production configuration.
+# Fill in the blanks, then:
+#   helm install cuscuta . -f values.default.yaml
+
+# -- Required: PostgreSQL connection
+postgresql:
+  url: "postgresql://user:password@host:5432/db"
+
+# -- Required: Redis connection
+redis:
+  url: "redis://host:6379/0"
+
+# -- Required: challenge constants (contact admin for values)
+chilo:
+  constants:
+    binC1: ""
+    binC2: ""
+    binLoginC31: ""
+    binLoginC32: ""
+
+# -- Required: GitHub tokens and repo info
+github:
+  bundleRepository: cuscutaceae/scales
+  bundlePath: bundle.json
+  bundleToken: ""
+  songRepository: cuscutaceae/scales
+  songPath: songs/songlist
+  songToken: ""
+
+# -- Required: target API endpoints
+api:
+  login: ""
+  listFriends: ""
+  addFriends: ""
+  deleteFriends: ""
+  getRank: ""

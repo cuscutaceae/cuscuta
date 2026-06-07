@@ -27,9 +27,7 @@ cuscuta不能独立工作，它依赖一些其它组件和外部服务工作：
 
 ### 部署
 
-非常抱歉，由于cuscuta尚未完工，目前无法部署为helm服务
-
-部分部署教程参见[部署](Deployment.md)
+部署指南参见[部署（简体中文）](Deployment.md) | [Deployment (English)](Deployment.en.md)
 
 ### 计划表
 
@@ -72,11 +70,11 @@ cuscuta不能独立工作，它依赖一些其它组件和外部服务工作：
 #### cuscutactl（什）
 
 - [ ] 功能
-  - [ ] 查询队列状态
-  - [ ] 基本数据库CRUD
+  - [x] 查询队列状态
+  - [x] 基本数据库CRUD
   - [ ] 查询chilo状态
 - [ ] 多连接模式
-  - [ ] 数据库直连模式
+  - [x] 数据库直连模式
   - [ ] Kubernetes代理模式
 
 ### 设计

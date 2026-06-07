@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cuscuta.fullname" . }}-worker
+  labels:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "cuscuta.componentLabels" (dict "root" . "component" "worker") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cuscuta.componentLabels" (dict "root" . "component" "worker") | nindent 8 }}
+    spec:
+      containers:
+        - name: worker
+          image: {{ include "cuscuta.image" (dict "root" . "component" "cuscuta-worker") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.worker.port }}
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: {{ .Values.rustLog | quote }}
+            - name: ACCOUNTS_SQL_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: ACCOUNTS_SQL_ADDR
+            - name: REDIS_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: REDIS_ADDR
+            - name: GITHUB_BUNDLE_REPOSITORY
+              value: {{ .Values.github.bundleRepository | quote }}
+            - name: GITHUB_BUNDLE_PATH
+              value: {{ .Values.github.bundlePath | quote }}
+            - name: GITHUB_BUNDLE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: GITHUB_BUNDLE_TOKEN
+            - name: GITHUB_SONG_REPOSITORY
+              value: {{ .Values.github.songRepository | quote }}
+            - name: GITHUB_SONG_PATH
+              value: {{ .Values.github.songPath | quote }}
+            - name: GITHUB_SONG_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: GITHUB_SONG_TOKEN
+            - name: API_CHILO
+              value: {{ include "cuscuta.chiloUrl" . | quote }}
+            - name: API_LOGIN
+              value: {{ .Values.api.login | quote }}
+            - name: API_LIST_FRIENDS
+              value: {{ .Values.api.listFriends | quote }}
+            - name: API_ADD_FRIENDS
+              value: {{ .Values.api.addFriends | quote }}
+            - name: API_DELETE_FRIENDS
+              value: {{ .Values.api.deleteFriends | quote }}
+            - name: API_GET_RANK
+              value: {{ .Values.api.getRank | quote }}
+            - name: WORKER_MAX_JOBS
+              value: {{ .Values.worker.maxJobs | quote }}
+            - name: WORKER_MAX_RETRIES
+              value: {{ .Values.worker.maxRetries | quote }}
+            - name: WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS
+              value: {{ .Values.worker.exponentialBackoffBaseMillis | quote }}
+            - name: WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER
+              value: {{ .Values.worker.exponentialBackoffMultiplier | quote }}
+            - name: WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS
+              value: {{ .Values.worker.exponentialBackoffMaxDelayMillis | quote }}
+            - name: WORKER_ACCOUNT_LEASE_TIME_SECS
+              value: {{ .Values.worker.accountLeaseTimeSecs | quote }}
+            - name: WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS
+              value: {{ .Values.worker.accountLeaseTimeRefreshGapSecs | quote }}
+            - name: REDIS_STREAM_REFRESH_TTL
+              value: {{ .Values.redisStreamRefreshTtl | quote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.worker.port }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: {{ .Values.worker.port }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

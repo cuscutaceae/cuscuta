@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cuscuta.fullname" . }}-entry
+  labels:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "entry") | nindent 4 }}
+spec:
+  type: {{ .Values.entry.service.type }}
+  ports:
+    - port: {{ .Values.entry.port }}
+      targetPort: {{ .Values.entry.port }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "entry") | nindent 4 }}

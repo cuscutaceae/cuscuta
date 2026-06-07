@@ -1,0 +1,34 @@
+{{- if .Values.mock.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cuscuta.fullname" . }}-mock
+  labels:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "mock") | nindent 4 }}
+spec:
+  replicas: {{ .Values.mock.replicas }}
+  selector:
+    matchLabels:
+      {{- include "cuscuta.componentLabels" (dict "root" . "component" "mock") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cuscuta.componentLabels" (dict "root" . "component" "mock") | nindent 8 }}
+    spec:
+      containers:
+        - name: mock
+          image: {{ include "cuscuta.image" (dict "root" . "component" "cuscuta-mock") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.mock.port }}
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: {{ .Values.rustLog | quote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.mock.port }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}
