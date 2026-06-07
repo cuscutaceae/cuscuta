@@ -1,4 +1,4 @@
-[workspace]
+﻿[workspace]
 members = [
     "cuscuta-common",
     "cuscuta-entry",
@@ -14,6 +14,7 @@ anyhow = "1.0.102"
 axum = "0.8.9"
 base64 = "0.22.1"
 chrono = { version = "0.4.44", features = ["serde"] }
+comfy-table = "7.1"
 env_logger = "0.11.10"
 hex = "0.4.3"
 log = "0.4.29"
@@ -27,4 +28,3 @@ sqlx = { version = "0.8.6", features = ["postgres", "chrono", "runtime-tokio"] }
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["rt-multi-thread"] }
 tokio-util = "0.7.18"
-

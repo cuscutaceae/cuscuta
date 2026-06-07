@@ -13,7 +13,7 @@ struct GitHubFileInternal {
 type Result<T> = core::result::Result<T, Error>;
 
 /// 调用Github Api，从Github上拉取资源
-/// 
+///
 /// # Errors
 /// - 当环境变量配置无效时，返回[`Error::Env`]
 /// - 当`reqwest`客户端初始化失败时，返回[`Error::ClientSetup`]
@@ -60,12 +60,9 @@ where
         base64::prelude::BASE64_STANDARD
             .decode(file_object.content.replace('\n', ""))
             .map_err(|e| Error::Decode(format!("phase a_2: {e}")))
+            .map(|it| String::from_utf8(it).map_err(|e| Error::Decode(format!("phase a_3: {e}"))))?
             .map(|it| {
-                String::from_utf8(it).map_err(|e| Error::Decode(format!("phase a_3: {e}")))
-            })?
-            .map(|it| {
-                serde_json::from_str::<T>(&it)
-                    .map_err(|e| Error::Decode(format!("phase a_4: {e}")))
+                serde_json::from_str::<T>(&it).map_err(|e| Error::Decode(format!("phase a_4: {e}")))
             })?
     }
 }
