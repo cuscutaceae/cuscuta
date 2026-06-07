@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cuscuta.fullname" . }}-entry
+  labels:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "entry") | nindent 4 }}
+spec:
+  replicas: {{ .Values.entry.replicas }}
+  selector:
+    matchLabels:
+      {{- include "cuscuta.componentLabels" (dict "root" . "component" "entry") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cuscuta.componentLabels" (dict "root" . "component" "entry") | nindent 8 }}
+    spec:
+      containers:
+        - name: entry
+          image: {{ include "cuscuta.image" (dict "root" . "component" "cuscuta-entry") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.entry.port }}
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: {{ .Values.rustLog | quote }}
+            - name: REDIS_STREAM_REFRESH_TTL
+              value: {{ .Values.redisStreamRefreshTtl | quote }}
+            - name: ACCOUNTS_SQL_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: ACCOUNTS_SQL_ADDR
+            - name: REDIS_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: REDIS_ADDR
+            - name: GITHUB_BUNDLE_REPOSITORY
+              value: {{ .Values.github.bundleRepository | quote }}
+            - name: GITHUB_BUNDLE_PATH
+              value: {{ .Values.github.bundlePath | quote }}
+            - name: GITHUB_BUNDLE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: GITHUB_BUNDLE_TOKEN
+            - name: GITHUB_SONG_REPOSITORY
+              value: {{ .Values.github.songRepository | quote }}
+            - name: GITHUB_SONG_PATH
+              value: {{ .Values.github.songPath | quote }}
+            - name: GITHUB_SONG_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cuscuta.fullname" . }}-secret
+                  key: GITHUB_SONG_TOKEN
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.entry.port }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: {{ .Values.entry.port }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

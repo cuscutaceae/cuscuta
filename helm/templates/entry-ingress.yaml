@@ -1,0 +1,25 @@
+{{- if .Values.entry.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "cuscuta.fullname" . }}-entry
+  labels:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "entry") | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.entry.ingress.className }}
+  rules:
+    {{- range .Values.entry.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "cuscuta.fullname" $ }}-entry
+                port:
+                  number: {{ $.Values.entry.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}

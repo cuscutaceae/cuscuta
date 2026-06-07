@@ -1,0 +1,121 @@
+nameOverride: ""
+fullnameOverride: ""
+
+# -- PostgreSQL connection (external service, not managed by this chart)
+postgresql:
+  # -- PostgreSQL connection URL (scheme: postgresql://user:pass@host:port/db)
+  url: ""
+
+# -- Redis connection (external service, not managed by this chart)
+redis:
+  # -- Redis connection URL (scheme: redis://host:port/db)
+  url: ""
+
+# -- Container image configuration
+image:
+  repository: ghcr.io/cuscutaceae
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# -- Log level for all components (env: RUST_LOG)
+rustLog: info
+
+# -- Redis stream TTL shared by entry and worker (env: REDIS_STREAM_REFRESH_TTL)
+redisStreamRefreshTtl: 300
+
+# -- GitHub data sources
+github:
+  bundleRepository: cuscutaceae/scales
+  bundlePath: bundle.json
+  # -- GitHub personal access token for bundle repo
+  bundleToken: ""
+  songRepository: cuscutaceae/scales
+  songPath: songs/songlist
+  # -- GitHub personal access token for song repo
+  songToken: ""
+
+# -- External target API endpoints (required for production; mock can be used for testing)
+api:
+  login: ""
+  listFriends: ""
+  addFriends: ""
+  deleteFriends: ""
+  getRank: ""
+
+# -- Migration job
+migration:
+  enabled: true
+  # -- migrate/migrate image
+  image: migrate/migrate
+  tag: latest
+
+# -- cuscuta-chilo (challenge generation service)
+chilo:
+  enabled: true
+  replicas: 1
+  # -- Container port (fixed, do not modify)
+  port: 8080
+  # -- Binary constants for the challenge algorithm
+  constants:
+    binC1: ""
+    binC2: ""
+    binLoginC31: ""
+    binLoginC32: ""
+  service:
+    # -- Service type
+    type: LoadBalancer
+
+# -- cuscuta-entry (API gateway / job dispatcher)
+entry:
+  # -- warning: entry deployment does NOT support scaling
+  replicas: 1
+  # -- Container port (fixed, do not modify)
+  port: 8081
+  service:
+    type: LoadBalancer
+  ingress:
+    enabled: false
+    className: ""
+    hosts:
+      - host: cuscuta.local
+        paths:
+          - path: /
+            pathType: Prefix
+
+# -- cuscuta-worker (job processor)
+worker:
+  replicas: 1
+  keda:
+    enabled: true
+    pollingInterval: 10
+    cooldownPeriod: 30
+    maxReplicaCount: 10
+    targetQueryValue: 1
+  # -- Container port (health checks only; fixed, do not modify)
+  port: 8080
+  # -- Worker tuning
+  maxJobs: 3
+  maxRetries: 10
+  exponentialBackoffBaseMillis: 100
+  exponentialBackoffMultiplier: 2
+  exponentialBackoffMaxDelayMillis: 1000
+  accountLeaseTimeSecs: 120
+  accountLeaseTimeRefreshGapSecs: 30
+
+# -- cuscuta-mock (mock API server for testing; disable in production)
+mock:
+  enabled: false
+  replicas: 1
+  # -- Container port
+  port: 8080
+  service:
+    type: ClusterIP
+
+# -- Resource limits applied to all containers
+resources: {}
+  # limits:
+  #   cpu: 500m
+  #   memory: 512Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi

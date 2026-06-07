@@ -1,0 +1,17 @@
+{{- if .Values.mock.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cuscuta.fullname" . }}-mock
+  labels:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "mock") | nindent 4 }}
+spec:
+  type: {{ .Values.mock.service.type }}
+  ports:
+    - port: {{ .Values.mock.port }}
+      targetPort: {{ .Values.mock.port }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "mock") | nindent 4 }}
+{{- end }}

@@ -1,0 +1,17 @@
+{{- if .Values.chilo.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cuscuta.fullname" . }}-chilo
+  labels:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "chilo") | nindent 4 }}
+spec:
+  type: {{ .Values.chilo.service.type }}
+  ports:
+    - port: {{ .Values.chilo.port }}
+      targetPort: {{ .Values.chilo.port }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cuscuta.componentLabels" (dict "root" . "component" "chilo") | nindent 4 }}
+{{- end }}
