@@ -1,4 +1,4 @@
-name: pr-check
+name: cargo-code-check
 
 on:
   pull_request:
