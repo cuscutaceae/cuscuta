@@ -15,7 +15,10 @@ use cuscuta_common::{
     },
     quick_fetch::QuickFetch,
 };
-use redis::{Client, TypedCommands};
+use redis::{
+    Client, TypedCommands,
+    streams::{StreamAutoClaimOptions, StreamId, StreamReadOptions},
+};
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
@@ -385,6 +388,7 @@ fn valid_jobs(jobs: &[Job]) -> usize {
     jobs.iter().filter(|it| !it.cleaned).count()
 }
 
+#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
 fn pull_jobs(
     jobs: &[Job],
     sub_queue: &SubQueue,
@@ -392,6 +396,50 @@ fn pull_jobs(
     redis_client: &Client,
     pod_uid: &str,
 ) -> Result<Option<Vec<Job>>, Error> {
+    fn claim_jobs(
+        connection: &mut redis::Connection,
+        key: &str,
+        consumer: &str,
+        min_idle_time_secs: f64,
+        target_counts: usize,
+    ) -> Result<Vec<StreamId>, Error> {
+        if target_counts == 0 {
+            return Ok(Vec::new());
+        }
+        Ok(connection
+            .xautoclaim_options(
+                key,
+                "default_group",
+                consumer,
+                (min_idle_time_secs * 1000.0) as i64,
+                "0-0",
+                StreamAutoClaimOptions::default().count(target_counts),
+            )
+            .map_err(Error::Redis)?
+            .claimed)
+    }
+    fn fetch_jobs(
+        connection: &mut redis::Connection,
+        key: &str,
+        consumer: &str,
+        target_counts: usize,
+    ) -> Result<Vec<StreamId>, Error> {
+        if target_counts == 0 {
+            return Ok(Vec::new());
+        }
+        Ok(connection
+            .xread_options(
+                &[&key],
+                &[">"],
+                &StreamReadOptions::default()
+                    .group("default_group", consumer)
+                    .count(target_counts),
+            )
+            .map_err(Error::Redis)?
+            .map_or(Vec::new(), |it| {
+                it.keys.into_iter().next().map_or(Vec::new(), |it| it.ids)
+            }))
+    }
     let valid_jobs = valid_jobs(jobs);
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     let max_jobs = config.worker_max_jobs.try_into().expect("wait... what?");
@@ -401,20 +449,26 @@ fn pull_jobs(
     if valid_jobs >= max_jobs {
         return Ok(Option::None);
     }
-    let option = redis::streams::StreamReadOptions::default()
-        .group("default_group", pod_uid)
-        .count(max_jobs - valid_jobs);
-    let Some(message) = connection
-        .xread_options(&[&sub_queue.name], &[">"], &option)
-        .map_err(Error::Redis)?
-    else {
-        return Ok(Option::None);
-    };
-    let Some(job_ids) = message.keys.first() else {
-        return Ok(Option::None);
-    };
+    let divisions = jobs.first().map_or(1, |it| it.cursor_length).max(1);
+    let min_idle_time =
+        (config.worker_job_max_work_time_secs as f64 / f64::from(divisions)).round();
+    let claimed_jobs = claim_jobs(
+        &mut connection,
+        &sub_queue.name,
+        pod_uid,
+        min_idle_time,
+        max_jobs.saturating_sub(valid_jobs),
+    )?;
+    let valid_jobs = valid_jobs + claimed_jobs.len();
+    let fetched_jobs = fetch_jobs(
+        &mut connection,
+        &sub_queue.name,
+        pod_uid,
+        max_jobs.saturating_sub(valid_jobs),
+    )?;
+    let jobs: Vec<_> = fetched_jobs.iter().chain(claimed_jobs.iter()).collect();
     let mut add_jobs = Vec::new();
-    for job_id in &job_ids.ids {
+    for job_id in jobs {
         let job: Job = (sub_queue.clone(), job_id.clone())
             .try_into()
             .map_err(Error::JobParse)?;
@@ -428,10 +482,9 @@ pub fn resume_state(worker_result: &WorkerResult) {
         let redis_client = REDIS_CLIENT
             .get()
             .ok_or(Error::NotReady("redis client".to_string()))?;
-        let config = CONFIG.try_read(std::clone::Clone::clone).unwrap_or(Config {
-            redis_stream_refresh_ttl: 300,
-            ..Config::default()
-        });
+        let redis_stream_refresh_ttl = CONFIG
+            .try_read(|it| it.redis_stream_refresh_ttl)
+            .unwrap_or(300);
         let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
         for job in &worker_result.jobs {
             log::info!("resuming_jobs: reenqueueing job: {job:?}");
@@ -443,7 +496,7 @@ pub fn resume_state(worker_result: &WorkerResult) {
                 &job.essential,
                 job.sub_queue.name.clone(),
                 false,
-                config.redis_stream_refresh_ttl,
+                redis_stream_refresh_ttl,
             )
             .map_err(Error::Redis)?;
         }

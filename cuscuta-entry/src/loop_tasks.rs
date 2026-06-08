@@ -142,7 +142,7 @@ pub async fn open_redis_client(_: &CancellationToken) {
     log::info!("redis_open: redis client created successfully");
 }
 
-pub async fn open_postgressql_client(_: &CancellationToken) {
+pub async fn open_postgresql_client(_: &CancellationToken) {
     async fn try_connect() -> Result<(), String> {
         let addr = env::var("ACCOUNTS_SQL_ADDR")
             .map_err(|e| format!("failed to read ACCOUNTS_SQL_ADDR: {e}"))?;
@@ -151,7 +151,7 @@ pub async fn open_postgressql_client(_: &CancellationToken) {
             .max_connections(5)
             .connect(addr.as_str())
             .await
-            .map_err(|e| format!("failed to connect to postgressql server: {e}"))?;
+            .map_err(|e| format!("failed to connect to postgresql server: {e}"))?;
         POSTGRESQL_POOL
             .try_write(move |_| x.into())
             .map_err(|e| format!("failed to write postgresql pool: {e}"))?;
@@ -160,10 +160,10 @@ pub async fn open_postgressql_client(_: &CancellationToken) {
     if POSTGRESQL_POOL.is_initialized() {
         return;
     }
-    log::debug!("postgresql_open: trying to connect to postgressql server...");
+    log::debug!("postgresql_open: trying to connect to postgresql server...");
     if let Err(e) = try_connect().await {
-        log::error!("postgresql_open: failed to connect to postgressql server: {e}");
+        log::error!("postgresql_open: failed to connect to postgresql server: {e}");
         return;
     }
-    log::info!("postgresql_open: postgressql pool created successfully");
+    log::info!("postgresql_open: postgresql pool created successfully");
 }

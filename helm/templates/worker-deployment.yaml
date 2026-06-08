@@ -77,7 +77,9 @@ spec:
             - name: WORKER_ACCOUNT_LEASE_TIME_SECS
               value: {{ .Values.worker.accountLeaseTimeSecs | quote }}
             - name: WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS
-              value: {{ .Values.worker.accountLeaseTimeRefreshGapSecs | quote }}
+              value: {{ .Values.worker.accountLeaseTimeRefreshGapSecs | quote }}  
+            - name: WORKER_JOB_MAX_WORK_TIME_SECS
+              value: {{ .Values.worker.jobMaxWorkTimeSecs | quote }}
             - name: REDIS_STREAM_REFRESH_TTL
               value: {{ .Values.redisStreamRefreshTtl | quote }}
           livenessProbe:

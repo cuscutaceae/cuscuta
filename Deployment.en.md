@@ -26,7 +26,7 @@ cp helm/values.default.yaml my-values.yaml
 # Edit my-values.yaml: postgresql.url, redis.url, chilo.constants, github.*, api.*
 
 # 2. Install
-helm install cuscuta ./helm -f my-values.yaml
+helm install cuscuta oci://ghcr.io/cuscutaceae/charts/cuscuta --version 0.1.0 -f my-values.yaml
 
 # 3. Verify cluster health
 cuscutactl --mode kubernetes doctor
@@ -168,6 +168,7 @@ All cuscuta components receive configuration through environment variables.
 | `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS` | 1000 | Max backoff delay (ms) |
 | `WORKER_ACCOUNT_LEASE_TIME_SECS` | 120 | Account lease duration (s) |
 | `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 30 | Lease refresh interval (s) |
+| `WORKER_JOB_MAX_WORK_TIME_SECS` | 600 | Maximum working time for a job (s) |
 | `API_CHILO` | — | chilo service URL |
 | `API_LOGIN` | — | Login API endpoint |
 | `API_LIST_FRIENDS` | — | Friend list API endpoint |

@@ -36,7 +36,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     endpoints::enqueue,
     init::cuscuta_init,
-    loop_tasks::{open_postgressql_client, open_redis_client, sync_bundle_data, sync_song_list},
+    loop_tasks::{open_postgresql_client, open_redis_client, sync_bundle_data, sync_song_list},
 };
 
 #[tokio::main]
@@ -63,7 +63,7 @@ async fn main() {
     tokio::spawn(register_job(
         halt_token.clone(),
         10,
-        open_postgressql_client,
+        open_postgresql_client,
     ));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_bundle_data));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_song_list));

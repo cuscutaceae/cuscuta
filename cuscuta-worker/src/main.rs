@@ -54,7 +54,7 @@ use crate::{
     },
     init::cuscuta_init,
     loop_tasks::{
-        open_postgressql_client, open_redis_client, sync_bundle_data, sync_config, sync_song_list,
+        open_postgresql_client, open_redis_client, sync_bundle_data, sync_config, sync_song_list,
         update_lease_time,
     },
     worker::{resume_state, worker_loop},
@@ -82,7 +82,7 @@ async fn main() {
     tokio::spawn(register_job(
         halt_token.clone(),
         10,
-        open_postgressql_client,
+        open_postgresql_client,
     ));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_bundle_data));
@@ -172,7 +172,7 @@ fn check_ready() -> Option<&'static str> {
     } else if REDIS_CLIENT.get().is_none() {
         Some("redis client is not initialized")
     } else if !POSTGRESQL_POOL.is_initialized() {
-        Some("postgressql pool is not initialized")
+        Some("postgresql pool is not initialized")
     } else if !BUNDLE_DATA.is_initialized() {
         Some("bundle data is not synced")
     } else {

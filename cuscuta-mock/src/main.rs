@@ -19,6 +19,7 @@ use axum::{
 use base64::Engine;
 use chrono::Utc;
 use rand::{RngExt, seq::SliceRandom};
+use serde_json::json;
 use tokio::net::TcpListener;
 
 use crate::data::{
@@ -45,6 +46,7 @@ async fn main() {
     initialize_friends();
     let router = Router::new()
         .route("/", get(hello))
+        .route("/healthz", get(healthz))
         .route("/auth/login", post(login))
         .route("/friend/me", get(list_friend))
         .route("/friend/me/add", post(add_friend))
@@ -427,4 +429,8 @@ fn get_current_token() -> String {
     let time = now.timestamp_millis();
     let buf = time.to_le_bytes();
     base64::prelude::BASE64_URL_SAFE.encode(buf)
+}
+
+async fn healthz() -> impl IntoResponse {
+    (StatusCode::OK, Json(json!({"health":"ok"})))
 }
