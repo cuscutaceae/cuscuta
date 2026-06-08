@@ -38,6 +38,7 @@ use std::env;
 
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use cuscuta_common::{
+    batch_check_initialized,
     db::account::try_release_account,
     quick_fetch::QuickFetch,
     scheduled_job::{register_individual_job, register_job},
@@ -47,7 +48,7 @@ use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG},
+    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, SONG_LIST},
     db::{
         postgresql::{POSTGRESQL_POOL, try_open_transaction},
         redis::REDIS_CLIENT,
@@ -163,17 +164,11 @@ async fn halt_progress() {
 }
 
 fn check_ready() -> Option<&'static str> {
-    if !CONFIG.is_initialized() {
-        Some("config is not synced")
-    } else if REDIS_CLIENT.get().is_none() {
-        Some("redis client is not initialized")
-    } else if !POSTGRESQL_POOL.is_initialized() {
-        Some("postgresql pool is not initialized")
-    } else if !BUNDLE_DATA.is_initialized() {
-        Some("bundle data is not synced")
-    } else {
-        None
+    if REDIS_CLIENT.get().is_none() {
+        return Some("redis client is not initialized");
     }
+    batch_check_initialized!(CONFIG, BUNDLE_DATA, SONG_LIST, ACCOUNT_ROW, POSTGRESQL_POOL);
+    None
 }
 
 async fn readyz() -> impl IntoResponse {
