@@ -79,11 +79,7 @@ async fn main() {
         cuscuta_init,
     ));
     tokio::spawn(register_job(halt_token.clone(), 10, open_redis_client));
-    tokio::spawn(register_job(
-        halt_token.clone(),
-        10,
-        open_postgresql_client,
-    ));
+    tokio::spawn(register_job(halt_token.clone(), 10, open_postgresql_client));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_bundle_data));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_song_list));
