@@ -26,7 +26,7 @@ cp helm/values.default.yaml my-values.yaml
 # 编辑 my-values.yaml，填入 postgresql.url、redis.url、chilo.constants、github.*、api.*
 
 # 2. 安装
-helm install cuscuta ./helm -f my-values.yaml
+helm install cuscuta oci://ghcr.io/cuscutaceae/charts/cuscuta --version 0.1.0 -f my-values.yaml
 
 # 3. 验证集群状态
 cuscutactl --mode kubernetes doctor
@@ -162,6 +162,7 @@ cuscuta 所有组件均通过环境变量注入配置。
 | `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS` | 1000 | 指数退避最大等待时间（毫秒） |
 | `WORKER_ACCOUNT_LEASE_TIME_SECS` | 120 | 账号租约时长（秒） |
 | `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 30 | 租约续期间隔（秒） |
+| `WORKER_JOB_MAX_WORK_TIME_SECS` | 600 | 任务的最长运行时间（秒） |
 | `API_CHILO` | — | chilo 服务地址 |
 | `API_LOGIN` | — | 登录 API 地址 |
 | `API_LIST_FRIENDS` | — | 好友列表 API 地址 |

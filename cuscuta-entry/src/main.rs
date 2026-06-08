@@ -20,14 +20,24 @@ mod endpoints;
 mod init;
 mod loop_tasks;
 
-use crate::{endpoints::query::query, enqueue::enqueue, loop_tasks::sync_config};
+use crate::{
+    data::{BUNDLE_DATA, CONFIG, SONG_LIST},
+    db::{postgresql::POSTGRESQL_POOL, redis::REDIS_CLIENT},
+    endpoints::query::query,
+    enqueue::enqueue,
+    loop_tasks::sync_config,
+};
+use cuscuta_common::quick_fetch::QuickFetch;
 
 use axum::{
     Json, Router,
     response::IntoResponse,
     routing::{get, post},
 };
-use cuscuta_common::scheduled_job::{register_individual_job, register_job};
+use cuscuta_common::{
+    batch_check_initialized,
+    scheduled_job::{register_individual_job, register_job},
+};
 use reqwest::StatusCode;
 use serde_json::json;
 use tokio::net::TcpListener;
@@ -36,7 +46,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     endpoints::enqueue,
     init::cuscuta_init,
-    loop_tasks::{open_postgressql_client, open_redis_client, sync_bundle_data, sync_song_list},
+    loop_tasks::{open_postgresql_client, open_redis_client, sync_bundle_data, sync_song_list},
 };
 
 #[tokio::main]
@@ -60,11 +70,7 @@ async fn main() {
         cuscuta_init,
     ));
     tokio::spawn(register_job(halt_token.clone(), 10, open_redis_client));
-    tokio::spawn(register_job(
-        halt_token.clone(),
-        10,
-        open_postgressql_client,
-    ));
+    tokio::spawn(register_job(halt_token.clone(), 10, open_postgresql_client));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_bundle_data));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_song_list));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
@@ -74,8 +80,22 @@ async fn main() {
         .unwrap_or_else(|e| panic!("{e:?}"));
 }
 
+fn check_ready() -> Option<&'static str> {
+    if REDIS_CLIENT.get().is_none() {
+        return Some("redis client is not initialized");
+    }
+    batch_check_initialized!(CONFIG, BUNDLE_DATA, SONG_LIST, POSTGRESQL_POOL);
+    None
+}
+
 async fn readyz() -> impl IntoResponse {
-    (StatusCode::OK, Json(json!({"status":"ready"})))
+    match check_ready() {
+        Some(e) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"status": "not ready", "reason": e})),
+        ),
+        None => (StatusCode::OK, Json(json!({"status":"ready"}))),
+    }
 }
 
 async fn healthz() -> impl IntoResponse {

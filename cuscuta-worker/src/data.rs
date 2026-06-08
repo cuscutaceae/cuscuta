@@ -14,8 +14,9 @@ pub struct Config {
     pub worker_exponential_backoff_multiplier: u64,
     pub worker_exponential_backoff_max_delay_millis: u64,
     pub redis_stream_refresh_ttl: i64,
-    pub worker_account_lease_time_secs: i64,
+    pub worker_account_lease_time_secs: u64,
     pub _worker_account_lease_time_refresh_gap_secs: u64,
+    pub worker_job_max_work_time_secs: u64,
 }
 
 pub static BUNDLE_DATA: OnceLock<RwLock<Option<BundleData>>> = OnceLock::new();

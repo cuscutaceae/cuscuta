@@ -72,3 +72,17 @@ impl<T> QuickFetch<T> for OnceLock<RwLock<Option<T>>> {
             .is_some_and(|it| it.is_some())
     }
 }
+
+/// 一个实用宏，批量检查变量是否初始化，若未初始化，则提前返回Some(&'static str)
+#[macro_export]
+macro_rules! batch_check_initialized {
+    ($($e:expr),*) => {
+        {
+            $(
+                if !$e.is_initialized(){
+                    return Some(concat!(stringify!($e)," is not initialized"));
+                }
+            )*
+        }
+    };
+}

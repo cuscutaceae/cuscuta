@@ -7,7 +7,7 @@ use cuscuta_common::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA},
+    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG},
     db::{
         self,
         account::auto::{TokenUpdateResult, check_and_update_token},
@@ -59,6 +59,9 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
         let bundle_data = BUNDLE_DATA
             .try_read(std::clone::Clone::clone)
             .map_err(|e| (Level::Retry, format!("failed to read BUNDLE_DATA: {e}")))?;
+        let worker_account_lease_time_secs = CONFIG
+            .try_read(|it| it.worker_account_lease_time_secs)
+            .map_err(|e| (Level::Retry, format!("failed to read BUNDLE_DATA: {e}")))?;
         REDIS_CLIENT
             .get()
             .ok_or((Level::Retry, "redis is not ready".to_string()))?
@@ -73,6 +76,7 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
             try_open_transaction()
                 .await
                 .map_err(|e| (Level::Retry, format!("failed to open transaction: {e}")))?,
+            worker_account_lease_time_secs,
         )
         .await
         .map_err(|e| {

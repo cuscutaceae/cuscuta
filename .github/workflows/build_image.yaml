@@ -39,7 +39,6 @@ jobs:
         run: |
           set -euo pipefail
           cargo_toml="${{ matrix.image }}/Cargo.toml"
-
           version="$(python3 - "$cargo_toml" <<'PY'
           import sys, tomllib
           with open(sys.argv[1], "rb") as f:
@@ -58,3 +57,27 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.image }}:${{ steps.ver.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.image }}:sha-${{ github.sha }}
+
+  helm:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install helm-push plugin
+        run: helm plugin install https://github.com/chartmuseum/helm-push
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package and push Helm chart
+        run: |
+          helm package ./helm
+          helm push cuscuta-*.tgz oci://${{ env.REGISTRY }}/${{ env.ORG }}/charts

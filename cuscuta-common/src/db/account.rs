@@ -49,6 +49,7 @@ impl AccountRow {
 /// 这个函数的错误全部来源于sql错误[`sqlx::Error`]
 pub async fn try_lock_account(
     mut tx: Transaction<'_, Postgres>,
+    worker_account_lease_time_secs: u64,
 ) -> Result<Option<AccountRow>, sqlx::Error> {
     let current_timestamp = Utc::now().timestamp();
     let picked_id: Option<i64> = sqlx::query_scalar(
@@ -79,7 +80,7 @@ pub async fn try_lock_account(
     )
     .bind(id)
     .bind("Using")
-    .bind(Utc::now() + Duration::from_mins(5))
+    .bind(Utc::now() + Duration::from_secs(worker_account_lease_time_secs))
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;
@@ -141,7 +142,7 @@ pub async fn update_account_rate(
 pub async fn update_account_lease_time(
     mut tx: Transaction<'_, Postgres>,
     account_row: &AccountRow,
-    advanced_seconds: i64,
+    advanced_seconds: u64,
 ) -> Result<Option<DateTime<Utc>>, sqlx::Error> {
     let current_timestamp = Utc::now().timestamp();
     let time: Option<DateTime<Utc>> = sqlx::query_scalar(
@@ -153,7 +154,7 @@ pub async fn update_account_lease_time(
         ",
     )
     .bind(account_row.id)
-    .bind(current_timestamp + advanced_seconds)
+    .bind(current_timestamp + advanced_seconds.cast_signed())
     .fetch_optional(&mut *tx)
     .await?;
     tx.commit().await?;
