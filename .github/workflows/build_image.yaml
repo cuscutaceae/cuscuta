@@ -68,7 +68,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Install helm-push plugin
-        run: helm plugin install https://github.com/chartmuseum/helm-push
+        run: helm plugin install --verify=false https://github.com/chartmuseum/helm-push
 
       - name: Login to GHCR
         uses: docker/login-action@v3
