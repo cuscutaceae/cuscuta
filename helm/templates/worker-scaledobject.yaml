@@ -13,6 +13,6 @@ spec:
     - type: postgresql
       metadata:
         connectionFromEnv: ACCOUNTS_SQL_ADDR
-        query: "SELECT COUNT(*) FROM account_table WHERE state='Using' AND rate > 0 AND lease_time > now();"
+        query: "SELECT COUNT(*) FROM account_table WHERE rate > 0;"
         targetQueryValue: {{ .Values.worker.keda.targetQueryValue | quote }}
 {{- end }}
