@@ -110,6 +110,7 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
             )
             .await
             .map_err(|e| (Level::Halt, format!("failed to clean friends: {e}")))?;
+            log::info!("init: removed friend: {friend:?}");
         }
         ACCOUNT_ROW
             .try_write(|_| Some(account_row.clone()))

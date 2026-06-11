@@ -27,10 +27,14 @@ pub async fn perform_login(
     .await?
     {
         api::chilo::ChiloResult::Success { value, .. } => value,
-        api::chilo::ChiloResult::Failed { .. } => {
+        api::chilo::ChiloResult::Failed { message, .. } => {
+            log::warn!("login_interface: failed to generate challenge: {message}");
             return Err(api::Error::BadStatus(StatusCode::INTERNAL_SERVER_ERROR));
         }
     };
+    log::info!("login_interface: challenge: {random_challenge}");
+    log::info!("login_interface: email: {}", account_row.account_email);
+    log::info!("login_interface: pw: {}", account_row.account_password);
     api_login(
         bundle_data,
         account_row.account_email.clone(),
@@ -129,6 +133,10 @@ pub mod auto {
             .temp_token
             .clone()
             .expect("this should not happen #2");
+        log::info!(
+            "check_token: fetch friends: {token}, {user_id}, {}, {bundle_data:?}",
+            current_row.account_email
+        );
         Ok((
             current_row.clone(),
             api_list_friend(
