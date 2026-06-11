@@ -24,7 +24,7 @@ pub fn analyze_k8s_url(
 ) -> anyhow::Result<K8sService> {
     let mut url = Url::from_str(url_str)?;
     let host = url.host_str().ok_or(Error::NoHost)?;
-    let host = host.replace(&format!(".svc.{cluster_domain}",), "");
+    let host = host.replace(&format!(".svc.{cluster_domain}"), "");
     let split: Vec<_> = host.split('.').collect();
     let service_name = split.first().ok_or(Error::InvalidHost)?;
     let namespace = split.get(1).unwrap_or(&namespace);
