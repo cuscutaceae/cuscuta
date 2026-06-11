@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 
 /// Database connection configuration.
 ///
-/// Works in two modes: `Legacy` (direct URLs) or `Kubernetes` (secrets, not yet implemented).
 #[derive(Debug, Serialize, Deserialize, Clone, Args)]
 pub struct Config {
     /// Working mode
@@ -11,7 +10,7 @@ pub struct Config {
     pub mode: CommandMode,
 
     #[command(flatten)]
-    pub kubernetes: Option<Kubernetes>,
+    pub kubernetes: Kubernetes,
 
     #[command(flatten)]
     pub legacy: Option<Legacy>,
@@ -24,7 +23,7 @@ pub struct Kubernetes {
     pub namespace: String,
 
     /// Secret name
-    #[arg(long, name = "kube_secret", default_value = "cuscuta-sql")]
+    #[arg(long, name = "kube_secret", default_value = "cuscuta-secret")]
     pub secret: String,
 
     /// Secret key for `PostgreSQL` URL
@@ -38,6 +37,26 @@ pub struct Kubernetes {
     /// Secret key for Redis URL
     #[arg(long, name = "kube_redis_key", default_value = "REDIS_ADDR")]
     pub redis_key: String,
+
+    /// Cluster domain
+    #[arg(long, name = "kube_cluster_domain", default_value = "cluster.local")]
+    pub cluster_domain: String,
+
+    /// `PostgreSQL` port from container
+    #[arg(long, name = "kube_postgresql_port", default_value_t = 5432)]
+    pub postgresql_port: u16,
+
+    /// Redis port from container
+    #[arg(long, name = "kube_redis_port", default_value_t = 6379)]
+    pub redis_port: u16,
+
+    /// Forwarded `PostgreSQL` port to host
+    #[arg(long, name = "kube_postgresql_forward_port", default_value_t = 50001)]
+    pub postgresql_forward_port: u16,
+
+    /// Forwarded Redis port to host
+    #[arg(long, name = "kube_redis_forward_port", default_value_t = 50002)]
+    pub redis_forward_port: u16,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Args)]
@@ -55,7 +74,7 @@ pub struct Legacy {
     Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Default, Serialize, Deserialize,
 )]
 pub enum CommandMode {
-    /// Read database addresses from Kubernetes secrets (not yet implemented)
+    /// Read database addresses from Kubernetes secrets
     #[default]
     #[value(alias = "k8s")]
     Kubernetes,
@@ -68,9 +87,9 @@ pub enum CommandMode {
 /// Configuration resolution errors.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// Kubernetes mode is selected but not yet available.
-    #[error("Kubernetes mode is not yet implemented; use --mode legacy")]
-    KubernetesNotImplemented,
+    /// No --legacy sub-options were provided in legacy mode.
+    #[error("--mode legacy requires --postgresql-url and/or --redis-url")]
+    LegacyOptionMissing,
 
     /// No `--postgresql-url` was provided in legacy mode.
     #[error("--postgresql-url is required in legacy mode")]
@@ -86,34 +105,31 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::KubernetesNotImplemented`] or [`Error::MissingPostgresqlUrl`].
-    pub fn require_postgresql_url(&self) -> Result<String, Error> {
-        match self.mode {
-            CommandMode::Kubernetes => Err(Error::KubernetesNotImplemented),
-            CommandMode::Legacy => {
-                let legacy = self.legacy.as_ref().ok_or(Error::MissingPostgresqlUrl)?;
-                let pg = legacy
-                    .postgresql_url
-                    .clone()
-                    .ok_or(Error::MissingPostgresqlUrl)?;
-                Ok(pg)
-            }
-        }
+    /// Returns [`Error::LegacyOptionMissing`] or [`Error::MissingPostgresqlUrl`].
+    pub fn resolve_legacy_postgresql_url(&self) -> Result<String, Error> {
+        let pg = self
+            .legacy
+            .clone()
+            .ok_or(Error::LegacyOptionMissing)?
+            .postgresql_url
+            .clone()
+            .ok_or(Error::MissingPostgresqlUrl)?;
+        Ok(pg)
     }
 
     /// Extracts the Redis connection URL.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::KubernetesNotImplemented`] or [`Error::MissingRedisUrl`].
-    pub fn resolve_redis_url(&self) -> Result<String, Error> {
-        match self.mode {
-            CommandMode::Kubernetes => Err(Error::KubernetesNotImplemented),
-            CommandMode::Legacy => {
-                let legacy = self.legacy.as_ref().ok_or(Error::MissingRedisUrl)?;
-                let redis = legacy.redis_url.clone().ok_or(Error::MissingRedisUrl)?;
-                Ok(redis)
-            }
-        }
+    /// Returns [`Error::LegacyOptionMissing`] or [`Error::MissingRedisUrl`].
+    pub fn resolve_legacy_redis_url(&self) -> Result<String, Error> {
+        let pg = self
+            .legacy
+            .clone()
+            .ok_or(Error::LegacyOptionMissing)?
+            .redis_url
+            .clone()
+            .ok_or(Error::MissingRedisUrl)?;
+        Ok(pg)
     }
 }

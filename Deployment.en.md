@@ -16,10 +16,6 @@ Pre-built images are available at `ghcr.io/cuscutaceae`. All components support 
 
 ### Helm
 
-> [!WARNING]
->
-> `cuscutactl` Kubernetes mode is not yet implemented.
-
 ```shell
 # 1. Copy the minimal config and fill in the blanks
 cp helm/values.default.yaml my-values.yaml
@@ -191,16 +187,15 @@ All cuscuta components receive configuration through environment variables.
 
 Use [cuscutactl](cuscutactl/README.md) for day-to-day operations.
 
-> [!WARNING]
->
-> `cuscutactl` is experimental. Its Kubernetes mode is not yet implemented.
-
 > [!TIP]
 >
 > The `accounts.txt` format is `account_email:password`, one entry per line.
 
 ```shell
-# Health check
+# Health check (Kubernetes mode)
+# cuscutactl --mode kubernetes --kube-namespace cuscuta doctor
+
+# Health check (Legacy mode)
 cuscutactl --mode legacy --postgresql-url "..." --redis-url "..." doctor
 
 # View account overview

@@ -16,9 +16,6 @@
 
 ### Helm
 
-> [!WARNING]
->
-> `cuscutactl`的kubernetes模式目前尚未实现！
 
 ```shell
 # 1. 复制最小配置文件并填写必填项
@@ -111,10 +108,10 @@ cargo build --release -p cuscuta-chilo
 |--------|------|
 | `postgresql.url` | PostgreSQL 连接字符串 |
 | `redis.url` | Redis 连接字符串 |
-| `chilo.constants.binC1` | 挑战常量 C1（十六进制） |
-| `chilo.constants.binC2` | 挑战常量 C2（十六进制） |
-| `chilo.constants.binLoginC31` | 挑战常量 login-C31（十六进制） |
-| `chilo.constants.binLoginC32` | 挑战常量 login-C32（十六进制） |
+| `chilo.constants.binC1` | 常量 C1（十六进制） |
+| `chilo.constants.binC2` | 常量 C2（十六进制） |
+| `chilo.constants.binLoginC31` | 常量 login-C31（十六进制） |
+| `chilo.constants.binLoginC32` | 常量 login-C32（十六进制） |
 | `github.bundleRepository` | Bundle 数据所在的 GitHub 仓库 |
 | `github.bundlePath` | 仓库中 bundle JSON 的路径 |
 | `github.bundleToken` | 访问 bundle 仓库的 GitHub PAT |
@@ -185,16 +182,15 @@ cuscuta 所有组件均通过环境变量注入配置。
 
 您可以使用 [cuscutactl](cuscutactl/README.md) 进行简易的管理操作：
 
-> [!WARNING]
->
-> `cuscutactl`目前处于实验性阶段，其kubernetes模式目前尚未实现！
-
 > [!TIP]
 >
 > `account.txt`的格式为`account_email:password`，数据之间使用换行符分割
 
 ```shell
-# 健康检查
+# 健康检查（Kubernetes 模式）
+# cuscutactl --mode kubernetes --kube-namespace cuscuta doctor
+
+# 健康检查（Legacy 模式）
 cuscutactl --mode legacy --postgresql-url "..." --redis-url "..." doctor
 
 # 查看账号概况

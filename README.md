@@ -65,7 +65,7 @@ cuscuta不能独立工作，它依赖一些其它组件和外部服务工作：
 #### 部署
 
 - [x] docker compose
-- [ ] helm
+- [x] helm
 
 #### cuscutactl（什）
 
@@ -73,9 +73,9 @@ cuscuta不能独立工作，它依赖一些其它组件和外部服务工作：
   - [x] 查询队列状态
   - [x] 基本数据库CRUD
   - [ ] 查询chilo状态
-- [ ] 多连接模式
+- [x] 多连接模式
   - [x] 数据库直连模式
-  - [ ] Kubernetes代理模式
+  - [x] Kubernetes代理模式
 
 ### 设计
 
