@@ -1,8 +1,6 @@
-//! **This crate is mostly AI-generated**
-//!
 //! CLI management tool for [cuscuta](https://github.com/cuscutaceae/cuscuta) clusters.
 //!
-//! `cuscutactl` provides direct administrative access to the `PostgreSQL` and Redis
+//! `cuscutactl` provides direct administrative access to the `PostgreSQL` and `Redis`
 //! databases backing a cuscuta deployment:
 //!
 //! - **`PostgreSQL`**: account CRUD, rating adjustments, manual lease release
@@ -11,7 +9,10 @@
 //! # Quick examples
 //!
 //! ```shell
-//! # Health check
+//! # Health check (Kubernetes mode)
+//! cuscutactl --mode kubernetes --kube-namespace cuscuta doctor
+//!
+//! # Health check (Legacy mode)
 //! cuscutactl --postgresql-url "..." --redis-url "..." doctor
 //!
 //! # Add accounts in batch
@@ -25,21 +26,29 @@
 //!
 //! Two modes are available via `--mode` (or `-m`):
 //!
-//! | Mode         | Alias   | Description                                        |
-//! |--------------|---------|----------------------------------------------------|
-//! | `legacy`     | `direct`| Reads URLs from `--postgresql-url` / `--redis-url` |
-//! | `kubernetes` | `k8s`   | Reads URLs from Kubernetes secrets (not yet implemented) |
+//! | Mode         | Alias    | Description                                             |
+//! |--------------|----------|---------------------------------------------------------|
+//! | `legacy`     | `direct` | Direct URLs via `--postgresql-url` / `--redis-url`      |
+//! | `kubernetes` | `k8s`    | Read URLs from cluster Secret via kubectl port-forward  |
 //!
-//! `legacy` is the default.
+//! `legacy` is the default. `kubernetes` mode reads database URLs from the cluster
+//! Secret (`cuscuta-secret` by default) and opens a local `kubectl port-forward` tunnel.
 
 #![deny(clippy::pedantic)]
 #![deny(missing_docs)]
 
+use std::pin::Pin;
+
+use anyhow::bail;
 use clap::Parser;
 
-use crate::command::{
-    Cli, SubCommandAccounts, SubCommandAccountsRate, SubCommandAccountsRow, SubCommandJobs,
-    SubCommands,
+use crate::{
+    command::{
+        Cli, SubCommandAccounts, SubCommandAccountsRate, SubCommandAccountsRow, SubCommandJobs,
+        SubCommands,
+    },
+    config::{CommandMode, Kubernetes},
+    kube::k8s_port_forward,
 };
 
 mod accounts;
@@ -47,13 +56,99 @@ mod command;
 mod config;
 mod doctor;
 mod jobs;
+mod kube;
+mod url;
+
+trait Handler {
+    fn get_url(&self) -> String;
+    fn kill(&mut self) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>;
+}
+
+impl Handler for String {
+    fn get_url(&self) -> String {
+        self.clone()
+    }
+
+    fn kill(&mut self) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
+        Box::pin(std::future::ready(()))
+    }
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    type DynHandlerResult = anyhow::Result<Box<dyn Handler>>;
     let cli = Cli::parse();
-    let pg_url = cli.config.require_postgresql_url();
-    let redis_url = cli.config.resolve_redis_url();
-    match cli.sub_command {
+    let (postgresql_handle, redis_handle): (DynHandlerResult, DynHandlerResult) =
+        match &cli.config.mode {
+            CommandMode::Kubernetes => {
+                let Kubernetes {
+                    namespace,
+                    secret,
+                    postgresql_key,
+                    redis_key,
+                    cluster_domain,
+                    postgresql_port,
+                    redis_port,
+                    postgresql_forward_port,
+                    redis_forward_port,
+                } = &cli.config.kubernetes;
+                (
+                    k8s_port_forward(
+                        namespace,
+                        secret,
+                        postgresql_key,
+                        cluster_domain,
+                        postgresql_forward_port,
+                        postgresql_port,
+                    )
+                    .await
+                    .map(|it| Box::new(it) as Box<dyn Handler>),
+                    k8s_port_forward(
+                        namespace,
+                        secret,
+                        redis_key,
+                        cluster_domain,
+                        redis_forward_port,
+                        redis_port,
+                    )
+                    .await
+                    .map(|it| Box::new(it) as Box<dyn Handler>),
+                )
+            }
+            CommandMode::Legacy => (
+                Box::new(cli.config.resolve_legacy_postgresql_url())
+                    .map_err(anyhow::Error::from)
+                    .map(|it| Box::new(it) as Box<dyn Handler>),
+                cli.config
+                    .resolve_legacy_redis_url()
+                    .map_err(anyhow::Error::from)
+                    .map(|it| Box::new(it) as Box<dyn Handler>),
+            ),
+        };
+    let pg_url = postgresql_handle
+        .as_ref()
+        .map(|it| it.get_url())
+        .map_err(std::string::ToString::to_string);
+    let redis_url = redis_handle
+        .as_ref()
+        .map(|it| it.get_url())
+        .map_err(std::string::ToString::to_string);
+    let _ = run_command(&cli, pg_url, redis_url).await;
+    if let Ok(mut postgresql_handle) = postgresql_handle {
+        postgresql_handle.kill().await;
+    }
+    if let Ok(mut redis_handle) = redis_handle {
+        redis_handle.kill().await;
+    }
+    Ok(())
+}
+
+async fn run_command(
+    cli: &Cli,
+    pg_url: Result<String, String>,
+    redis_url: Result<String, String>,
+) -> anyhow::Result<()> {
+    match &cli.sub_command {
         SubCommands::Doctor => {
             let redis_url = if let Ok(ref x) = redis_url {
                 Some(x)
@@ -78,19 +173,19 @@ async fn main() -> anyhow::Result<()> {
                 Err(e) => {
                     eprintln!("Configuration error: {e:?}");
                     eprintln!("Hint: use --mode legacy --redis-url <URL>");
-                    std::process::exit(1);
+                    bail!(e);
                 }
             };
             match command {
-                SubCommandJobs::Status { max_count } => jobs::status(&redis_url, max_count)?,
+                SubCommandJobs::Status { max_count } => jobs::status(&redis_url, *max_count)?,
                 SubCommandJobs::Find { code, max_count } => {
-                    jobs::find(&redis_url, &code, max_count)?;
+                    jobs::find(&redis_url, code, *max_count)?;
                 }
                 SubCommandJobs::Result {
                     code,
                     max_count,
                     print_detail,
-                } => jobs::result(&redis_url, &code, max_count, print_detail)?,
+                } => jobs::result(&redis_url, code, *max_count, *print_detail)?,
             }
         }
 
@@ -100,12 +195,12 @@ async fn main() -> anyhow::Result<()> {
                 Err(e) => {
                     eprintln!("Configuration error: {e:?}");
                     eprintln!("Hint: use --mode legacy --postgresql-url <URL>");
-                    std::process::exit(1);
+                    bail!(e);
                 }
             };
             match command {
                 SubCommandAccounts::Status { max_count } => {
-                    accounts::status(&pg_url, max_count).await?;
+                    accounts::status(&pg_url, *max_count).await?;
                 }
                 SubCommandAccounts::Row { command } => match command {
                     SubCommandAccountsRow::Add {
@@ -113,25 +208,26 @@ async fn main() -> anyhow::Result<()> {
                         password,
                         stdin,
                     } => {
-                        accounts::row_add(&pg_url, email, password, stdin).await?;
+                        accounts::row_add(&pg_url, email.clone(), password.clone(), *stdin).await?;
                     }
                     SubCommandAccountsRow::Remove { id } => {
-                        accounts::row_remove(&pg_url, id).await?;
+                        accounts::row_remove(&pg_url, *id).await?;
                     }
-                    SubCommandAccountsRow::Query { id } => accounts::row_query(&pg_url, id).await?,
+                    SubCommandAccountsRow::Query { id } => {
+                        accounts::row_query(&pg_url, *id).await?;
+                    }
                 },
                 SubCommandAccounts::Rate { command, id } => match command {
                     SubCommandAccountsRate::Set { value, delta } => {
-                        accounts::rate_set(&pg_url, id, value, delta).await?;
+                        accounts::rate_set(&pg_url, *id, *value, *delta).await?;
                     }
-                    SubCommandAccountsRate::Query => accounts::rate_query(&pg_url, id).await?,
+                    SubCommandAccountsRate::Query => accounts::rate_query(&pg_url, *id).await?,
                 },
                 SubCommandAccounts::Release { id, force } => {
-                    accounts::release(&pg_url, id, force).await?;
+                    accounts::release(&pg_url, *id, *force).await?;
                 }
             }
         }
     }
-
     Ok(())
 }

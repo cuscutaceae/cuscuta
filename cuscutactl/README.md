@@ -25,7 +25,7 @@ cuscutactl --redis-url "..." jobs result --code 123456789 --print-detail
 | Mode         | Alias   | Description                                        |
 |--------------|---------|----------------------------------------------------|
 | `legacy`     | `direct`| Direct URLs via `--postgresql-url` / `--redis-url`  |
-| `kubernetes` | `k8s`   | Read URLs from Kubernetes secrets (not yet implemented) |
+| `kubernetes` | `k8s`   | Read URLs from Kubernetes secrets via kubectl port-forward |
 
 `legacy` is the default.
 
