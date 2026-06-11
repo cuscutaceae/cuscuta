@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use cuscuta_common::{
     api::{
@@ -76,9 +76,17 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
             .try_read(std::clone::Clone::clone)
             .map_err(|e| Error::NotReady(format!("song list ({e})")))?;
         let current_sub_queue = &current_jobs.first().map(|it| it.sub_queue.clone());
+        let song_list_len = song_list.len();
         let (new_jobs, current_segments) = if let Some(s) = current_sub_queue {
             (
-                pull_jobs(current_jobs, s, &config, redis_client, random)?,
+                pull_jobs(
+                    current_jobs,
+                    s,
+                    &config,
+                    redis_client,
+                    random,
+                    song_list_len,
+                )?,
                 s,
             )
         } else {
@@ -86,8 +94,14 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
                 job::Error::Redis(redis_error) => Error::Redis(redis_error),
                 job::Error::BadData(e) => Error::BadState(format!("bad data: {e}")),
             })?;
-            let Some((jobs, sub_queue)) =
-                discover_sub_queue(current_jobs, &config, redis_client, random, &sub_queues)?
+            let Some((jobs, sub_queue)) = discover_sub_queue(
+                current_jobs,
+                &config,
+                redis_client,
+                random,
+                &sub_queues,
+                song_list_len,
+            )?
             else {
                 sleep(Duration::from_secs(1)).await;
                 return Ok(());
@@ -127,7 +141,8 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
         )
         .await?;
         let linked_result = process_job_with_result(current_jobs, &rank_list);
-        write_result_to_redis(redis_client, &config, &linked_result)?;
+        write_result_to_redis(redis_client, &linked_result)?;
+        refresh_redis_ttl(current_jobs, redis_client, &config)?;
         clean_jobs(
             current_jobs,
             friends,
@@ -177,6 +192,16 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
     }
 }
 
+fn refresh_redis_ttl(jobs: &[Job], redis_client: &Client, config: &Config) -> Result<(), Error> {
+    let mut pipe = redis::pipe();
+    for job in jobs {
+        pipe.expire(job_index_redis_key(job), config.redis_stream_refresh_ttl)
+            .expire(job_result_redis_key(job), config.redis_stream_refresh_ttl);
+    }
+    let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
+    pipe.exec(&mut connection).map_err(Error::Redis)
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn clean_jobs(
     jobs: &mut Vec<Job>,
@@ -197,11 +222,7 @@ async fn clean_jobs(
                 std::slice::from_ref(&finished_job.job_id),
             )
             .map_err(Error::Redis)?;
-        let output_list_key = format!(
-            "cuscuta:results:index:{}-{}",
-            finished_job.friend_code.clone(),
-            finished_job.timestamp.clone()
-        );
+        let output_list_key = job_index_redis_key(finished_job);
         let json = serde_json::to_string(&JobTag {
             queue: finished_job.sub_queue.clone(),
             job_essential: finished_job.essential.clone(),
@@ -238,18 +259,11 @@ fn process_job_with_result(jobs: &mut [Job], scores: &[SongScore]) -> Vec<(Strin
             .iter()
             .filter(|it| job.friend_user_id.clone().unwrap_or_default() == it.user_id.to_string());
         job.current_length += 1;
-        if job.current_length >= job.cursor_length.cast_unsigned() as usize {
+        if job.current_length >= job.essential.cursor_length.cast_unsigned() as usize {
             job.finished = true;
         }
         for linked_score in linked_score {
-            job_links.push((
-                format!(
-                    "cuscuta:results:value:{}-{}",
-                    job.friend_code.clone(),
-                    job.timestamp.clone()
-                ),
-                linked_score.clone(),
-            ));
+            job_links.push((job_result_redis_key(job), linked_score.clone()));
         }
     }
     log::debug!(
@@ -262,7 +276,6 @@ fn process_job_with_result(jobs: &mut [Job], scores: &[SongScore]) -> Vec<(Strin
 
 fn write_result_to_redis(
     redis_client: &Client,
-    config: &Config,
     score_pairs: &[(String, SongScore)],
 ) -> Result<(), Error> {
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
@@ -270,7 +283,6 @@ fn write_result_to_redis(
         let json = serde_json::to_string(score)
             .map_err(|e| Error::BadState(format!("failed to serialize data to json: {e}")))?;
         connection.lpush(key, &json).map_err(Error::Redis)?;
-        let _ = connection.expire(key, config.redis_stream_refresh_ttl);
     }
     Ok(())
 }
@@ -326,20 +338,43 @@ async fn try_add_friends(
     cursor: usize,
     friends: &mut Vec<FriendInfo>,
 ) -> Result<(), Error> {
+    let ids: Vec<_> = jobs
+        .iter()
+        .filter_map(|it| {
+            it.friend_user_id
+                .clone()
+                .map(|id| (it.essential.friend_code.clone(), id))
+        })
+        .collect();
     for job in jobs
         .iter_mut()
         .filter(|it| !it.friend_added && !it.finished)
     {
+        let option_existing_ids = ids
+            .iter()
+            .find(|(code, _)| code == &job.essential.friend_code);
+        if let Some((_, existing_friend_id)) = option_existing_ids {
+            job.friend_user_id = Some(existing_friend_id.clone());
+            job.essential.cursor_start = cursor.cast_signed() as i32;
+            job.friend_added = true;
+            continue;
+        }
         let result = api::xxxxxx::api_add_friend(
             bundle_data,
             account_row.account_email.clone(),
             user_id.to_string(),
             token.to_string(),
-            job.friend_code.clone(),
+            job.essential.friend_code.clone(),
         )
         .await;
         let friends_new = match result {
             Err(e) => {
+                if let api::Error::BadStatus(code) = &e
+                    && *code == 400
+                {
+                    log::warn!("friend is already exist but cache is out-dated!");
+                    continue;
+                }
                 log::warn!("failed to add friend: {e}");
                 continue;
             }
@@ -362,7 +397,7 @@ async fn try_add_friends(
         };
         *friends = friends_new;
         job.friend_user_id = Some(friend_add.user_id.to_string());
-        job.cursor_start = cursor.cast_signed() as i32;
+        job.essential.cursor_start = cursor.cast_signed() as i32;
         job.friend_added = true;
     }
     Ok(())
@@ -374,11 +409,16 @@ fn discover_sub_queue(
     redis_client: &Client,
     pod_uid: &str,
     sub_queues: &[SubQueue],
+    total_length: usize,
 ) -> Result<Option<(Vec<Job>, SubQueue)>, Error> {
     for queue in sub_queues {
-        let Some(jobs) = pull_jobs(jobs, queue, config, redis_client, pod_uid)? else {
+        let Some(jobs) = pull_jobs(jobs, queue, config, redis_client, pod_uid, total_length)?
+        else {
             continue;
         };
+        if jobs.is_empty() {
+            continue;
+        }
         return Ok(Some((jobs, queue.clone())));
     }
     Ok(None)
@@ -395,6 +435,7 @@ fn pull_jobs(
     config: &Config,
     redis_client: &Client,
     pod_uid: &str,
+    total_length: usize,
 ) -> Result<Option<Vec<Job>>, Error> {
     fn claim_jobs(
         connection: &mut redis::Connection,
@@ -440,6 +481,7 @@ fn pull_jobs(
                 it.keys.into_iter().next().map_or(Vec::new(), |it| it.ids)
             }))
     }
+    //TODO: handle overlap
     let valid_jobs = valid_jobs(jobs);
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     let max_jobs = config.worker_max_jobs.try_into().expect("wait... what?");
@@ -449,7 +491,12 @@ fn pull_jobs(
     if valid_jobs >= max_jobs {
         return Ok(Option::None);
     }
-    let divisions = jobs.first().map_or(1, |it| it.cursor_length).max(1);
+    let divisions = jobs
+        .first()
+        .map_or(1, |it| {
+            (total_length as f64 / it.sub_queue.segment.len() as f64) as i32
+        })
+        .max(1);
     let min_idle_time =
         (config.worker_job_max_work_time_secs as f64 / f64::from(divisions)).round();
     let claimed_jobs = claim_jobs(
@@ -466,15 +513,43 @@ fn pull_jobs(
         pod_uid,
         max_jobs.saturating_sub(valid_jobs),
     )?;
-    let jobs: Vec<_> = fetched_jobs.iter().chain(claimed_jobs.iter()).collect();
-    let mut add_jobs = Vec::new();
-    for job_id in jobs {
-        let job: Job = (sub_queue.clone(), job_id.clone())
-            .try_into()
-            .map_err(Error::JobParse)?;
-        add_jobs.push(job);
+    let jobs: Vec<_> = fetched_jobs
+        .iter()
+        .chain(claimed_jobs.iter())
+        .map(|it| {
+            (sub_queue.clone(), it.clone())
+                .try_into()
+                .map_err(Error::JobParse)
+        })
+        .collect::<Result<Vec<Job>, Error>>()?;
+    let mut no_duplicated_jobs = HashMap::new();
+    for job in &jobs {
+        no_duplicated_jobs.entry(&job.essential).or_insert(job);
     }
-    Ok(Some(add_jobs))
+    Ok(Some(
+        no_duplicated_jobs
+            .into_iter()
+            .collect::<Vec<(_, _)>>()
+            .into_iter()
+            .map(|it| it.1.clone())
+            .collect(),
+    ))
+}
+
+fn job_index_redis_key(job: &Job) -> String {
+    format!(
+        "cuscuta:results:index:{}-{}",
+        job.essential.friend_code.clone(),
+        job.essential.timestamp.clone()
+    )
+}
+
+fn job_result_redis_key(job: &Job) -> String {
+    format!(
+        "cuscuta:results:value:{}-{}",
+        job.essential.friend_code.clone(),
+        job.essential.timestamp.clone()
+    )
 }
 
 pub fn resume_state(worker_result: &WorkerResult) {

@@ -129,8 +129,7 @@ pub async fn api_login(
         .map_err(Error::ClientSetup)?
         .post(try_get_env_var("API_LOGIN")?)
         .header("X-Random-Challenge", random_challenge)
-        .header("AppVersion", "6.14.0")
-        // .header("AppVersion", bundle_data.application_version_number.clone())
+        .header("AppVersion", bundle_data.application_version_number.clone())
         .header("ContentBundle", bundle_data.version_number.clone())
         .header("DeviceId", generate_device_id(&email))
         .basic_auth(email, Some(password))

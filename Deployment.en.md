@@ -157,14 +157,14 @@ All cuscuta components receive configuration through environment variables.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WORKER_MAX_JOBS` | 3 | Max concurrent jobs per worker |
-| `WORKER_MAX_RETRIES` | 10 | Max API retry attempts |
-| `WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS` | 100 | Exponential backoff base (ms) |
+| `WORKER_MAX_JOBS` | 8 | Max concurrent jobs per worker |
+| `WORKER_MAX_RETRIES` | 30 | Max API retry attempts |
+| `WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS` | 10 | Exponential backoff base (ms) |
 | `WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER` | 2 | Exponential backoff multiplier |
-| `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS` | 1000 | Max backoff delay (ms) |
+| `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS` | 500 | Max backoff delay (ms) |
 | `WORKER_ACCOUNT_LEASE_TIME_SECS` | 120 | Account lease duration (s) |
 | `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 30 | Lease refresh interval (s) |
-| `WORKER_JOB_MAX_WORK_TIME_SECS` | 600 | Maximum working time for a job (s) |
+| `WORKER_JOB_MAX_WORK_TIME_SECS` | 1200 | Maximum working time for a job (s) |
 | `API_CHILO` | — | chilo service URL |
 | `API_LOGIN` | — | Login API endpoint |
 | `API_LIST_FRIENDS` | — | Friend list API endpoint |

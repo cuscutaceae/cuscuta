@@ -152,14 +152,14 @@ cuscuta 所有组件均通过环境变量注入配置。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `WORKER_MAX_JOBS` | 3 | 每个 worker 最大并发任务数 |
-| `WORKER_MAX_RETRIES` | 10 | API 调用最大重试次数 |
-| `WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS` | 100 | 指数退避初始等待时间（毫秒） |
+| `WORKER_MAX_JOBS` | 8 | 每个 worker 最大并发任务数 |
+| `WORKER_MAX_RETRIES` | 30 | API 调用最大重试次数 |
+| `WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS` | 10 | 指数退避初始等待时间（毫秒） |
 | `WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER` | 2 | 指数退避乘数 |
-| `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS` | 1000 | 指数退避最大等待时间（毫秒） |
+| `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS` | 500 | 指数退避最大等待时间（毫秒） |
 | `WORKER_ACCOUNT_LEASE_TIME_SECS` | 120 | 账号租约时长（秒） |
 | `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 30 | 租约续期间隔（秒） |
-| `WORKER_JOB_MAX_WORK_TIME_SECS` | 600 | 任务的最长运行时间（秒） |
+| `WORKER_JOB_MAX_WORK_TIME_SECS` | 1200 | 任务的最长运行时间（秒） |
 | `API_CHILO` | — | chilo 服务地址 |
 | `API_LOGIN` | — | 登录 API 地址 |
 | `API_LIST_FRIENDS` | — | 好友列表 API 地址 |

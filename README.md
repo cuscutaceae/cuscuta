@@ -1,4 +1,11 @@
 ## cuscuta
+[![CI](https://github.com/cuscutaceae/cuscuta/actions/workflows/pr_check.yaml/badge.svg)](https://github.com/cuscutaceae/cuscuta/actions/workflows/pr_check.yaml)
+[![Build](https://github.com/cuscutaceae/cuscuta/actions/workflows/build_image.yaml/badge.svg)](https://github.com/cuscutaceae/cuscuta/actions/workflows/build_image.yaml)
+[![Helm Chart](https://img.shields.io/badge/helm%20chart-ghcr.io-blue)](https://github.com/cuscutaceae/cuscuta/pkgs/container/charts%2Fcuscuta)
+[![cuscuta-entry](https://img.shields.io/badge/cuscuta%20entry-ghcr.io-blue)](https://github.com/cuscutaceae/cuscuta/pkgs/container/cuscuta-entry)
+[![cuscuta-worker](https://img.shields.io/badge/cuscuta%20worker-ghcr.io-blue)](https://github.com/cuscutaceae/cuscuta/pkgs/container/cuscuta-worker)
+[![cuscuta-chilo](https://img.shields.io/badge/cuscuta%20chilo-ghcr.io-blue)](https://github.com/cuscutaceae/cuscuta/pkgs/container/cuscuta-chilo)
+[![License](https://img.shields.io/github/license/cuscutaceae/cuscuta)](LICENSE)
 
 欢迎来到cuscuta的Sekai！ヾ(^▽^*) ……虽然这里乏味而无趣（并且还未完成）
 
@@ -8,14 +15,14 @@ cuscuta是一系列小型软件的集合，组合起来的话……可以用来�
 
 cuscuta内含了一些组件
 
-| 名称           | 状态   | 约束                                                   | 用途                                                         |
-| -------------- | ------ | ------------------------------------------------------ | ------------------------------------------------------------ |
-| cuscuta-entry  | 不稳定 | `#![deny(clippy::pedantic)]`                           | 处理入站流量，暴露服务，分发任务，目前理论 **不可扩展（仅单例）** |
-| cuscuta-worker | 不稳定 | `#![deny(clippy::pedantic)]`                           | 实际处理任务，理论可扩展                                     |
-| cuscuta-common | 较稳定 | `#![deny(clippy::pedantic)]`, `#![deny(missing_docs)]` | entry和worker的通用组件                                      |
+| 名称           | 状态   | 约束                                                   | 用途                                                                                    |
+| -------------- | ------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| cuscuta-entry  | 不稳定 | `#![deny(clippy::pedantic)]`                           | 处理入站流量，暴露服务，分发任务，目前理论 **不可扩展（仅单例）**                       |
+| cuscuta-worker | 不稳定 | `#![deny(clippy::pedantic)]`                           | 实际处理任务，理论可扩展                                                                |
+| cuscuta-common | 较稳定 | `#![deny(clippy::pedantic)]`, `#![deny(missing_docs)]` | entry和worker的通用组件                                                                 |
 | cuscuta-chilo  | 不稳定 | `#![deny(clippy::pedantic)]`                           | [chilo](https://github.com/cuscutaceae/chilo)的一个WebAPI包装，被worker依赖，理论可扩展 |
-| cuscuta-mock   | 不稳定 | 无                                                     | worker的mock用镜像                                           |
-| cuscutactl     | 待验证 | `#![deny(clippy::pedantic)]`, `#![deny(missing_docs)]` | cuscuta集群的一个简易命令行管理工具（使用AI生成）            |
+| cuscuta-mock   | 不稳定 | 无                                                     | worker的mock用镜像                                                                      |
+| cuscutactl     | 待验证 | `#![deny(clippy::pedantic)]`, `#![deny(missing_docs)]` | cuscuta集群的一个简易命令行管理工具（使用AI生成）                                       |
 
 ### 依赖
 

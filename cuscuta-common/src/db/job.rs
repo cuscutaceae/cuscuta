@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    ops::{Deref, DerefMut, Range},
-};
+use std::{collections::HashMap, ops::Range};
 
 use redis::{Client, FromRedisValue, ScanOptions, TypedCommands, streams::StreamId};
 use serde::{Deserialize, Serialize};
@@ -29,7 +26,7 @@ pub struct SubQueue {
 }
 
 /// 一个Worker负责的`Job`实例，包含`Job`的关键信息和临时状态信息
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Job {
     // From Redis
     /// 任务在Redis队列（Stream）中的id
@@ -58,6 +55,12 @@ pub struct Job {
     pub cleaned: bool,
 }
 
+impl PartialEq for Job {
+    fn eq(&self, other: &Self) -> bool {
+        self.essential == other.essential
+    }
+}
+
 /// 一个任务的index信息，会被存放至`cuscuta:result:index:...`中
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobTag {
@@ -69,19 +72,6 @@ pub struct JobTag {
 
     /// 这个任务的关键信息
     pub job_essential: JobEssential,
-}
-
-impl Deref for Job {
-    type Target = JobEssential;
-    fn deref(&self) -> &Self::Target {
-        &self.essential
-    }
-}
-
-impl DerefMut for Job {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.essential
-    }
 }
 
 impl TryFrom<(SubQueue, StreamId)> for Job {
@@ -108,7 +98,7 @@ impl TryFrom<(SubQueue, StreamId)> for Job {
 }
 
 /// `Job`的关键信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct JobEssential {
     /// 查询对象的好友代码
     pub friend_code: String,
