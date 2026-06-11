@@ -94,14 +94,14 @@ worker:
   # -- Container port (health checks only; fixed, do not modify)
   port: 8080
   # -- Worker tuning
-  maxJobs: 3
-  maxRetries: 10
-  exponentialBackoffBaseMillis: 100
+  maxJobs: 8
+  maxRetries: 30
+  exponentialBackoffBaseMillis: 10
   exponentialBackoffMultiplier: 2
-  exponentialBackoffMaxDelayMillis: 1000
+  exponentialBackoffMaxDelayMillis: 500
   accountLeaseTimeSecs: 120
   accountLeaseTimeRefreshGapSecs: 30
-  jobMaxWorkTimeSecs: 600
+  jobMaxWorkTimeSecs: 1200
 
 # -- cuscuta-mock (mock API server for testing; disable in production)
 mock:
