@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Range};
 
+use chrono::Utc;
 use redis::{Client, FromRedisValue, ScanOptions, TypedCommands, streams::StreamId};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
@@ -37,22 +38,57 @@ pub struct Job {
 
     // Temp
     /// 目前已经轮询的长度
-    pub current_length: usize,
 
     /// 源任务队列
     pub sub_queue: SubQueue,
 
-    /// 好友的`user_id`，若尚未加好友，则为`None`
-    pub friend_user_id: Option<String>,
+    /// Job的内部状态
+    pub state: JobState,
+    // /// 好友的`user_id`，若尚未加好友，则为`None`
+    // pub friend_user_id: Option<String>,
 
-    /// 是否添加好友（未来考虑删除）
-    pub friend_added: bool,
+    // /// 是否添加好友（未来考虑删除）
+    // pub friend_added: bool,
 
-    /// 任务完成标记
-    pub finished: bool,
+    // /// 任务完成标记
+    // pub finished: bool,
 
-    /// 任务清理标记
-    pub cleaned: bool,
+    // /// 任务清理标记
+    // pub cleaned: bool,
+}
+
+/// 记录任务的状态
+#[derive(Debug, Clone, PartialEq)]
+pub enum JobState {
+    /// 任务刚刚被拉取，还没有加好友
+    Pulled {
+        /// 任务开始时的时间戳
+        start_timestamp: i64,
+    },
+
+    /// 任务已加好友，正在进行
+    Pending {
+        /// 任务的好友ID
+        friend_user_id: String,
+
+        /// 任务目前进行的长度
+        current_length: usize,
+
+        /// 任务开始时的时间戳
+        start_timestamp: i64,
+    },
+
+    /// 任务已经完成，等待清理
+    Finished {
+        /// 任务的好友ID
+        friend_user_id: String,
+
+        /// 任务开始时的时间戳
+        start_timestamp: i64,
+    },
+
+    /// 任务已被清理
+    Cleaned,
 }
 
 impl PartialEq for Job {
@@ -78,6 +114,7 @@ impl TryFrom<(SubQueue, StreamId)> for Job {
     type Error = Error;
     fn try_from((sub_queue, id): (SubQueue, StreamId)) -> Result<Self, Self::Error> {
         let map = id.map;
+        let timestamp = Utc::now().timestamp_millis();
         Ok(Job {
             job_id: id.id,
             essential: JobEssential::new(
@@ -88,11 +125,9 @@ impl TryFrom<(SubQueue, StreamId)> for Job {
                 from_redis(&map, "job:retry_count")?,
             ),
             sub_queue,
-            current_length: 0,
-            friend_user_id: None,
-            friend_added: false,
-            finished: false,
-            cleaned: false,
+            state: JobState::Pulled {
+                start_timestamp: timestamp,
+            },
         })
     }
 }

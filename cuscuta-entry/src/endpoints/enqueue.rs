@@ -61,7 +61,7 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
         if active_account_count == 0 {
             return Err(Error::Internal(ErrorType::InternalNoWorker));
         }
-        let ranges = split_weighted_ranges(&song_list_len, active_account_count)?;
+        let ranges = split_weighted_ranges(&song_list_len, active_account_count * 5)?;
         let queues = scan_sub_queue(redis_client)
             .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
         let timestamp = Utc::now().timestamp().to_string();

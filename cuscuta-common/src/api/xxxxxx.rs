@@ -382,7 +382,6 @@ pub fn calc_friend_delta(
 pub mod auto {
     use std::time::Duration;
 
-    use reqwest::StatusCode;
     use tokio::time::sleep;
 
     use crate::api;
@@ -411,7 +410,7 @@ pub mod auto {
             let result = f().await;
             match result {
                 Ok(result) => return Ok(result),
-                Err(api::Error::BadStatus(code)) if code == StatusCode::TOO_MANY_REQUESTS => {
+                Err(api::Error::BadStatus(code)) if !code.is_success() => {
                     sleep(Duration::from_millis(
                         (exponential_backoff_base_millis
                             * exponential_backoff_multiplier.pow(retries as u32))
