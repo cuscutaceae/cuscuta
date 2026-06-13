@@ -57,26 +57,41 @@ pub mod postgresql {
 
 /// 定义了Redis所需要使用的常生成
 pub mod redis {
-    use crate::db::job::Job;
+
+    /// 与Redis相关的错误
+    #[derive(Debug, thiserror::Error)]
+    pub enum Error {
+        /// Redis错误
+        #[error("redis error: {0}")]
+        Redis(redis::RedisError),
+
+        /// 数据不符合预期时的错误
+        #[error("bad: {0}")]
+        BadData(String),
+    }
+
+    /// 记录Job进行索引的key
+    #[must_use]
+    pub fn job_index_redis_key(postfix: &str) -> String {
+        format!("cuscuta:pending:index:{postfix}",)
+    }
 
     /// 记录Job完成索引的key
     #[must_use]
-    pub fn job_index_redis_key(job: &Job) -> String {
-        format!(
-            "cuscuta:results:index:{}-{}",
-            job.essential.friend_code.clone(),
-            job.essential.timestamp.clone()
-        )
+    pub fn job_output_index_redis_key(postfix: &str) -> String {
+        format!("cuscuta:results:index:{postfix}",)
     }
 
     /// 记录Job实际输出结果的key
     #[must_use]
-    pub fn job_result_redis_key(job: &Job) -> String {
-        format!(
-            "cuscuta:results:value:{}-{}",
-            job.essential.friend_code.clone(),
-            job.essential.timestamp.clone()
-        )
+    pub fn job_result_redis_key(postfix: &str) -> String {
+        format!("cuscuta:results:value:{postfix}",)
+    }
+
+    /// 记录子任务队列的key
+    #[must_use]
+    pub fn job_sub_queue_redis_key(postfix: &str) -> String {
+        format!("cuscuta:jobs:{postfix}")
     }
 
     /// 记录Job运行时间的key

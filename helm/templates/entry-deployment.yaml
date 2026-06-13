@@ -26,6 +26,12 @@ spec:
               value: {{ .Values.rustLog | quote }}
             - name: REDIS_STREAM_REFRESH_TTL
               value: {{ .Values.redisStreamRefreshTtl | quote }}
+            - name: ETA_ENABLE
+              value: {{ .Values.eta.enabled | quote }}
+            - name: ETA_RECORD_TRIM
+              value: {{ .Values.eta.recordTrim | quote }}
+            - name: ETA_SEARCH_LIMIT
+              value: {{ .Values.eta.searchLimit | quote }}
             - name: ACCOUNTS_SQL_ADDR
               valueFrom:
                 secretKeyRef:

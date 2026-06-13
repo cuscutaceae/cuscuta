@@ -1,18 +1,6 @@
 use redis::{Client, TypedCommands};
 
-use crate::db::redis::job_eta_redis_key;
-
-/// 与任务剩余时间估算相关的错误
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Redis错误
-    #[error("redis error: {0}")]
-    Redis(redis::RedisError),
-
-    /// 任务剩余时间数据不符合预期时的错误
-    #[error("bad: {0}")]
-    BadData(String),
-}
+use crate::db::redis::{Error, job_eta_redis_key};
 
 /// 向Redis数据库记录剩余时间
 ///
@@ -32,7 +20,7 @@ pub fn record_eta(redis_client: &Client, eta_millis: i64) -> Result<(), Error> {
 /// # Errors
 /// 本函数的错误全部来自[`redis::RedisError`]
 #[allow(clippy::cast_precision_loss)]
-pub fn fetch_eta(redis_client: &Client, limit: usize) -> Result<Option<f64>, Error> {
+pub fn fetch_unit_eta(redis_client: &Client, limit: usize) -> Result<Option<f64>, Error> {
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     let result = connection
         .lrange(

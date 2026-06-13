@@ -82,6 +82,10 @@ spec:
               value: {{ .Values.worker.jobMaxWorkTimeSecs | quote }}
             - name: REDIS_STREAM_REFRESH_TTL
               value: {{ .Values.redisStreamRefreshTtl | quote }}
+            - name: ETA_ENABLE
+              value: {{ .Values.eta.enabled | quote }}
+            - name: ETA_SEARCH_LIMIT
+              value: {{ .Values.eta.searchLimit | quote }}
           livenessProbe:
             httpGet:
               path: /healthz

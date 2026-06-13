@@ -1,15 +1,23 @@
+use std::{collections::HashSet, env, hash::RandomState};
+
 use axum::{Json, extract::Query, response::IntoResponse};
 use base64::Engine;
 use cuscuta_common::{
     api::xxxxxx::SongScore,
-    db::job::{JobTag, fetch_result, scan_fragment},
-    quick_fetch::QuickFetch,
+    db::{
+        job::{
+            SearchPositionResult, fetch_pending_tags, fetch_result, fetch_result_tags,
+            search_position,
+        },
+        job_eta::fetch_unit_eta,
+        redis::{job_index_redis_key, job_output_index_redis_key},
+    },
 };
+use redis::{Client, TypedCommands};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    data::SONG_LIST,
     db::redis::REDIS_CLIENT,
     endpoints::{Error, ErrorType},
 };
@@ -47,6 +55,7 @@ enum QueryResult {
         success: bool,
         pending: bool,
         progress: f64,
+        eta: Option<f64>,
     },
     Failed {
         success: bool,
@@ -66,47 +75,54 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
         let redis_client = REDIS_CLIENT
             .get()
             .ok_or(Error::NotReady(ErrorType::RedisNotReady))?;
-        let song_list_len = SONG_LIST
-            .try_read(std::vec::Vec::len)
-            .map_err(|_| Error::NotReady(ErrorType::SongListNotReady))?;
-        let token = base64::prelude::BASE64_URL_SAFE
-            .decode(query.token)
-            .map_err(|_| Error::BadRequest(ErrorType::BadRequestBase64))?;
-        let token =
-            String::from_utf8(token).map_err(|_| Error::BadRequest(ErrorType::BadRequestBase64))?;
-        let token: Vec<_> = token.split('|').collect();
-        if token.len() != 2 {
-            return Err(Error::BadRequest(ErrorType::BadRequestBase64));
+        let token = String::from_utf8(
+            base64::prelude::BASE64_URL_SAFE
+                .decode(query.token)
+                .map_err(|_| Error::BadRequest(ErrorType::BadRequestBase64))?,
+        )
+        .map_err(|_| Error::BadRequest(ErrorType::BadRequestBase64))?;
+        let enable_eta = env::var("ETA_ENABLE")
+            .unwrap_or("false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+        let evidence_check_result = check_evidence(redis_client, &token)?;
+        // TODO: 硬编码Trim，以后要改
+        // TODO: 扫描队列也需要加一个环境变量
+        match evidence_check_result {
+            EvidenceCheckResult::Pending {
+                total_jobs,
+                finished_jobs,
+            } => {
+                // TODO: 这个设计只能全量查询，若需增量查询，需要改动
+                let percent = round_fixed(finished_jobs as f64 / total_jobs as f64, 2);
+                let eta = None.or_else(|| {
+                    if enable_eta {
+                        calc_eta(redis_client, &token).unwrap_or(None)
+                    } else {
+                        None
+                    }
+                });
+                Ok(QueryResult::SuccessPending {
+                    success: true,
+                    pending: true,
+                    eta,
+                    progress: percent,
+                })
+            }
+            EvidenceCheckResult::Finished { retries } => {
+                let result = fetch_result(redis_client, &token)
+                    .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
+                Ok(QueryResult::SuccessFinished {
+                    success: true,
+                    pending: false,
+                    retries,
+                    result,
+                })
+            }
+            EvidenceCheckResult::Failed => {
+                Err(Error::BadRequest(ErrorType::BadRequestTokenCheckFailed))
+            }
         }
-        let key = token[0];
-        let evidence: Vec<_> = token[1].split(',').collect();
-        let fragments = scan_fragment(redis_client, key)
-            .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
-        let fragment_length: usize = fragments
-            .iter()
-            .map(|it| it.job_essential.cursor_length.cast_unsigned() as usize)
-            .sum();
-        // TODO: 这个设计只能全量查询，若需增量查询，需要改动
-        if fragment_length < song_list_len {
-            let percent = round_fixed(fragment_length as f64 / song_list_len as f64, 2);
-            return Ok(QueryResult::SuccessPending {
-                success: true,
-                pending: true,
-                progress: percent,
-            });
-        }
-        let EvidenceCheckResult { invalid, retries } = check_evidence(&evidence, &fragments)?;
-        if invalid != 0 {
-            return Err(Error::BadRequest(ErrorType::BadRequestTokenCheckFailed));
-        }
-        let result = fetch_result(redis_client, key)
-            .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
-        Ok(QueryResult::SuccessFinished {
-            success: true,
-            pending: false,
-            retries,
-            result,
-        })
     }
 
     match op(query) {
@@ -114,7 +130,7 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
             let status_code = match &token {
                 QueryResult::SuccessFinished { .. } => StatusCode::OK,
                 QueryResult::SuccessPending { .. } => StatusCode::PARTIAL_CONTENT,
-                QueryResult::Failed { .. } => panic!("it's should not happen"),
+                QueryResult::Failed { .. } => unreachable!("it's should not happen"),
             };
             (status_code, Json(token))
         }
@@ -132,40 +148,98 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
     }
 }
 
-struct EvidenceCheckResult {
-    invalid: usize,
-    retries: usize,
+enum EvidenceCheckResult {
+    Pending {
+        total_jobs: usize,
+        finished_jobs: usize,
+    },
+    Finished {
+        retries: usize,
+    },
+    Failed,
 }
 
-fn check_evidence(evidence: &[&str], fragments: &[JobTag]) -> Result<EvidenceCheckResult, Error> {
-    let new_evidence: Result<Vec<_>, _> = evidence
+fn check_evidence(redis_client: &Client, postfix: &str) -> Result<EvidenceCheckResult, Error> {
+    let mut connection = redis_client
+        .get_connection()
+        .map_err(|e| Error::Redis(ErrorType::FailedCheckEvidenceRedis, e))?;
+    let total_jobs_len = connection
+        .llen(job_index_redis_key(postfix))
+        .map_err(|e| Error::Redis(ErrorType::FailedCheckEvidenceRedis, e))?;
+    if total_jobs_len == 0 {
+        return Ok(EvidenceCheckResult::Failed);
+    }
+    let finished_jobs_len = connection
+        .llen(job_output_index_redis_key(postfix))
+        .map_err(|e| Error::Redis(ErrorType::FailedCheckEvidenceRedis, e))?;
+    if total_jobs_len > finished_jobs_len {
+        return Ok(EvidenceCheckResult::Pending {
+            total_jobs: total_jobs_len,
+            finished_jobs: finished_jobs_len,
+        });
+    }
+    let finished_jobs_tags = fetch_result_tags(redis_client, postfix)
+        .map_err(|e| Error::RedisExtend(ErrorType::FailedCheckEvidenceRedis, e))?;
+    let job_id_set = finished_jobs_tags
+        .into_iter()
+        .map(|it| it.job_essential.job_uid)
+        .collect::<HashSet<String, RandomState>>();
+    Ok(EvidenceCheckResult::Finished {
+        retries: total_jobs_len - job_id_set.len(),
+    })
+}
+
+fn calc_eta(redis_client: &Client, postfix: &str) -> Result<Option<f64>, Error> {
+    let eta_record_trim = env::var("ETA_RECORD_TRIM")
+        .map_err(|_| ())
+        .and_then(|it| it.parse::<usize>().map_err(|_| ()))
+        .unwrap_or(15);
+    let eta_search_limit = env::var("ETA_SEARCH_LIMIT")
+        .map_err(|_| ())
+        .and_then(|it| it.parse::<usize>().map_err(|_| ()))
+        .unwrap_or(10);
+    let Some(estimated_unit_eta) = fetch_unit_eta(redis_client, eta_record_trim)
+        .map_err(|e| Error::RedisExtend(ErrorType::FailedReadEtaRedis, e))?
+    else {
+        return Ok(None);
+    };
+    let pending_jobs = fetch_pending_tags(redis_client, postfix)
+        .map_err(|e| Error::RedisExtend(ErrorType::FailedReadEtaRedis, e))?;
+    let positions = pending_jobs
         .iter()
-        .map(|it| {
-            let arr: Vec<_> = it.split('_').collect();
-            if arr.len() == 2 {
-                Ok((arr[0].to_string(), arr[1].to_string()))
-            } else {
-                Err(Error::BadRequest(ErrorType::BadRequestBase64))
-            }
+        .filter_map(|it| {
+            search_position(
+                redis_client,
+                eta_search_limit,
+                &it.job_essential.job_uid,
+                &it.queue.name,
+            )
+            .ok()
         })
-        .collect();
-    let new_evidence = new_evidence?;
-    let (invalid, retries) =
-        new_evidence
-            .iter()
-            .fold((0usize, 0usize), |(invalid, retries), (first_id, uid)| {
-                let find = fragments
-                    .iter()
-                    .find(|frag| &frag.job_essential.job_uid == uid);
-                if let Some(tag) = find {
-                    if &tag.job_last_id == first_id {
-                        (invalid, retries)
-                    } else {
-                        (invalid, retries + 1)
-                    }
-                } else {
-                    (invalid + 1, retries)
-                }
-            });
-    Ok(EvidenceCheckResult { invalid, retries })
+        .collect::<Vec<_>>();
+    if positions.is_empty() {
+        return Ok(None);
+    }
+    if positions
+        .iter()
+        .all(|it| it == &SearchPositionResult::Pending)
+    {
+        return Ok(Some(estimated_unit_eta));
+    }
+    if positions
+        .iter()
+        .all(|it| !matches!(it, SearchPositionResult::QueueingFound(_)))
+    {
+        return Ok(None);
+    }
+    #[allow(clippy::cast_precision_loss)]
+    Ok(positions
+        .iter()
+        .filter_map(|it| match it {
+            SearchPositionResult::QueueingFound(x) => Some(x),
+            _ => None,
+        })
+        .max()
+        .copied()
+        .map(|it| estimated_unit_eta * it as f64))
 }

@@ -5,7 +5,10 @@ use redis::{Client, FromRedisValue, ScanOptions, TypedCommands, streams::StreamI
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 
-use crate::api::xxxxxx::SongScore;
+use crate::{
+    api::xxxxxx::SongScore,
+    db::redis::{Error, job_index_redis_key, job_output_index_redis_key, job_sub_queue_redis_key},
+};
 
 /// 代表一个任务分片，对应Redis数据库中的分任务队列
 ///
@@ -26,6 +29,43 @@ pub struct SubQueue {
     pub segment: Range<usize>,
 }
 
+impl TryFrom<&str> for SubQueue {
+    type Error = Error;
+
+    fn try_from(name: &str) -> Result<Self, Self::Error> {
+        let chunk_info: Vec<&str> = name.split('_').collect();
+        if chunk_info.len() != 5 {
+            return Err(Error::BadData(format!("bad queue name: {name}")));
+        }
+        let segment_from = chunk_info[3].parse::<usize>().map_err(|e| {
+            Error::BadData(format!(
+                "bad segment start \"{}\" of {} ({e})",
+                chunk_info[3], name
+            ))
+        })?;
+        let segment_to = chunk_info[4].parse::<usize>().map_err(|e| {
+            Error::BadData(format!(
+                "bad segment end \"{}\" of {} ({e})",
+                chunk_info[4], name
+            ))
+        })?;
+        if segment_from > segment_to {
+            return Err(Error::BadData(format!("bad segment (end<start): {name}")));
+        }
+        Ok(SubQueue {
+            name: name.to_string(),
+            hash: chunk_info[1].to_string(),
+            timestamp: chunk_info[2].parse::<u64>().map_err(|e| {
+                Error::BadData(format!(
+                    "bad timestamp \"{}\" of {} ({e})",
+                    chunk_info[2], name
+                ))
+            })?,
+            segment: segment_from..segment_to,
+        })
+    }
+}
+
 /// 一个Worker负责的`Job`实例，包含`Job`的关键信息和临时状态信息
 #[derive(Debug, Clone)]
 pub struct Job {
@@ -36,25 +76,26 @@ pub struct Job {
     /// 任务的关键信息
     pub essential: JobEssential,
 
-    // Temp
-    /// 目前已经轮询的长度
-
+    // States
     /// 源任务队列
     pub sub_queue: SubQueue,
 
     /// Job的内部状态
     pub state: JobState,
-    // /// 好友的`user_id`，若尚未加好友，则为`None`
-    // pub friend_user_id: Option<String>,
+}
 
-    // /// 是否添加好友（未来考虑删除）
-    // pub friend_added: bool,
+impl PartialEq for Job {
+    fn eq(&self, other: &Self) -> bool {
+        self.essential == other.essential
+    }
+}
 
-    // /// 任务完成标记
-    // pub finished: bool,
-
-    // /// 任务清理标记
-    // pub cleaned: bool,
+impl Job {
+    /// 获取Job对应的结果类队列id
+    #[must_use]
+    pub fn get_stream_key_postfix(&self) -> String {
+        self.essential.get_stream_key_postfix()
+    }
 }
 
 /// 记录任务的状态
@@ -91,13 +132,7 @@ pub enum JobState {
     Cleaned,
 }
 
-impl PartialEq for Job {
-    fn eq(&self, other: &Self) -> bool {
-        self.essential == other.essential
-    }
-}
-
-/// 一个任务的index信息，会被存放至`cuscuta:result:index:...`中
+/// 一个任务的index信息，会被存放至`cuscuta:result:index:...`和`cuscuta:pending:index:...`中
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobTag {
     /// 这个任务最后一次成功完成时在Redis队列中的id
@@ -117,13 +152,7 @@ impl TryFrom<(SubQueue, StreamId)> for Job {
         let timestamp = Utc::now().timestamp_millis();
         Ok(Job {
             job_id: id.id,
-            essential: JobEssential::new(
-                from_redis(&map, "job:friend_code")?,
-                from_redis(&map, "job:timestamp")?,
-                from_redis(&map, "job:cursor_start")?,
-                from_redis(&map, "job:cursor_length")?,
-                from_redis(&map, "job:retry_count")?,
-            ),
+            essential: JobEssential::try_from(&map)?,
             sub_queue,
             state: JobState::Pulled {
                 start_timestamp: timestamp,
@@ -185,18 +214,26 @@ impl JobEssential {
             job_uid: digest,
         }
     }
+
+    /// 获取Job对应的结果类队列id
+    #[must_use]
+    pub fn get_stream_key_postfix(&self) -> String {
+        format!("{}-{}", self.friend_code.clone(), self.timestamp.clone())
+    }
 }
 
-/// 与任务相关的错误
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Redis错误
-    #[error("redis error: {0}")]
-    Redis(redis::RedisError),
+impl TryFrom<&HashMap<String, redis::Value>> for JobEssential {
+    type Error = Error;
 
-    /// 任务数据不符合预期时的错误
-    #[error("bad: {0}")]
-    BadData(String),
+    fn try_from(map: &HashMap<String, redis::Value>) -> Result<Self, Self::Error> {
+        Ok(JobEssential::new(
+            from_redis(map, "job:friend_code")?,
+            from_redis(map, "job:timestamp")?,
+            from_redis(map, "job:cursor_start")?,
+            from_redis(map, "job:cursor_length")?,
+            from_redis(map, "job:retry_count")?,
+        ))
+    }
 }
 
 /// 向任务队列写入新任务
@@ -209,10 +246,11 @@ pub enum Error {
 pub fn write_job(
     redis_client: &Client,
     job_essential: &JobEssential,
-    key: String,
+    postfix: &str,
     recreate_group: bool,
     expire_time: i64,
 ) -> Result<String, redis::RedisError> {
+    let key = job_sub_queue_redis_key(postfix);
     let mut connection = redis_client.get_connection()?;
     if let Err(e) = connection.xgroup_create_mkstream(key.clone(), "default_group", "0-0")
         && !e.to_string().contains("BUSYGROUP")
@@ -236,6 +274,23 @@ pub fn write_job(
         .expect("XADD returns null when no 'NOMKSTREAM' declared, this should not happen"))
 }
 
+/// 将JobTag内容写入index，以便生成token供查询
+///
+/// # Errors
+/// 本函数的错误全部来自[`redis::RedisError`]
+pub fn write_job_index(redis_client: &Client, job_tag: &JobTag) -> Result<(), Error> {
+    let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
+    connection
+        .lpush(
+            job_index_redis_key(&job_tag.job_essential.get_stream_key_postfix()),
+            serde_json::to_string(job_tag).map_err(|e| {
+                Error::BadData(format!("failed to serialize JobTag: {job_tag:?} :{e}"))
+            })?,
+        )
+        .map_err(Error::Redis)?;
+    Ok(())
+}
+
 /// 不保证同步性，搜索工作队列分片
 ///
 /// # Errors
@@ -253,36 +308,7 @@ pub fn scan_sub_queue(redis_client: &Client) -> Result<Vec<SubQueue>, Error> {
         .map_err(Error::Redis)?
     {
         let name = it.map_err(Error::Redis)?;
-        let chunk_info: Vec<&str> = name.split('_').collect();
-        if chunk_info.len() != 5 {
-            return Err(Error::BadData(format!("bad queue name: {name}")));
-        }
-        let segment_from = chunk_info[3].parse::<usize>().map_err(|e| {
-            Error::BadData(format!(
-                "bad segment start \"{}\" of {} ({e})",
-                chunk_info[3], name
-            ))
-        })?;
-        let segment_to = chunk_info[4].parse::<usize>().map_err(|e| {
-            Error::BadData(format!(
-                "bad segment end \"{}\" of {} ({e})",
-                chunk_info[4], name
-            ))
-        })?;
-        if segment_from > segment_to {
-            return Err(Error::BadData(format!("bad segment (end<start): {name}")));
-        }
-        sub_queues.push(SubQueue {
-            name: name.clone(),
-            hash: chunk_info[1].to_string(),
-            timestamp: chunk_info[2].parse::<u64>().map_err(|e| {
-                Error::BadData(format!(
-                    "bad timestamp \"{}\" of {} ({e})",
-                    chunk_info[2], name
-                ))
-            })?,
-            segment: segment_from..segment_to,
-        });
+        sub_queues.push(SubQueue::try_from(name.as_str())?);
     }
     sub_queues.sort_by_key(|it| it.timestamp);
     Ok(sub_queues)
@@ -294,11 +320,23 @@ pub fn scan_sub_queue(redis_client: &Client) -> Result<Vec<SubQueue>, Error> {
 ///
 /// # Errors
 /// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
-pub fn scan_fragment(redis_client: &Client, key: &str) -> Result<Vec<JobTag>, Error> {
+pub fn fetch_result_tags(redis_client: &Client, postfix: &str) -> Result<Vec<JobTag>, Error> {
+    fetch_job_tags(redis_client, &job_output_index_redis_key(postfix))
+}
+
+/// 不保证同步性，搜索任务的index
+///
+/// 这个函数被用于辅助确认任务完成情况
+///
+/// # Errors
+/// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
+pub fn fetch_pending_tags(redis_client: &Client, postfix: &str) -> Result<Vec<JobTag>, Error> {
+    fetch_job_tags(redis_client, &job_index_redis_key(postfix))
+}
+
+fn fetch_job_tags(redis_client: &Client, key: &str) -> Result<Vec<JobTag>, Error> {
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
-    let range = connection
-        .lrange(format!("cuscuta:results:index:{key}"), 0, -1)
-        .map_err(Error::Redis)?;
+    let range = connection.lrange(key, 0, -1).map_err(Error::Redis)?;
     let mut out = Vec::<JobTag>::new();
     for it in &range {
         out.push(serde_json::from_str(it).map_err(|e| {
@@ -312,10 +350,10 @@ pub fn scan_fragment(redis_client: &Client, key: &str) -> Result<Vec<JobTag>, Er
 ///
 /// # Errors
 /// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
-pub fn fetch_result(redis_client: &Client, key: &str) -> Result<Vec<SongScore>, Error> {
+pub fn fetch_result(redis_client: &Client, job_key: &str) -> Result<Vec<SongScore>, Error> {
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     let range = connection
-        .lrange(format!("cuscuta:results:value:{key}"), 0, -1)
+        .lrange(format!("cuscuta:results:value:{job_key}"), 0, -1)
         .map_err(Error::Redis)?;
     let mut out = Vec::<SongScore>::new();
     for it in &range {
@@ -324,6 +362,79 @@ pub fn fetch_result(redis_client: &Client, key: &str) -> Result<Vec<SongScore>, 
         })?);
     }
     Ok(out)
+}
+
+/// [`search_position`]的返回结果
+#[derive(Debug, PartialEq, Eq)]
+pub enum SearchPositionResult {
+    /// 任务正在进行
+    Pending,
+
+    /// 任务正在排队，且在搜索范围内
+    QueueingFound(usize),
+
+    /// 任务正在排队，但超出搜索范围外
+    QueueingNotFound,
+}
+
+/// 在任务队列中搜索Job的位置，用来计算任务剩余时间\
+/// 由于函数的特殊性和非原子性（原子化没必要且易阻塞），本函数返回的结果可能有偏差
+///
+/// 这个函数的开销预计比较大
+///
+/// # Errors
+/// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
+pub fn search_position(
+    redis_client: &Client,
+    limit: usize,
+    job_uid: &str,
+    sub_queue_name: &str,
+) -> Result<SearchPositionResult, Error> {
+    let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
+    let pending_result = connection
+        .xpending_count(sub_queue_name, "default_group", "-", "+", "")
+        .map_err(Error::Redis)?;
+    // 试图从PEL解析出真实数据的操作若失败，则忽略；因为这个函数并不要求总是成功
+    if pending_result
+        .ids
+        .into_iter()
+        .filter_map(|it| {
+            connection
+                .xrange(sub_queue_name, it.id.clone(), it.id)
+                .map(|it| it.ids.first().cloned())
+                .unwrap_or(None)
+        })
+        .filter_map(|it| JobEssential::try_from(&it.map).ok())
+        .any(|it| it.job_uid == job_uid)
+    {
+        return Ok(SearchPositionResult::Pending);
+    }
+    let default_group_info = connection
+        .xinfo_groups(sub_queue_name)
+        .map_err(Error::Redis)?
+        .groups
+        .into_iter()
+        .find(|it| &it.name == "default_group")
+        .ok_or(Error::BadData("no default_group found".to_string()))?;
+    let range_result = connection
+        .xrange_count(
+            sub_queue_name,
+            format!("({}", default_group_info.last_delivered_id),
+            "+",
+            limit,
+        )
+        .map_err(Error::Redis)?
+        .ids
+        .into_iter()
+        .filter_map(|it| JobEssential::try_from(&it.map).ok())
+        .enumerate()
+        .find(|(_, id)| id.job_uid == job_uid)
+        .map(|it| it.0);
+    if let Some(result) = range_result {
+        Ok(SearchPositionResult::QueueingFound(result))
+    } else {
+        Ok(SearchPositionResult::QueueingNotFound)
+    }
 }
 
 fn from_redis<T>(value: &HashMap<String, redis::Value>, key: &str) -> Result<T, Error>

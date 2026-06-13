@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use reqwest::StatusCode;
 
 pub mod enqueue;
@@ -14,6 +16,8 @@ enum ErrorType {
 
     FailedScanRedis = -301,
     FailedEnqueueRedis = -302,
+    FailedReadEtaRedis = -303,
+    FailedCheckEvidenceRedis = -304,
 
     InternalNoWorker = -400,
 
@@ -21,21 +25,27 @@ enum ErrorType {
     BadRequestTokenCheckFailed = -501,
 }
 
+impl Display for ErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&format!("{}", *self as i64))
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 enum Error {
-    #[error("server is not ready")]
+    #[error("server is not ready:{0}")]
     NotReady(ErrorType),
-    #[error("service unavailable: 0x010")]
+    #[error("service unavailable: 0x010:{0}")]
     Db(ErrorType, sqlx::Error),
-    #[error("service unavailable: 0x011")]
+    #[error("service unavailable: 0x011:{0}")]
     DbExtend(ErrorType, cuscuta_common::db::postgresql::Error),
-    #[error("service unavailable: 0x020")]
+    #[error("service unavailable: 0x020:{0}")]
     Redis(ErrorType, redis::RedisError),
-    #[error("service unavailable: 0x021")]
-    RedisExtend(ErrorType, cuscuta_common::db::job::Error),
-    #[error("service unavailable: 0x000")]
+    #[error("service unavailable: 0x021:{0}")]
+    RedisExtend(ErrorType, cuscuta_common::db::redis::Error),
+    #[error("service unavailable: 0x000:{0}")]
     Internal(ErrorType),
-    #[error("bad request")]
+    #[error("bad request:{0}")]
     BadRequest(ErrorType),
 }
 

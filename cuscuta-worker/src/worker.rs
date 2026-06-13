@@ -11,10 +11,11 @@ use cuscuta_common::{
     },
     data::{BundleData, Song},
     db::{
+        self,
         account::AccountRow,
         job::{self, Job, JobState, JobTag, SubQueue, write_job},
         job_eta::record_eta,
-        redis::{job_index_redis_key, job_result_redis_key},
+        redis::{job_output_index_redis_key, job_result_redis_key},
     },
     quick_fetch::QuickFetch,
 };
@@ -44,7 +45,7 @@ pub enum Error {
     #[error("redis error: {0}")]
     Redis(redis::RedisError),
     #[error("job parse error: {0}")]
-    JobParse(job::Error),
+    JobParse(db::redis::Error),
     #[error("api error: {0}")]
     Api(api::Error),
     #[error("bad state error: {0}")]
@@ -94,8 +95,8 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
             )
         } else {
             let sub_queues = job::scan_sub_queue(redis_client).map_err(|e| match e {
-                job::Error::Redis(redis_error) => Error::Redis(redis_error),
-                job::Error::BadData(e) => Error::BadState(format!("bad data: {e}")),
+                db::redis::Error::Redis(redis_error) => Error::Redis(redis_error),
+                db::redis::Error::BadData(e) => Error::BadState(format!("bad data: {e}")),
             })?;
             let Some((jobs, sub_queue)) = discover_sub_queue(
                 current_jobs,
@@ -198,8 +199,14 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
 fn refresh_redis_ttl(jobs: &[Job], redis_client: &Client, config: &Config) -> Result<(), Error> {
     let mut pipe = redis::pipe();
     for job in jobs {
-        pipe.expire(job_index_redis_key(job), config.redis_stream_refresh_ttl)
-            .expire(job_result_redis_key(job), config.redis_stream_refresh_ttl);
+        pipe.expire(
+            job_output_index_redis_key(&job.get_stream_key_postfix()),
+            config.redis_stream_refresh_ttl,
+        )
+        .expire(
+            job_result_redis_key(&job.get_stream_key_postfix()),
+            config.redis_stream_refresh_ttl,
+        );
     }
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     pipe.exec(&mut connection).map_err(Error::Redis)
@@ -227,7 +234,7 @@ async fn clean_jobs(
         .collect();
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     for finished_job in jobs.iter_mut() {
-        let output_list_key = job_index_redis_key(finished_job);
+        let output_list_key = job_output_index_redis_key(&finished_job.get_stream_key_postfix());
         let JobState::Finished {
             friend_user_id,
             start_timestamp,
@@ -278,7 +285,7 @@ async fn clean_jobs(
 fn process_job_with_result(jobs: &mut [Job], scores: &[SongScore]) -> Vec<(String, SongScore)> {
     let mut job_links = Vec::new();
     for job in jobs.iter_mut() {
-        let redis_key = job_result_redis_key(job);
+        let redis_key = job_result_redis_key(&job.get_stream_key_postfix());
         let JobState::Pending {
             friend_user_id,
             current_length,
@@ -487,6 +494,7 @@ fn pull_jobs(
     pod_uid: &str,
     total_length: usize,
 ) -> Result<Option<Vec<Job>>, Error> {
+    // TODO: 添加无GROUP找不到的错误处理（跳过）
     fn claim_jobs(
         connection: &mut redis::Connection,
         key: &str,
@@ -531,7 +539,6 @@ fn pull_jobs(
                 it.keys.into_iter().next().map_or(Vec::new(), |it| it.ids)
             }))
     }
-    //TODO: handle overlap
     let valid_jobs = valid_jobs(jobs);
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     let max_jobs = config.worker_max_jobs.try_into().expect("wait... what?");
@@ -615,7 +622,7 @@ pub fn resume_state(worker_result: &WorkerResult) {
             write_job(
                 redis_client,
                 &job.essential,
-                job.sub_queue.name.clone(),
+                &job.sub_queue.name,
                 false,
                 redis_stream_refresh_ttl,
             )
