@@ -34,6 +34,7 @@
 //! `legacy` is the default. `kubernetes` mode reads database URLs from the cluster
 //! Secret (`cuscuta-secret` by default) and opens a local `kubectl port-forward` tunnel.
 
+#![deny(clippy::nursery)]
 #![deny(clippy::pedantic)]
 #![deny(missing_docs)]
 
@@ -150,23 +151,26 @@ async fn run_command(
 ) -> anyhow::Result<()> {
     match &cli.sub_command {
         SubCommands::Doctor => {
-            let redis_url = if let Ok(ref x) = redis_url {
-                Some(x)
-            } else {
-                eprintln!("warning: no redis url specified, redis check will be skipped");
-                eprintln!("Hint: use --mode legacy --redis-url <URL>");
-                None
-            };
-            let pg_url = if let Ok(ref x) = pg_url {
-                Some(x)
-            } else {
-                eprintln!("warning: no postgresql url specified, account check will be skipped");
-                eprintln!("Hint: use --mode legacy --postgresql-url <URL>");
-                None
-            };
+            let redis_url = redis_url.as_ref().map_or_else(
+                |_| {
+                    eprintln!("warning: no redis url specified, redis check will be skipped");
+                    eprintln!("Hint: use --mode legacy --redis-url <URL>");
+                    None
+                },
+                Some,
+            );
+            let pg_url = pg_url.as_ref().map_or_else(
+                |_| {
+                    eprintln!(
+                        "warning: no postgresql url specified, account check will be skipped"
+                    );
+                    eprintln!("Hint: use --mode legacy --postgresql-url <URL>");
+                    None
+                },
+                Some,
+            );
             doctor::run(pg_url, redis_url).await?;
         }
-
         SubCommands::Jobs { command } => {
             let redis_url = match redis_url {
                 Ok(x) => x,

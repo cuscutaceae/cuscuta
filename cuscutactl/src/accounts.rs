@@ -233,7 +233,7 @@ pub async fn row_query(pg_url: &str, id: i64) -> anyhow::Result<()> {
             );
             println!(
                 "user_id:  {}",
-                r.user_id.map_or("-".to_string(), |v| v.to_string())
+                r.user_id.map_or_else(|| "-".to_string(), |v| v.to_string())
             );
             println!(
                 "token:    {}",

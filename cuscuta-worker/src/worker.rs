@@ -13,7 +13,7 @@ use cuscuta_common::{
     db::{
         self,
         account::AccountRow,
-        job::{self, Job, JobState, JobTag, SubQueue, write_job},
+        job::{self, Job, JobState, JobTag, SubQueue, write_job, write_job_index},
         job_eta::record_eta,
         redis::{job_output_index_redis_key, job_result_redis_key},
     },
@@ -44,6 +44,8 @@ pub enum Error {
     NotReady(String),
     #[error("redis error: {0}")]
     Redis(redis::RedisError),
+    #[error("redis extended error: {0}")]
+    RedisExtend(cuscuta_common::db::redis::Error),
     #[error("job parse error: {0}")]
     JobParse(db::redis::Error),
     #[error("api error: {0}")]
@@ -273,7 +275,8 @@ async fn clean_jobs(
         }
         let _ = record_eta(
             redis_client,
-            Utc::now().timestamp_millis() - *start_timestamp,
+            (Utc::now().timestamp_millis() - *start_timestamp)
+                / i64::from(finished_job.essential.cursor_length),
         );
         log::info!("job: {finished_job:?} finished");
         finished_job.state = JobState::Cleaned;
@@ -605,8 +608,8 @@ fn pull_jobs(
     ))
 }
 
-pub fn resume_state(worker_result: &WorkerResult) {
-    fn resume_jobs(worker_result: &WorkerResult) -> Result<(), Error> {
+pub fn resume_state(worker_result: WorkerResult) {
+    fn resume_jobs(worker_result: WorkerResult) -> Result<(), Error> {
         let redis_client = REDIS_CLIENT
             .get()
             .ok_or(Error::NotReady("redis client".to_string()))?;
@@ -614,12 +617,12 @@ pub fn resume_state(worker_result: &WorkerResult) {
             .try_read(|it| it.redis_stream_refresh_ttl)
             .unwrap_or(300);
         let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
-        for job in &worker_result.jobs {
+        for job in worker_result.jobs {
             log::info!("resuming_jobs: reenqueueing job: {job:?}");
             connection
                 .xack(&job.sub_queue.name, "default_group", &[&job.job_id])
                 .map_err(Error::Redis)?;
-            write_job(
+            let job_id = write_job(
                 redis_client,
                 &job.essential,
                 &job.sub_queue.name,
@@ -627,6 +630,15 @@ pub fn resume_state(worker_result: &WorkerResult) {
                 redis_stream_refresh_ttl,
             )
             .map_err(Error::Redis)?;
+            write_job_index(
+                redis_client,
+                &JobTag {
+                    job_last_id: job_id,
+                    queue: job.sub_queue,
+                    job_essential: job.essential,
+                },
+            )
+            .map_err(Error::RedisExtend)?;
         }
         Ok(())
     }

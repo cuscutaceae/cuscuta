@@ -39,6 +39,7 @@ pub mod postgresql {
     /// - 当SQL全局变量未初始化或初始化未完全时，返回[`Error::NotReady`]
     /// - 当全局变量读取失败时，返回[`Error::TryLock`]
     /// - 当出现SQL错误时，返回[`Error::Sql`]
+    #[allow(clippy::significant_drop_tightening)]
     pub async fn try_open_transaction<'a>(
         postgresql_pool: &OnceLock<RwLock<Option<sqlx::PgPool>>>,
     ) -> Result<Transaction<'a, Postgres>, Error> {

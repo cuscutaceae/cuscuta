@@ -138,7 +138,7 @@ pub async fn api_login(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<LoginResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -174,7 +174,7 @@ pub async fn api_list_friend(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<FriendListResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -213,7 +213,7 @@ pub async fn api_add_friend(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<FriendListResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -252,7 +252,7 @@ pub async fn api_delete_friend(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<FriendListResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -300,7 +300,7 @@ pub async fn api_get_rank_list(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<SongScoreResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))

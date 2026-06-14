@@ -26,6 +26,7 @@
 //! - `API_GET_RANK`
 //!
 
+#![deny(clippy::nursery)]
 #![deny(clippy::pedantic)]
 
 mod data;
@@ -111,7 +112,7 @@ async fn start_loop(cancellation_token: CancellationToken) {
         worker_loop_result.jobs.len(),
         worker_loop_result.cursor
     );
-    resume_state(&worker_loop_result);
+    resume_state(worker_loop_result);
     cancellation_token.cancel();
 }
 
@@ -172,13 +173,15 @@ fn check_ready() -> Option<&'static str> {
 }
 
 async fn readyz() -> impl IntoResponse {
-    match check_ready() {
-        Some(e) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"status": "not ready", "reason": e})),
-        ),
-        None => (StatusCode::OK, Json(json!({"status":"ready"}))),
-    }
+    check_ready().map_or_else(
+        || (StatusCode::OK, Json(json!({"status":"ready"}))),
+        |e| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"status": "not ready", "reason": e})),
+            )
+        },
+    )
 }
 
 async fn healthz() -> impl IntoResponse {

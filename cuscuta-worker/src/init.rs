@@ -28,7 +28,7 @@ struct Error {
 }
 impl From<(Level, String)> for Error {
     fn from(value: (Level, String)) -> Self {
-        Error {
+        Self {
             level: value.0,
             description: value.1,
         }
@@ -64,7 +64,7 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
             .map_err(|e| (Level::Retry, format!("failed to read BUNDLE_DATA: {e}")))?;
         REDIS_CLIENT
             .get()
-            .ok_or((Level::Retry, "redis is not ready".to_string()))?
+            .ok_or_else(|| (Level::Retry, "redis is not ready".to_string()))?
             .get_connection()
             .map_err(|e| {
                 (
@@ -85,7 +85,7 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
                 format!("failed to operate postgresql database: {e}"),
             )
         })?
-        .ok_or((Level::Halt, "no account found".to_string()))?;
+        .ok_or_else(|| (Level::Halt, "no account found".to_string()))?;
         log::info!("init: locked {}", account_row.id);
         ACCOUNT_ROW
             .try_write(|_| Some(account_row.clone()))
@@ -100,12 +100,12 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
                 account_row.account_email.clone(),
                 account_row
                     .user_id
-                    .ok_or((Level::Halt, "unexpected data #1".to_string()))?
+                    .ok_or_else(|| (Level::Halt, "unexpected data #1".to_string()))?
                     .to_string(),
                 account_row
                     .temp_token
                     .clone()
-                    .ok_or((Level::Halt, "unexpected data #2".to_string()))?,
+                    .ok_or_else(|| (Level::Halt, "unexpected data #2".to_string()))?,
                 friend.user_id.to_string(),
             )
             .await

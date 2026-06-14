@@ -15,14 +15,14 @@ cuscuta是一系列小型软件的集合，组合起来的话……可以用来�
 
 cuscuta内含了一些组件
 
-| 名称           | 状态   | 约束                                                   | 用途                                                                                    |
-| -------------- | ------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| cuscuta-entry  | 不稳定 | `#![deny(clippy::pedantic)]`                           | 处理入站流量，暴露服务，分发任务，目前理论 **不可扩展（仅单例）**                       |
-| cuscuta-worker | 不稳定 | `#![deny(clippy::pedantic)]`                           | 实际处理任务，理论可扩展                                                                |
-| cuscuta-common | 较稳定 | `#![deny(clippy::pedantic)]`, `#![deny(missing_docs)]` | entry和worker的通用组件                                                                 |
-| cuscuta-chilo  | 不稳定 | `#![deny(clippy::pedantic)]`                           | [chilo](https://github.com/cuscutaceae/chilo)的一个WebAPI包装，被worker依赖，理论可扩展 |
-| cuscuta-mock   | 不稳定 | 无                                                     | worker的mock用镜像                                                                      |
-| cuscutactl     | 待验证 | `#![deny(clippy::pedantic)]`, `#![deny(missing_docs)]` | cuscuta集群的一个简易命令行管理工具（使用AI生成）                                       |
+| 名称           | 状态   | 约束                                                                                | 用途                                                                                    |
+| -------------- | ------ | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| cuscuta-entry  | 不稳定 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`                           | 处理入站流量，暴露服务，分发任务，目前理论 **不可扩展（仅单例）**                       |
+| cuscuta-worker | 不稳定 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`                           | 实际处理任务，理论可扩展                                                                |
+| cuscuta-common | 较稳定 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`, `#![deny(missing_docs)]` | entry和worker的通用组件                                                                 |
+| cuscuta-chilo  | 不稳定 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`                           | [chilo](https://github.com/cuscutaceae/chilo)的一个WebAPI包装，被worker依赖，理论可扩展 |
+| cuscuta-mock   | 不稳定 | 无                                                                                  | worker的mock用镜像                                                                      |
+| cuscutactl     | 待验证 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`, `#![deny(missing_docs)]` | cuscuta集群的一个简易命令行管理工具（使用AI生成）                                       |
 
 ### 依赖
 

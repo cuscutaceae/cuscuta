@@ -50,27 +50,27 @@ enum Error {
 }
 
 impl Error {
-    fn get_error_type(&self) -> ErrorType {
+    const fn get_error_type(&self) -> ErrorType {
         match self {
-            Error::NotReady(error_type)
-            | Error::Db(error_type, _)
-            | Error::DbExtend(error_type, _)
-            | Error::Redis(error_type, _)
-            | Error::RedisExtend(error_type, _)
-            | Error::Internal(error_type)
-            | Error::BadRequest(error_type) => *error_type,
+            Self::NotReady(error_type)
+            | Self::Db(error_type, _)
+            | Self::DbExtend(error_type, _)
+            | Self::Redis(error_type, _)
+            | Self::RedisExtend(error_type, _)
+            | Self::Internal(error_type)
+            | Self::BadRequest(error_type) => *error_type,
         }
     }
 
-    fn get_status_code(&self) -> StatusCode {
+    const fn get_status_code(&self) -> StatusCode {
         match self {
-            Error::NotReady(_)
-            | Error::Db(_, _)
-            | Error::DbExtend(_, _)
-            | Error::Redis(_, _)
-            | Error::RedisExtend(_, _) => StatusCode::INTERNAL_SERVER_ERROR,
-            Error::Internal(_) => StatusCode::IM_A_TEAPOT,
-            Error::BadRequest(_) => StatusCode::BAD_REQUEST,
+            Self::NotReady(_)
+            | Self::Db(_, _)
+            | Self::DbExtend(_, _)
+            | Self::Redis(_, _)
+            | Self::RedisExtend(_, _) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Internal(_) => StatusCode::IM_A_TEAPOT,
+            Self::BadRequest(_) => StatusCode::BAD_REQUEST,
         }
     }
 }

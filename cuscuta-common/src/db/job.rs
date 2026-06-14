@@ -52,7 +52,7 @@ impl TryFrom<&str> for SubQueue {
         if segment_from > segment_to {
             return Err(Error::BadData(format!("bad segment (end<start): {name}")));
         }
-        Ok(SubQueue {
+        Ok(Self {
             name: name.to_string(),
             hash: chunk_info[1].to_string(),
             timestamp: chunk_info[2].parse::<u64>().map_err(|e| {
@@ -99,7 +99,7 @@ impl Job {
 }
 
 /// 记录任务的状态
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JobState {
     /// 任务刚刚被拉取，还没有加好友
     Pulled {
@@ -150,7 +150,7 @@ impl TryFrom<(SubQueue, StreamId)> for Job {
     fn try_from((sub_queue, id): (SubQueue, StreamId)) -> Result<Self, Self::Error> {
         let map = id.map;
         let timestamp = Utc::now().timestamp_millis();
-        Ok(Job {
+        Ok(Self {
             job_id: id.id,
             essential: JobEssential::try_from(&map)?,
             sub_queue,
@@ -205,7 +205,7 @@ impl JobEssential {
             .copied()
             .collect();
         let digest = hex::encode(sha2::Sha256::digest(traits));
-        JobEssential {
+        Self {
             friend_code,
             timestamp,
             cursor_start,
@@ -226,7 +226,7 @@ impl TryFrom<&HashMap<String, redis::Value>> for JobEssential {
     type Error = Error;
 
     fn try_from(map: &HashMap<String, redis::Value>) -> Result<Self, Self::Error> {
-        Ok(JobEssential::new(
+        Ok(Self::new(
             from_redis(map, "job:friend_code")?,
             from_redis(map, "job:timestamp")?,
             from_redis(map, "job:cursor_start")?,
@@ -430,11 +430,10 @@ pub fn search_position(
         .enumerate()
         .find(|(_, id)| id.job_uid == job_uid)
         .map(|it| it.0);
-    if let Some(result) = range_result {
-        Ok(SearchPositionResult::QueueingFound(result))
-    } else {
-        Ok(SearchPositionResult::QueueingNotFound)
-    }
+    range_result.map_or_else(
+        || Ok(SearchPositionResult::QueueingNotFound),
+        |result| Ok(SearchPositionResult::QueueingFound(result)),
+    )
 }
 
 fn from_redis<T>(value: &HashMap<String, redis::Value>, key: &str) -> Result<T, Error>

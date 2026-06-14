@@ -67,17 +67,18 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
         let timestamp = Utc::now().timestamp().to_string();
         for range in ranges {
             let target_queue = queues.iter().find(|q| q.segment == range);
-            let (queue_name, exist) = match target_queue {
-                Some(it) => (it.name.clone(), true),
-                //TODO add hash here
-                None => (
-                    format!(
-                        "chunk_{}_{}_{}_{}",
-                        "00000000", timestamp, range.start, range.end
-                    ),
-                    false,
-                ),
-            };
+            let (queue_name, exist) = target_queue.map_or_else(
+                || {
+                    (
+                        format!(
+                            "chunk_{}_{}_{}_{}",
+                            "00000000", timestamp, range.start, range.end
+                        ),
+                        false,
+                    )
+                },
+                |it| (it.name.clone(), true),
+            );
             #[allow(clippy::cast_possible_truncation)]
             let job_essential = JobEssential::new(
                 form.friend_code.clone(),

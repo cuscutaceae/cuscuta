@@ -11,6 +11,7 @@
 //! - `BIN_LOGIN_C31`
 //! - `BIN_LOGIN_C32`
 
+#![deny(clippy::nursery)]
 #![deny(clippy::pedantic)]
 
 use std::{env, sync::OnceLock};
@@ -586,18 +587,20 @@ async fn generate(Query(query): Query<GenerateQuery>) -> impl IntoResponse {
     )
 }
 
-fn check_ready() -> Option<String> {
+const fn check_ready() -> Option<String> {
     None
 }
 
 async fn readyz() -> impl IntoResponse {
-    match check_ready() {
-        Some(e) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"status": "not ready", "reason": e})),
-        ),
-        None => (StatusCode::OK, Json(json!({"status":"ready"}))),
-    }
+    check_ready().map_or_else(
+        || (StatusCode::OK, Json(json!({"status":"ready"}))),
+        |e| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"status": "not ready", "reason": e})),
+            )
+        },
+    )
 }
 
 async fn healthz() -> impl IntoResponse {

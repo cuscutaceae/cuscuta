@@ -6,6 +6,7 @@
 //! # 局限
 //! 很明显，cuscuta并没有做数据层兼容，即cuscuta目前**强绑定于**`Redis`和`PostgreSQL`，这将在未来必要时重构
 
+#![deny(clippy::nursery)]
 #![deny(clippy::pedantic)]
 #![deny(missing_docs)]
 

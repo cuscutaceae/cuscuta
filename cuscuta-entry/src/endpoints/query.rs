@@ -82,12 +82,10 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
         )
         .map_err(|_| Error::BadRequest(ErrorType::BadRequestBase64))?;
         let enable_eta = env::var("ETA_ENABLE")
-            .unwrap_or("false".to_string())
+            .unwrap_or_else(|_| "false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
         let evidence_check_result = check_evidence(redis_client, &token)?;
-        // TODO: 硬编码Trim，以后要改
-        // TODO: 扫描队列也需要加一个环境变量
         match evidence_check_result {
             EvidenceCheckResult::Pending {
                 total_jobs,
@@ -189,6 +187,7 @@ fn check_evidence(redis_client: &Client, postfix: &str) -> Result<EvidenceCheckR
     })
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn calc_eta(redis_client: &Client, postfix: &str) -> Result<Option<f64>, Error> {
     let eta_record_trim = env::var("ETA_RECORD_TRIM")
         .map_err(|_| ())
@@ -205,6 +204,11 @@ fn calc_eta(redis_client: &Client, postfix: &str) -> Result<Option<f64>, Error> 
     };
     let pending_jobs = fetch_pending_tags(redis_client, postfix)
         .map_err(|e| Error::RedisExtend(ErrorType::FailedReadEtaRedis, e))?;
+    let avg_songs = pending_jobs
+        .iter()
+        .map(|it| it.queue.segment.len())
+        .sum::<usize>() as f64
+        / pending_jobs.len() as f64;
     let positions = pending_jobs
         .iter()
         .filter_map(|it| {
@@ -224,7 +228,7 @@ fn calc_eta(redis_client: &Client, postfix: &str) -> Result<Option<f64>, Error> 
         .iter()
         .all(|it| it == &SearchPositionResult::Pending)
     {
-        return Ok(Some(estimated_unit_eta));
+        return Ok(Some(estimated_unit_eta * avg_songs));
     }
     if positions
         .iter()
@@ -232,7 +236,6 @@ fn calc_eta(redis_client: &Client, postfix: &str) -> Result<Option<f64>, Error> 
     {
         return Ok(None);
     }
-    #[allow(clippy::cast_precision_loss)]
     Ok(positions
         .iter()
         .filter_map(|it| match it {
@@ -241,5 +244,5 @@ fn calc_eta(redis_client: &Client, postfix: &str) -> Result<Option<f64>, Error> 
         })
         .max()
         .copied()
-        .map(|it| estimated_unit_eta * it as f64))
+        .map(|it| estimated_unit_eta * it as f64 * avg_songs))
 }

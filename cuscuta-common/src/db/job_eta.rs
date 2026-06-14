@@ -46,7 +46,9 @@ pub fn fetch_unit_eta(redis_client: &Client, limit: usize) -> Result<Option<f64>
         return Ok(None);
     }
     let avg = result.iter().sum::<f64>() / (result.len() as f64);
-    let sd = (result.iter().fold(0f64, |i, it| i + (*it - avg).powi(2))
+    let sd = (result
+        .iter()
+        .fold(0f64, |i, it| (*it - avg).mul_add(*it - avg, i))
         / (result.len() as f64 - 1.0))
         .sqrt();
     let filtered: Vec<_> = result
