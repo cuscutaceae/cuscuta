@@ -15,7 +15,7 @@ use cuscuta_common::{
         account::AccountRow,
         job::{self, Job, JobState, JobTag, SubQueue, write_job, write_job_index},
         job_eta::record_eta,
-        redis::{job_output_index_redis_key, job_result_redis_key},
+        redis::{job_index_redis_key, job_output_index_redis_key, job_result_redis_key},
     },
     quick_fetch::QuickFetch,
 };
@@ -207,6 +207,10 @@ fn refresh_redis_ttl(jobs: &[Job], redis_client: &Client, config: &Config) -> Re
         )
         .expire(
             job_result_redis_key(&job.get_stream_key_postfix()),
+            config.redis_stream_refresh_ttl,
+        )
+        .expire(
+            job_index_redis_key(&job.get_stream_key_postfix()),
             config.redis_stream_refresh_ttl,
         );
     }
