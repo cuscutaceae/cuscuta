@@ -396,7 +396,7 @@ pub mod auto {
         max_retries: u64,
         exponential_backoff_base_millis: u64,
         exponential_backoff_multiplier: u64,
-        worker_exponential_backoff_max_delay_millis: u64,
+        exponential_backoff_max_delay_millis: u64,
         f: F,
     ) -> Result<R, api::Error>
     where
@@ -414,7 +414,7 @@ pub mod auto {
                     sleep(Duration::from_millis(
                         (exponential_backoff_base_millis
                             * exponential_backoff_multiplier.pow(retries as u32))
-                        .min(worker_exponential_backoff_max_delay_millis),
+                        .min(exponential_backoff_max_delay_millis),
                     ))
                     .await;
                 }

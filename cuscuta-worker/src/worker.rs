@@ -127,6 +127,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
             return Ok(());
         }
         try_add_friends(
+            &config,
             &bundle_data,
             &user_id,
             &token,
@@ -266,12 +267,20 @@ async fn clean_jobs(
             .map_err(Error::Redis)?;
         let _ = connection.expire(output_list_key, config.redis_stream_refresh_ttl);
         if !pending_friends.contains(&finished_job.essential.friend_code) {
-            api_delete_friend(
-                bundle_data,
-                account_row.account_email.clone(),
-                user_id.to_string(),
-                token.to_string(),
-                friend_user_id.clone(),
+            xxxxxx_safe_call(
+                config.worker_max_retry_count,
+                config.worker_exponential_backoff_base_millis,
+                config.worker_exponential_backoff_multiplier,
+                config.worker_exponential_backoff_max_delay_millis,
+                || {
+                    api_delete_friend(
+                        bundle_data,
+                        account_row.account_email.clone(),
+                        user_id.to_string(),
+                        token.to_string(),
+                        friend_user_id.clone(),
+                    )
+                },
             )
             .await
             .map_err(Error::Api)?;
@@ -377,8 +386,9 @@ async fn gather_rank_list<'a>(
     Ok(result)
 }
 
-#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 async fn try_add_friends(
+    config: &Config,
     bundle_data: &BundleData,
     user_id: &str,
     token: &str,
@@ -414,12 +424,20 @@ async fn try_add_friends(
             job.essential.cursor_start = cursor.cast_signed() as i32;
             continue;
         }
-        let result = api::xxxxxx::api_add_friend(
-            bundle_data,
-            account_row.account_email.clone(),
-            user_id.to_string(),
-            token.to_string(),
-            job.essential.friend_code.clone(),
+        let result = xxxxxx_safe_call(
+            config.worker_max_retry_count,
+            config.worker_exponential_backoff_base_millis,
+            config.worker_exponential_backoff_multiplier,
+            config.worker_exponential_backoff_max_delay_millis,
+            || {
+                api::xxxxxx::api_add_friend(
+                    bundle_data,
+                    account_row.account_email.clone(),
+                    user_id.to_string(),
+                    token.to_string(),
+                    job.essential.friend_code.clone(),
+                )
+            },
         )
         .await;
         let friends_new = match result {
