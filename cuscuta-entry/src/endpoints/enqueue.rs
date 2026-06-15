@@ -77,7 +77,7 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
                         false,
                     )
                 },
-                |it| (it.name.clone(), true),
+                |it| (it.get_postfix(), true),
             );
             #[allow(clippy::cast_possible_truncation)]
             let job_essential = JobEssential::new(

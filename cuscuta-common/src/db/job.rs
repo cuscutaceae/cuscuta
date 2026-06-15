@@ -29,6 +29,17 @@ pub struct SubQueue {
     pub segment: Range<usize>,
 }
 
+impl SubQueue {
+    /// 获取任务的后缀
+    #[must_use]
+    pub fn get_postfix(&self) -> String {
+        format!(
+            "chunk_{}_{}_{}_{}",
+            self.hash, self.timestamp, self.segment.start, self.segment.end
+        )
+    }
+}
+
 impl TryFrom<&str> for SubQueue {
     type Error = Error;
 
