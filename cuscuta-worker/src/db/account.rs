@@ -17,7 +17,7 @@ pub async fn perform_login(
 ) -> Result<LoginResult, api::Error> {
     let url =
         Url::from_str(&env::var("API_LOGIN").map_err(|e| api::Error::Env(e, "API_LOGIN".into()))?)
-            .unwrap_or(Url::from_str("http://nofyso:11451/auth/login").unwrap());
+            .unwrap_or_else(|_| Url::from_str("http://nofyso:11451/auth/login").unwrap());
     let timestamp = Local::now().timestamp_millis().to_string();
     let random_challenge = match chilo_generate(
         timestamp,
@@ -96,7 +96,7 @@ pub mod auto {
 
     impl From<(AccountRow, FriendListResult1)> for TokenUpdateResult {
         fn from(value: (AccountRow, FriendListResult1)) -> Self {
-            TokenUpdateResult {
+            Self {
                 account_row: value.0,
                 friends: value.1,
             }

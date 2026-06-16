@@ -23,6 +23,15 @@ rustLog: info
 # -- Redis stream TTL shared by entry and worker (env: REDIS_STREAM_REFRESH_TTL)
 redisStreamRefreshTtl: 300
 
+# -- ETA estimation configuration
+eta:
+  # -- Enable ETA estimation (env: ETA_ENABLE)
+  enabled: true
+# -- Max ETA data points to retain (env: ETA_RECORD_TRIM)
+  recordTrim: 15
+  # -- Max jobs to search for ETA estimation (env: ETA_SEARCH_LIMIT)
+  searchLimit: 10
+
 # -- GitHub data sources
 github:
   bundleRepository: cuscutaceae/scales

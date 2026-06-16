@@ -112,7 +112,6 @@ impl Config {
             .clone()
             .ok_or(Error::LegacyOptionMissing)?
             .postgresql_url
-            .clone()
             .ok_or(Error::MissingPostgresqlUrl)?;
         Ok(pg)
     }
@@ -128,7 +127,6 @@ impl Config {
             .clone()
             .ok_or(Error::LegacyOptionMissing)?
             .redis_url
-            .clone()
             .ok_or(Error::MissingRedisUrl)?;
         Ok(pg)
     }

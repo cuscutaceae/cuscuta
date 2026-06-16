@@ -12,6 +12,7 @@
 //! - `REDIS_ADDR`
 //! - `ACCOUNTS_SQL_ADDR`
 
+#![deny(clippy::nursery)]
 #![deny(clippy::pedantic)]
 
 mod data;
@@ -89,13 +90,15 @@ fn check_ready() -> Option<&'static str> {
 }
 
 async fn readyz() -> impl IntoResponse {
-    match check_ready() {
-        Some(e) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"status": "not ready", "reason": e})),
-        ),
-        None => (StatusCode::OK, Json(json!({"status":"ready"}))),
-    }
+    check_ready().map_or_else(
+        || (StatusCode::OK, Json(json!({"status":"ready"}))),
+        |e| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"status": "not ready", "reason": e})),
+            )
+        },
+    )
 }
 
 async fn healthz() -> impl IntoResponse {

@@ -138,7 +138,7 @@ pub async fn api_login(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<LoginResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -174,7 +174,7 @@ pub async fn api_list_friend(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<FriendListResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -213,7 +213,7 @@ pub async fn api_add_friend(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<FriendListResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -252,7 +252,7 @@ pub async fn api_delete_friend(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<FriendListResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -300,7 +300,7 @@ pub async fn api_get_rank_list(
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<SongScoreResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -382,7 +382,6 @@ pub fn calc_friend_delta(
 pub mod auto {
     use std::time::Duration;
 
-    use reqwest::StatusCode;
     use tokio::time::sleep;
 
     use crate::api;
@@ -397,7 +396,7 @@ pub mod auto {
         max_retries: u64,
         exponential_backoff_base_millis: u64,
         exponential_backoff_multiplier: u64,
-        worker_exponential_backoff_max_delay_millis: u64,
+        exponential_backoff_max_delay_millis: u64,
         f: F,
     ) -> Result<R, api::Error>
     where
@@ -411,11 +410,11 @@ pub mod auto {
             let result = f().await;
             match result {
                 Ok(result) => return Ok(result),
-                Err(api::Error::BadStatus(code)) if code == StatusCode::TOO_MANY_REQUESTS => {
+                Err(api::Error::BadStatus(code)) if !code.is_success() => {
                     sleep(Duration::from_millis(
                         (exponential_backoff_base_millis
                             * exponential_backoff_multiplier.pow(retries as u32))
-                        .min(worker_exponential_backoff_max_delay_millis),
+                        .min(exponential_backoff_max_delay_millis),
                     ))
                     .await;
                 }

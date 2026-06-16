@@ -13,7 +13,10 @@ use crate::{
 };
 
 use cuscuta_common::{
-    db::job::{JobEssential, scan_sub_queue, write_job},
+    db::{
+        job::{JobEssential, JobTag, SubQueue, scan_sub_queue, write_job, write_job_index},
+        redis::job_sub_queue_redis_key,
+    },
     quick_fetch::QuickFetch,
 };
 
@@ -61,24 +64,24 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
         if active_account_count == 0 {
             return Err(Error::Internal(ErrorType::InternalNoWorker));
         }
-        let ranges = split_weighted_ranges(&song_list_len, active_account_count)?;
+        let ranges = split_weighted_ranges(&song_list_len, active_account_count * 5)?;
         let queues = scan_sub_queue(redis_client)
             .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
         let timestamp = Utc::now().timestamp().to_string();
-        let mut job_ids = Vec::new();
         for range in ranges {
             let target_queue = queues.iter().find(|q| q.segment == range);
-            let (queue_name, exist) = match target_queue {
-                Some(it) => (it.name.clone(), true),
-                //TODO add hash here
-                None => (
-                    format!(
-                        "cuscuta:jobs:chunk_{}_{}_{}_{}",
-                        "00000000", timestamp, range.start, range.end
-                    ),
-                    false,
-                ),
-            };
+            let (queue_name, exist) = target_queue.map_or_else(
+                || {
+                    (
+                        format!(
+                            "chunk_{}_{}_{}_{}",
+                            "00000000", timestamp, range.start, range.end
+                        ),
+                        false,
+                    )
+                },
+                |it| (it.get_postfix(), true),
+            );
             #[allow(clippy::cast_possible_truncation)]
             let job_essential = JobEssential::new(
                 form.friend_code.clone(),
@@ -90,20 +93,21 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
             let job_id = write_job(
                 redis_client,
                 &job_essential,
-                queue_name,
+                &queue_name,
                 !exist,
                 config.redis_stream_refresh_ttl,
             )
             .map_err(|e| Error::Redis(ErrorType::FailedEnqueueRedis, e))?;
-            job_ids.push(format!("{}_{}", job_id, job_essential.job_uid));
+            let job_tag = JobTag {
+                job_last_id: job_id,
+                queue: SubQueue::try_from(job_sub_queue_redis_key(&queue_name).as_str())
+                    .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?,
+                job_essential,
+            };
+            write_job_index(redis_client, &job_tag)
+                .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?;
         }
-        let query_argument = base64::prelude::BASE64_URL_SAFE.encode(format!(
-            "{}-{}|{}",
-            form.friend_code.clone(),
-            timestamp,
-            job_ids.join(",")
-        ));
-        Ok(query_argument)
+        Ok(base64::prelude::BASE64_STANDARD.encode(format!("{}-{}", form.friend_code, timestamp)))
     }
     match op(form).await {
         Ok(token) => (

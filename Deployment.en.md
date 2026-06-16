@@ -146,6 +146,9 @@ All cuscuta components receive configuration through environment variables.
 | `ACCOUNTS_SQL_ADDR` | entry, worker |
 | `REDIS_ADDR` | entry, worker |
 | `REDIS_STREAM_REFRESH_TTL` | entry, worker |
+| `ETA_ENABLE` | entry, worker |
+| `ETA_SEARCH_LIMIT` | entry, worker |
+| `ETA_RECORD_TRIM` | entry |
 | `GITHUB_BUNDLE_REPOSITORY` | entry, worker |
 | `GITHUB_BUNDLE_PATH` | entry, worker |
 | `GITHUB_BUNDLE_TOKEN` | entry, worker |
@@ -165,6 +168,7 @@ All cuscuta components receive configuration through environment variables.
 | `WORKER_ACCOUNT_LEASE_TIME_SECS` | 120 | Account lease duration (s) |
 | `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 30 | Lease refresh interval (s) |
 | `WORKER_JOB_MAX_WORK_TIME_SECS` | 1200 | Maximum working time for a job (s) |
+| `ETA_ENABLE` | true | Enable ETA estimation |
 | `API_CHILO` | — | chilo service URL |
 | `API_LOGIN` | — | Login API endpoint |
 | `API_LIST_FRIENDS` | — | Friend list API endpoint |

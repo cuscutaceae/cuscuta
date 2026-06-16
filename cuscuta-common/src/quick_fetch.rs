@@ -41,6 +41,7 @@ pub trait QuickFetch<T> {
 }
 
 impl<T> QuickFetch<T> for OnceLock<RwLock<Option<T>>> {
+    #[allow(clippy::significant_drop_tightening)]
     fn try_read<U, F>(&self, f: F) -> Result<U>
     where
         F: FnOnce(&T) -> U,
@@ -53,6 +54,7 @@ impl<T> QuickFetch<T> for OnceLock<RwLock<Option<T>>> {
         Ok(f(x))
     }
 
+    #[allow(clippy::significant_drop_tightening)]
     fn try_write<F>(&self, f: F) -> Result<()>
     where
         F: FnOnce(Option<T>) -> Option<T>,

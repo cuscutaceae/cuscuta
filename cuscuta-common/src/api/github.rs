@@ -38,7 +38,7 @@ where
         .await
         .map_err(Error::Network)?
         .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
         .json::<GitHubFileInternal>()
         .await
         .map_err(|e| Error::Decode(format!("phase1: {e}")))?;
@@ -52,7 +52,7 @@ where
             .await
             .map_err(Error::Network)?
             .error_for_status()
-            .map_err(|e| Error::BadStatus(e.status().unwrap_or(StatusCode::default())))?
+            .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
             .json::<T>()
             .await
             .map_err(|e| Error::Decode(format!("phase b_1: {e}")))

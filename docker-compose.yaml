@@ -107,6 +107,8 @@ services:
       WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS: 30
       WORKER_JOB_MAX_WORK_TIME_SECS: 1200
       REDIS_STREAM_REFRESH_TTL: 300
+      ETA_ENABLE: "true"
+      ETA_SEARCH_LIMIT: "10"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -136,6 +138,9 @@ services:
       GITHUB_SONG_TOKEN: "DummyToken"
       # Config
       REDIS_STREAM_REFRESH_TTL: 300
+      ETA_ENABLE: "true"
+      ETA_SEARCH_LIMIT: "10"
+      ETA_RECORD_TRIM: "15"
     ports:
       - "8081:8081"
     depends_on:

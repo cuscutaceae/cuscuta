@@ -141,6 +141,9 @@ cuscuta 所有组件均通过环境变量注入配置。
 | `ACCOUNTS_SQL_ADDR` | entry, worker |
 | `REDIS_ADDR` | entry, worker |
 | `REDIS_STREAM_REFRESH_TTL` | entry, worker |
+| `ETA_ENABLE` | entry, worker |
+| `ETA_SEARCH_LIMIT` | entry, worker |
+| `ETA_RECORD_TRIM` | entry |
 | `GITHUB_BUNDLE_REPOSITORY` | entry, worker |
 | `GITHUB_BUNDLE_PATH` | entry, worker |
 | `GITHUB_BUNDLE_TOKEN` | entry, worker |
@@ -160,6 +163,7 @@ cuscuta 所有组件均通过环境变量注入配置。
 | `WORKER_ACCOUNT_LEASE_TIME_SECS` | 120 | 账号租约时长（秒） |
 | `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 30 | 租约续期间隔（秒） |
 | `WORKER_JOB_MAX_WORK_TIME_SECS` | 1200 | 任务的最长运行时间（秒） |
+| `ETA_ENABLE` | true | 是否启用 ETA 预估 |
 | `API_CHILO` | — | chilo 服务地址 |
 | `API_LOGIN` | — | 登录 API 地址 |
 | `API_LIST_FRIENDS` | — | 好友列表 API 地址 |
