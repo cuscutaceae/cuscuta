@@ -74,3 +74,23 @@ impl Error {
         }
     }
 }
+
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+pub fn round_fixed(v: f64, n: u32) -> f64 {
+    let i = 10_usize.pow(n) as f64;
+    let x = v * i;
+    if v > 0_f64 {
+        f64::from(x.round() as u32) / i
+    } else {
+        let mr = x.trunc();
+        let mf = x.fract();
+        if mf.abs() >= 0.5 {
+            return (mr + 1_f64) / i;
+        }
+        mr / i
+    }
+}

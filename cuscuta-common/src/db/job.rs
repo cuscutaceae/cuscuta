@@ -403,7 +403,7 @@ pub fn search_position(
 ) -> Result<SearchPositionResult, Error> {
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     let pending_result = connection
-        .xpending_count(sub_queue_name, "default_group", "-", "+", "")
+        .xpending_count(sub_queue_name, "default_group", "-", "+", 50)
         .map_err(Error::Redis)?;
     // 试图从PEL解析出真实数据的操作若失败，则忽略；因为这个函数并不要求总是成功
     if pending_result

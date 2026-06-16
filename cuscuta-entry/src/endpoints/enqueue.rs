@@ -13,7 +13,10 @@ use crate::{
 };
 
 use cuscuta_common::{
-    db::job::{JobEssential, JobTag, SubQueue, scan_sub_queue, write_job, write_job_index},
+    db::{
+        job::{JobEssential, JobTag, SubQueue, scan_sub_queue, write_job, write_job_index},
+        redis::job_sub_queue_redis_key,
+    },
     quick_fetch::QuickFetch,
 };
 
@@ -97,7 +100,7 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
             .map_err(|e| Error::Redis(ErrorType::FailedEnqueueRedis, e))?;
             let job_tag = JobTag {
                 job_last_id: job_id,
-                queue: SubQueue::try_from(queue_name.as_str())
+                queue: SubQueue::try_from(job_sub_queue_redis_key(&queue_name).as_str())
                     .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?,
                 job_essential,
             };
