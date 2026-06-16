@@ -236,7 +236,9 @@ async fn calc_eta_millis(redis_client: &Client, postfix: &str) -> Result<Option<
         .iter()
         .filter(|it| matches!(it, SearchPositionResult::QueueingFound(_)))
         .count();
-    let estimated_multiply = ((found_counts as f64) / (active_account_count as f64)).ceil().max(1.0);
+    let estimated_multiply = ((found_counts as f64) / (active_account_count as f64))
+        .ceil()
+        .max(1.0);
     Ok(max_found.map(|it| {
         let add = usize::from(
             positions
