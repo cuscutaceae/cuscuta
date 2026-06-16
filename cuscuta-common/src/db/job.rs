@@ -412,8 +412,7 @@ pub fn search_position(
         .filter_map(|it| {
             connection
                 .xrange(sub_queue_name, it.id.clone(), it.id)
-                .map(|it| it.ids.first().cloned())
-                .unwrap_or(None)
+                .map_or(None, |it| it.ids.first().cloned())
         })
         .filter_map(|it| JobEssential::try_from(&it.map).ok())
         .any(|it| it.job_uid == job_uid)

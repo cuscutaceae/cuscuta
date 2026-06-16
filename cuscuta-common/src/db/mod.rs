@@ -74,19 +74,19 @@ pub mod redis {
     /// 记录Job进行索引的key
     #[must_use]
     pub fn job_index_redis_key(postfix: &str) -> String {
-        format!("cuscuta:pending:index:{postfix}",)
+        format!("cuscuta:pending:index:{postfix}")
     }
 
     /// 记录Job完成索引的key
     #[must_use]
     pub fn job_output_index_redis_key(postfix: &str) -> String {
-        format!("cuscuta:results:index:{postfix}",)
+        format!("cuscuta:results:index:{postfix}")
     }
 
     /// 记录Job实际输出结果的key
     #[must_use]
     pub fn job_result_redis_key(postfix: &str) -> String {
-        format!("cuscuta:results:value:{postfix}",)
+        format!("cuscuta:results:value:{postfix}")
     }
 
     /// 记录子任务队列的key
