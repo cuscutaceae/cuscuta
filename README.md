@@ -9,7 +9,19 @@
 
 欢迎来到cuscuta的Sekai！ヾ(^▽^*) ……虽然这里乏味而无趣（并且还未完成）
 
-cuscuta是一系列小型软件的集合，组合起来的话……可以用来干一些事情……当然，实验性……
+cuscuta是一系列小型image的集合，组合起来的话……可以用来干一些事情……当然，实验性……
+
+### 依赖
+
+cuscuta不能独立工作，它依赖一些其它组件和外部服务工作：
+
++ PostgreSQL：用来存放worker需要使用的信息
++ Redis：工作队列与缓存
++ 外部服务：就是外部服务……嗯对（在内部测试时可以使用mock代替）
+
+### 部署
+
+部署指南参见[部署（简体中文）](Deployment.md) | [Deployment (English)](Deployment.en.md)
 
 ### 组件
 
@@ -23,18 +35,6 @@ cuscuta内含了一些组件
 | cuscuta-chilo  | 不稳定 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`                           | [chilo](https://github.com/cuscutaceae/chilo)的一个WebAPI包装，被worker依赖，理论可扩展 |
 | cuscuta-mock   | 不稳定 | 无                                                                                  | worker的mock用镜像                                                                      |
 | cuscutactl     | 待验证 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`, `#![deny(missing_docs)]` | cuscuta集群的一个简易命令行管理工具（使用AI生成）                                       |
-
-### 依赖
-
-cuscuta不能独立工作，它依赖一些其它组件和外部服务工作：
-
-+ PostgreSQL：用来存放worker需要使用的信息
-+ Redis：工作队列与缓存
-+ 外部服务：就是外部服务……嗯对（在内部测试时可以使用mock代替）
-
-### 部署
-
-部署指南参见[部署（简体中文）](Deployment.md) | [Deployment (English)](Deployment.en.md)
 
 ### 计划表
 

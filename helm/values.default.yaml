@@ -5,10 +5,20 @@
 # -- Required: PostgreSQL connection
 postgresql:
   url: "postgresql://user:password@host:5432/db"
+  # To use an external Secret instead, uncomment below and remove url above:
+  # secret:
+  #   enabled: true
+  #   name: "my-postgres-secret"
+  #   key: "ACCOUNTS_SQL_ADDR"
 
 # -- Required: Redis connection
 redis:
   url: "redis://host:6379/0"
+  # To use an external Secret instead, uncomment below and remove url above:
+  # secret:
+  #   enabled: true
+  #   name: "my-redis-secret"
+  #   key: "REDIS_ADDR"
 
 # -- Required: challenge constants (contact admin for values)
 chilo:

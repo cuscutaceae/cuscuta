@@ -19,10 +19,19 @@ spec:
       containers:
         - name: migrate
           image: {{ printf "%s:%s" .Values.migration.image .Values.migration.tag }}
+          command: ["/bin/sh", "-c"]
           args:
-            - "-path=/migrations"
-            - {{ printf "-database=%s?sslmode=disable" .Values.postgresql.url | quote }}
-            - "up"
+            - "migrate -path=/migrations -database=$DATABASE_URL?sslmode=disable up"
+          env:
+            - name: DATABASE_URL
+            {{- if .Values.postgresql.secret.enabled }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.secret.name }}
+                  key: {{ include "cuscuta.secretKey" (dict "cfg" .Values.postgresql.secret "defaultKey" "ACCOUNTS_SQL_ADDR") }}
+            {{- else }}
+              value: {{ required "postgresql.url is required when postgresql.secret.enabled is false" .Values.postgresql.url | quote }}
+            {{- end }}
           volumeMounts:
             - name: migrations
               mountPath: /migrations

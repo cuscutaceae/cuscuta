@@ -27,13 +27,13 @@ spec:
             - name: ACCOUNTS_SQL_ADDR
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "cuscuta.fullname" . }}-secret
-                  key: ACCOUNTS_SQL_ADDR
+                  name: {{ include "cuscuta.secretName" (dict "root" . "cfg" .Values.postgresql.secret) }}
+                  key: {{ include "cuscuta.secretKey" (dict "cfg" .Values.postgresql.secret "defaultKey" "ACCOUNTS_SQL_ADDR") }}
             - name: REDIS_ADDR
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "cuscuta.fullname" . }}-secret
-                  key: REDIS_ADDR
+                  name: {{ include "cuscuta.secretName" (dict "root" . "cfg" .Values.redis.secret) }}
+                  key: {{ include "cuscuta.secretKey" (dict "cfg" .Values.redis.secret "defaultKey" "REDIS_ADDR") }}
             - name: GITHUB_BUNDLE_REPOSITORY
               value: {{ .Values.github.bundleRepository | quote }}
             - name: GITHUB_BUNDLE_PATH
