@@ -3,11 +3,25 @@ fullnameOverride: ""
 
 # -- PostgreSQL connection (external service, not managed by this chart)
 postgresql:
+  # -- Use an external Secret for the database URL instead of the chart-owned Secret.
+  # When enabled, url below is ignored and no corresponding entry is created in the chart Secret.
+  secret:
+    enabled: false
+    name: "external-secret"
+    key: "ACCOUNTS_SQL_ADDR"
+
   # -- PostgreSQL connection URL (scheme: postgresql://user:pass@host:port/db)
   url: ""
 
 # -- Redis connection (external service, not managed by this chart)
 redis:
+  # -- Use an external Secret for the database URL instead of the chart-owned Secret.
+  # When enabled, url below is ignored and no corresponding entry is created in the chart Secret.
+  secret:
+    enabled: false
+    name: "external-secret"
+    key: "REDIS_ADDR"
+  
   # -- Redis connection URL (scheme: redis://host:port/db)
   url: ""
 

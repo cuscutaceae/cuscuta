@@ -107,7 +107,13 @@ cargo build --release -p cuscuta-chilo
 | 配置项 | 说明 |
 |--------|------|
 | `postgresql.url` | PostgreSQL 连接字符串 |
+| `postgresql.secret.enabled` | 是否从外部 Secret 读取 PostgreSQL URL |
+| `postgresql.secret.name` | 外部 Secret 的名称 |
+| `postgresql.secret.key` | 外部 Secret 中 PostgreSQL URL 的键名 |
 | `redis.url` | Redis 连接字符串 |
+| `redis.secret.enabled` | 是否从外部 Secret 读取 Redis URL |
+| `redis.secret.name` | 外部 Secret 的名称 |
+| `redis.secret.key` | 外部 Secret 中 Redis URL 的键名 |
 | `chilo.constants.binC1` | 常量 C1（十六进制） |
 | `chilo.constants.binC2` | 常量 C2（十六进制） |
 | `chilo.constants.binLoginC31` | 常量 login-C31（十六进制） |

@@ -112,7 +112,13 @@ See [helm/values.yaml](helm/values.yaml) for the complete list.
 | Value | Description |
 |--------|-------------|
 | `postgresql.url` | PostgreSQL connection string |
+| `postgresql.secret.enabled` | Read PostgreSQL URL from an external Secret |
+| `postgresql.secret.name` | External Secret name |
+| `postgresql.secret.key` | External Secret key for PostgreSQL URL |
 | `redis.url` | Redis connection string |
+| `redis.secret.enabled` | Read Redis URL from an external Secret |
+| `redis.secret.name` | External Secret name |
+| `redis.secret.key` | External Secret key for Redis URL |
 | `chilo.constants.binC1` | Challenge constant C1 (hex) |
 | `chilo.constants.binC2` | Challenge constant C2 (hex) |
 | `chilo.constants.binLoginC31` | Challenge constant login-C31 (hex) |
