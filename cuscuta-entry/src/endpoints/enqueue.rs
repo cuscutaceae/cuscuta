@@ -42,6 +42,9 @@ pub struct EnqueueBody {
 /// 注意，由于SCAN不保证一致性，故此操作并不幂等，请勿简单扩增entry实例
 pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
     async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
+        if !input_check(&form.friend_code) {
+            return Err(Error::BadRequest(ErrorType::BadRequestFriendCode));
+        }
         let config = CONFIG
             .try_read(std::clone::Clone::clone)
             .map_err(|_| Error::NotReady(ErrorType::ConfigNotReady))?;
@@ -131,6 +134,10 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
     }
 }
 
+fn input_check(input: &str) -> bool {
+    input.len() == 9 && input.chars().all(|it| it.is_ascii_digit())
+}
+
 fn split_weighted_ranges(weights: &[usize], count: usize) -> Result<Vec<Range<usize>>, Error> {
     let t = split_weighted_ranges_min(weights, count)?;
     let iter = weights.iter().copied().enumerate();
@@ -187,7 +194,9 @@ fn split_weighted_ranges_min(num: &[usize], m: usize) -> Result<usize, Error> {
 
 #[cfg(test)]
 mod test {
-    use crate::endpoints::enqueue::{split_weighted_ranges, split_weighted_ranges_min};
+    use crate::endpoints::enqueue::{
+        input_check, split_weighted_ranges, split_weighted_ranges_min,
+    };
 
     #[test]
     fn test_split_weighted_ranges_1() {
@@ -220,5 +229,14 @@ mod test {
             split_weighted_ranges_min(a, n).unwrap(),
             split_weighted_ranges(a, n).unwrap()
         );
+    }
+
+    #[test]
+    fn test_input() {
+        assert!(input_check("123456789"));
+        assert!(!input_check("12345678a"));
+        assert!(!input_check(""));
+        assert!(!input_check("122"));
+        assert!(!input_check("1234567890"));
     }
 }

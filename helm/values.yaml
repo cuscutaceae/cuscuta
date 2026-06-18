@@ -28,7 +28,7 @@ redis:
 # -- Container image configuration
 image:
   repository: ghcr.io/cuscutaceae
-  tag: latest
+  tag: 0.1.2
   pullPolicy: IfNotPresent
 
 # -- Log level for all components (env: RUST_LOG)
@@ -86,7 +86,7 @@ chilo:
     binLoginC32: ""
   service:
     # -- Service type
-    type: LoadBalancer
+    type: ClusterIP
 
 # -- cuscuta-entry (API gateway / job dispatcher)
 entry:
@@ -95,7 +95,7 @@ entry:
   # -- Container port (fixed, do not modify)
   port: 8081
   service:
-    type: LoadBalancer
+    type: ClusterIP
   ingress:
     enabled: false
     className: ""
@@ -112,7 +112,7 @@ worker:
     enabled: true
     pollingInterval: 10
     cooldownPeriod: 30
-    maxReplicaCount: 10
+    maxReplicaCount: 50
     targetQueryValue: 1
   # -- Container port (health checks only; fixed, do not modify)
   port: 8080

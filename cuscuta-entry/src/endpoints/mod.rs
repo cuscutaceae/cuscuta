@@ -23,6 +23,7 @@ enum ErrorType {
 
     BadRequestBase64 = -500,
     BadRequestTokenCheckFailed = -501,
+    BadRequestFriendCode = -502,
 }
 
 impl Display for ErrorType {
