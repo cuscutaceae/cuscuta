@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo_toml="${{ matrix.image }}/Cargo.toml"
+          cargo_toml="Cargo.toml"
           version="$(python3 - "$cargo_toml" <<'PY'
           import sys, tomllib
           with open(sys.argv[1], "rb") as f:
