@@ -15,8 +15,8 @@ use cuscuta_common::{
         account::AccountRow,
         job::{
             Job, JobState, JobTag, SubQueue,
-            eta::record_eta,
             enqueue::{write_job, write_job_index},
+            eta::record_eta,
             scan_sub_queue,
         },
         redis::{job_index_redis_key, job_output_index_redis_key, job_result_redis_key},
@@ -279,10 +279,10 @@ async fn clean_jobs(
                 || {
                     api_delete_friend(
                         bundle_data,
-                        account_row.account_email.clone(),
-                        user_id.to_string(),
-                        token.to_string(),
-                        friend_user_id.clone(),
+                        &account_row.account_email,
+                        user_id,
+                        token,
+                        friend_user_id,
                     )
                 },
             )
@@ -363,6 +363,7 @@ async fn gather_rank_list<'a>(
     };
     let mut result = Vec::new();
     for difficulty in &song.difficulties {
+        let rating_class = difficulty.rating_class.to_string();
         let rank_list = xxxxxx_safe_call(
             config.worker_max_retry_count,
             config.worker_exponential_backoff_base_millis,
@@ -371,13 +372,13 @@ async fn gather_rank_list<'a>(
             || {
                 api::xxxxxx::api_get_rank_list(
                     bundle_data,
-                    account_row.account_email.clone(),
-                    user_id.to_string(),
-                    token.to_string(),
-                    song.id.clone(),
-                    difficulty.rating_class.to_string(),
-                    "0".into(),
-                    "11".into(),
+                    &account_row.account_email,
+                    user_id,
+                    token,
+                    &song.id,
+                    &rating_class,
+                    "0",
+                    "11",
                 )
             },
         )
@@ -436,10 +437,10 @@ async fn try_add_friends(
             || {
                 api::xxxxxx::api_add_friend(
                     bundle_data,
-                    account_row.account_email.clone(),
-                    user_id.to_string(),
-                    token.to_string(),
-                    job.essential.friend_code.clone(),
+                    &account_row.account_email,
+                    user_id,
+                    token,
+                    &job.essential.friend_code,
                 )
             },
         )

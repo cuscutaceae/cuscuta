@@ -16,8 +16,8 @@ use cuscuta_common::{
     db::{
         job::{
             JobEssential, JobTag, SubQueue,
-            scan_sub_queue,
             enqueue::{write_job, write_job_index},
+            scan_sub_queue,
         },
         redis::job_sub_queue_redis_key,
     },
