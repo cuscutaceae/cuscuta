@@ -5,7 +5,6 @@ metadata:
   labels:
     {{- include "cuscuta.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
 spec:
-  replicas: {{ .Values.worker.replicas }}
   selector:
     matchLabels:
       {{- include "cuscuta.componentLabels" (dict "root" . "component" "worker") | nindent 6 }}
