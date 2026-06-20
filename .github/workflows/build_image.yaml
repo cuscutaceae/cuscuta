@@ -43,7 +43,7 @@ jobs:
           import sys, tomllib
           with open(sys.argv[1], "rb") as f:
               obj = tomllib.load(f)
-          print(obj["package"]["version"])
+          print(obj["workspace"]["package"]["version"])
           PY
           )"
           echo "version=$version" >> "$GITHUB_OUTPUT"
