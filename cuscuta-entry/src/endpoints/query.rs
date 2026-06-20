@@ -7,7 +7,7 @@ use cuscuta_common::{
     db::{
         job::{
             eta::fetch_unit_eta,
-            result::{
+            fetch::{
                 SearchPositionResult, fetch_pending_tags, fetch_result, fetch_result_tags,
                 search_position,
             },

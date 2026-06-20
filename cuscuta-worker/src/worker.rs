@@ -16,7 +16,7 @@ use cuscuta_common::{
         job::{
             Job, JobState, JobTag, SubQueue,
             eta::record_eta,
-            input::{write_job, write_job_index},
+            enqueue::{write_job, write_job_index},
             scan_sub_queue,
         },
         redis::{job_index_redis_key, job_output_index_redis_key, job_result_redis_key},

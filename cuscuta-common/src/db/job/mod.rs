@@ -11,10 +11,10 @@ use crate::db::redis::Error;
 pub mod eta;
 
 /// 任务完成情况相关功能
-pub mod result;
+pub mod fetch;
 
 /// 任务入列相关功能
-pub mod input;
+pub mod enqueue;
 
 /// 代表一个任务分片，对应Redis数据库中的分任务队列
 ///
