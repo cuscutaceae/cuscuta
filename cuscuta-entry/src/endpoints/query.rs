@@ -6,10 +6,12 @@ use cuscuta_common::{
     api::xxxxxx::SongScore,
     db::{
         job::{
-            SearchPositionResult, fetch_pending_tags, fetch_result, fetch_result_tags,
-            search_position,
+            eta::fetch_unit_eta,
+            result::{
+                SearchPositionResult, fetch_pending_tags, fetch_result, fetch_result_tags,
+                search_position,
+            },
         },
-        job_eta::fetch_unit_eta,
         redis::{job_index_redis_key, job_output_index_redis_key},
     },
 };

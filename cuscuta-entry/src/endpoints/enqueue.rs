@@ -14,7 +14,11 @@ use crate::{
 
 use cuscuta_common::{
     db::{
-        job::{JobEssential, JobTag, SubQueue, scan_sub_queue, write_job, write_job_index},
+        job::{
+            JobEssential, JobTag, SubQueue,
+            scan_sub_queue,
+            input::{write_job, write_job_index},
+        },
         redis::job_sub_queue_redis_key,
     },
     quick_fetch::QuickFetch,

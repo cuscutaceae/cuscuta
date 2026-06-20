@@ -13,8 +13,12 @@ use cuscuta_common::{
     db::{
         self,
         account::AccountRow,
-        job::{self, Job, JobState, JobTag, SubQueue, write_job, write_job_index},
-        job_eta::record_eta,
+        job::{
+            Job, JobState, JobTag, SubQueue,
+            eta::record_eta,
+            input::{write_job, write_job_index},
+            scan_sub_queue,
+        },
         redis::{job_index_redis_key, job_output_index_redis_key, job_result_redis_key},
     },
     quick_fetch::QuickFetch,
@@ -96,7 +100,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
                 s,
             )
         } else {
-            let sub_queues = job::scan_sub_queue(redis_client).map_err(|e| match e {
+            let sub_queues = scan_sub_queue(redis_client).map_err(|e| match e {
                 db::redis::Error::Redis(redis_error) => Error::Redis(redis_error),
                 db::redis::Error::BadData(e) => Error::BadState(format!("bad data: {e}")),
             })?;
