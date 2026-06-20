@@ -19,7 +19,7 @@ use cuscuta_common::{
             eta::record_eta,
             scan_sub_queue,
         },
-        redis::{job_index_redis_key, job_output_index_redis_key, job_result_redis_key},
+        redis::{job_pending_index_redis_key, job_output_index_redis_key, job_result_value_redis_key},
     },
     quick_fetch::QuickFetch,
 };
@@ -211,11 +211,11 @@ fn refresh_redis_ttl(jobs: &[Job], redis_client: &Client, config: &Config) -> Re
             config.redis_stream_refresh_ttl,
         )
         .expire(
-            job_result_redis_key(&job.get_stream_key_postfix()),
+            job_result_value_redis_key(&job.get_stream_key_postfix()),
             config.redis_stream_refresh_ttl,
         )
         .expire(
-            job_index_redis_key(&job.get_stream_key_postfix()),
+            job_pending_index_redis_key(&job.get_stream_key_postfix()),
             config.redis_stream_refresh_ttl,
         );
     }
@@ -305,7 +305,7 @@ async fn clean_jobs(
 fn process_job_with_result(jobs: &mut [Job], scores: &[SongScore]) -> Vec<(String, SongScore)> {
     let mut job_links = Vec::new();
     for job in jobs.iter_mut() {
-        let redis_key = job_result_redis_key(&job.get_stream_key_postfix());
+        let redis_key = job_result_value_redis_key(&job.get_stream_key_postfix());
         let JobState::Pending {
             friend_user_id,
             current_length,

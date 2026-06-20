@@ -2,7 +2,7 @@ use redis::{Client, TypedCommands};
 
 use crate::db::{
     job::{JobEssential, JobTag},
-    redis::{Error, job_index_redis_key, job_sub_queue_redis_key},
+    redis::{Error, job_pending_index_redis_key, job_sub_queue_redis_key},
 };
 
 /// 向任务队列写入新任务
@@ -51,7 +51,7 @@ pub fn write_job_index(redis_client: &Client, job_tag: &JobTag) -> Result<(), Er
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     connection
         .lpush(
-            job_index_redis_key(&job_tag.job_essential.get_stream_key_postfix()),
+            job_pending_index_redis_key(&job_tag.job_essential.get_stream_key_postfix()),
             serde_json::to_string(job_tag).map_err(|e| {
                 Error::BadData(format!("failed to serialize JobTag: {job_tag:?} :{e}"))
             })?,

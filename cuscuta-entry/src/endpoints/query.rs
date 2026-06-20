@@ -12,7 +12,7 @@ use cuscuta_common::{
                 search_position,
             },
         },
-        redis::{job_index_redis_key, job_output_index_redis_key},
+        redis::{job_pending_index_redis_key, job_output_index_redis_key, job_result_value_redis_key},
     },
 };
 use redis::{Client, TypedCommands};
@@ -94,7 +94,7 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
                 })
             }
             EvidenceCheckResult::Finished { retries } => {
-                let result = fetch_result(redis_client, &token)
+                let result = fetch_result(redis_client, &job_result_value_redis_key(&token))
                     .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
                 Ok(QueryResult::SuccessFinished {
                     success: true,
@@ -148,7 +148,7 @@ fn check_evidence(redis_client: &Client, postfix: &str) -> Result<EvidenceCheckR
         .get_connection()
         .map_err(|e| Error::Redis(ErrorType::FailedCheckEvidenceRedis, e))?;
     let total_jobs_len = connection
-        .llen(job_index_redis_key(postfix))
+        .llen(job_pending_index_redis_key(postfix))
         .map_err(|e| Error::Redis(ErrorType::FailedCheckEvidenceRedis, e))?;
     if total_jobs_len == 0 {
         return Ok(EvidenceCheckResult::Failed);
