@@ -75,8 +75,7 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
         let evidence_check_result = check_evidence(redis_client, &token)?;
         let friend_info =
             fetch_result::<FriendInfo>(redis_client, &job_result_friend_info_redis_key(&token))
-                .map(|it| it.into_iter().next())
-                .unwrap_or(None);
+                .map_or(None, |it| it.into_iter().next());
         match evidence_check_result {
             EvidenceCheckResult::Pending {
                 total_jobs,
