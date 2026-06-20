@@ -4,9 +4,6 @@ pub mod account;
 /// 工作队列相关
 pub mod job;
 
-/// 剩余时间相关
-pub mod job_eta;
-
 /// 定义了`PostgreSQL`所需要使用的函数和错误
 pub mod postgresql {
     use std::sync::OnceLock;
@@ -73,7 +70,7 @@ pub mod redis {
 
     /// 记录Job进行索引的key
     #[must_use]
-    pub fn job_index_redis_key(postfix: &str) -> String {
+    pub fn job_pending_index_redis_key(postfix: &str) -> String {
         format!("cuscuta:pending:index:{postfix}")
     }
 
@@ -85,8 +82,14 @@ pub mod redis {
 
     /// 记录Job实际输出结果的key
     #[must_use]
-    pub fn job_result_redis_key(postfix: &str) -> String {
+    pub fn job_result_value_redis_key(postfix: &str) -> String {
         format!("cuscuta:results:value:{postfix}")
+    }
+
+    /// 记录Job对应的好友信息的key
+    #[must_use]
+    pub fn job_result_friend_info_redis_key(postfix: &str) -> String {
+        format!("cuscuta:results:friend_info:{postfix}")
     }
 
     /// 记录子任务队列的key

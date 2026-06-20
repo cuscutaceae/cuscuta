@@ -20,9 +20,9 @@ pub async fn perform_login(
             .unwrap_or_else(|_| Url::from_str("http://nofyso:11451/auth/login").unwrap());
     let timestamp = Local::now().timestamp_millis().to_string();
     let random_challenge = match chilo_generate(
-        timestamp,
-        format!("{}{}", "grant_type=client_credentials", url.path()),
-        "login".to_string(),
+        &timestamp,
+        &format!("{}{}", "grant_type=client_credentials", url.path()),
+        "login",
     )
     .await?
     {
@@ -37,9 +37,9 @@ pub async fn perform_login(
     log::info!("login_interface: pw: {}", account_row.account_password);
     api_login(
         bundle_data,
-        account_row.account_email.clone(),
-        account_row.account_password.clone(),
-        random_challenge,
+        &account_row.account_email,
+        &account_row.account_password,
+        &random_challenge,
     )
     .await
 }
@@ -141,9 +141,9 @@ pub mod auto {
             current_row.clone(),
             api_list_friend(
                 bundle_data,
-                current_row.account_email.clone(),
-                user_id.to_string(),
-                token,
+                &current_row.account_email,
+                &user_id.to_string(),
+                &token,
             )
             .await
             .map_err(Error::Api)?,

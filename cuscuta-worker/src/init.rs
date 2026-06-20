@@ -97,16 +97,16 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
         for friend in friends.friends {
             api_delete_friend(
                 &bundle_data,
-                account_row.account_email.clone(),
-                account_row
+                &account_row.account_email,
+                &account_row
                     .user_id
                     .ok_or_else(|| (Level::Halt, "unexpected data #1".to_string()))?
                     .to_string(),
-                account_row
+                &account_row
                     .temp_token
                     .clone()
                     .ok_or_else(|| (Level::Halt, "unexpected data #2".to_string()))?,
-                friend.user_id.to_string(),
+                &friend.user_id.to_string(),
             )
             .await
             .map_err(|e| (Level::Halt, format!("failed to clean friends: {e}")))?;

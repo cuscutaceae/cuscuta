@@ -28,7 +28,7 @@ type Result<T> = core::result::Result<T, Error>;
 /// - 当`reqwest`客户端初始化失败时，返回[`Error::ClientSetup`]
 /// - 当请求发送失败时，返回[`Error::Network`]
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
-pub async fn chilo_generate(timestamp: String, path: String, kind: String) -> Result<ChiloResult> {
+pub async fn chilo_generate(timestamp: &str, path: &str, kind: &str) -> Result<ChiloResult> {
     reqwest::Client::builder()
         .user_agent("curl/7.88.1")
         .build()

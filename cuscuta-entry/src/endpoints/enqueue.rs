@@ -14,7 +14,11 @@ use crate::{
 
 use cuscuta_common::{
     db::{
-        job::{JobEssential, JobTag, SubQueue, scan_sub_queue, write_job, write_job_index},
+        job::{
+            JobEssential, JobTag, SubQueue,
+            enqueue::{write_job, write_job_index},
+            scan_sub_queue,
+        },
         redis::job_sub_queue_redis_key,
     },
     quick_fetch::QuickFetch,
@@ -37,81 +41,11 @@ enum EnqueueResult {
 #[derive(Debug, Deserialize)]
 pub struct EnqueueBody {
     friend_code: String,
+    info_only: bool,
 }
 
 /// 注意，由于SCAN不保证一致性，故此操作并不幂等，请勿简单扩增entry实例
 pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
-    async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
-        if !input_check(&form.friend_code) {
-            return Err(Error::BadRequest(ErrorType::BadRequestFriendCode));
-        }
-        let config = CONFIG
-            .try_read(std::clone::Clone::clone)
-            .map_err(|_| Error::NotReady(ErrorType::ConfigNotReady))?;
-        let redis_client = REDIS_CLIENT
-            .get()
-            .ok_or(Error::NotReady(ErrorType::RedisNotReady))?;
-        let transaction = try_open_transaction()
-            .await
-            .map_err(|e| Error::DbExtend(ErrorType::FailedTransactionOpenDb, e))?;
-        let song_list_len = SONG_LIST
-            .try_read(|it| {
-                it.iter()
-                    .map(|song| song.difficulties.len())
-                    .collect::<Vec<_>>()
-            })
-            .map_err(|_| Error::NotReady(ErrorType::SongListNotReady))?;
-        let active_account_count = count_active_account(transaction)
-            .await
-            .map_err(|e| Error::Db(ErrorType::FailedCountDb, e))?;
-        if active_account_count == 0 {
-            return Err(Error::Internal(ErrorType::InternalNoWorker));
-        }
-        let ranges = split_weighted_ranges(&song_list_len, active_account_count * 5)?;
-        let queues = scan_sub_queue(redis_client)
-            .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
-        let timestamp = Utc::now().timestamp().to_string();
-        for range in ranges {
-            let target_queue = queues.iter().find(|q| q.segment == range);
-            let (queue_name, exist) = target_queue.map_or_else(
-                || {
-                    (
-                        format!(
-                            "chunk_{}_{}_{}_{}",
-                            "00000000", timestamp, range.start, range.end
-                        ),
-                        false,
-                    )
-                },
-                |it| (it.get_postfix(), true),
-            );
-            #[allow(clippy::cast_possible_truncation)]
-            let job_essential = JobEssential::new(
-                form.friend_code.clone(),
-                timestamp.clone(),
-                range.start.cast_signed() as i32,
-                range.len().cast_signed() as i32,
-                0,
-            );
-            let job_id = write_job(
-                redis_client,
-                &job_essential,
-                &queue_name,
-                !exist,
-                config.redis_stream_refresh_ttl,
-            )
-            .map_err(|e| Error::Redis(ErrorType::FailedEnqueueRedis, e))?;
-            let job_tag = JobTag {
-                job_last_id: job_id,
-                queue: SubQueue::try_from(job_sub_queue_redis_key(&queue_name).as_str())
-                    .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?,
-                job_essential,
-            };
-            write_job_index(redis_client, &job_tag)
-                .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?;
-        }
-        Ok(base64::prelude::BASE64_STANDARD.encode(format!("{}-{}", form.friend_code, timestamp)))
-    }
     match op(form).await {
         Ok(token) => (
             StatusCode::OK,
@@ -132,6 +66,87 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
             )
         }
     }
+}
+
+async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
+    if !input_check(&form.friend_code) {
+        return Err(Error::BadRequest(ErrorType::BadRequestFriendCode));
+    }
+    let config = CONFIG
+        .try_read(std::clone::Clone::clone)
+        .map_err(|_| Error::NotReady(ErrorType::ConfigNotReady))?;
+    let redis_client = REDIS_CLIENT
+        .get()
+        .ok_or(Error::NotReady(ErrorType::RedisNotReady))?;
+    let transaction = try_open_transaction()
+        .await
+        .map_err(|e| Error::DbExtend(ErrorType::FailedTransactionOpenDb, e))?;
+    let song_list_len = SONG_LIST
+        .try_read(|it| {
+            it.iter()
+                .map(|song| song.difficulties.len())
+                .collect::<Vec<_>>()
+        })
+        .map_err(|_| Error::NotReady(ErrorType::SongListNotReady))?;
+    let active_account_count = count_active_account(transaction)
+        .await
+        .map_err(|e| Error::Db(ErrorType::FailedCountDb, e))?;
+    if active_account_count == 0 {
+        return Err(Error::Internal(ErrorType::InternalNoWorker));
+    }
+    #[allow(clippy::single_range_in_vec_init)]
+    let ranges = if form.info_only {
+        vec![(0..0)]
+    } else {
+        split_weighted_ranges(&song_list_len, active_account_count * 5)?
+    };
+    let queues = scan_sub_queue(redis_client)
+        .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
+    let timestamp = if form.info_only {
+        "0".to_string()
+    } else {
+        Utc::now().timestamp().to_string()
+    };
+    for range in ranges {
+        let target_queue = queues.iter().find(|q| q.segment == range);
+        let (queue_name, exist) = target_queue.map_or_else(
+            || {
+                (
+                    format!(
+                        "chunk_{}_{}_{}_{}",
+                        "00000000", timestamp, range.start, range.end
+                    ),
+                    false,
+                )
+            },
+            |it| (it.get_postfix(), true),
+        );
+        #[allow(clippy::cast_possible_truncation)]
+        let job_essential = JobEssential::new(
+            form.friend_code.clone(),
+            timestamp.clone(),
+            range.start.cast_signed() as i32,
+            range.len().cast_signed() as i32,
+            0,
+        );
+        let job_id = write_job(
+            redis_client,
+            &job_essential,
+            &queue_name,
+            !exist,
+            config.redis_stream_refresh_ttl,
+        )
+        .map_err(|e| Error::Redis(ErrorType::FailedEnqueueRedis, e))?;
+        let job_tag = JobTag {
+            job_last_id: job_id,
+            queue: SubQueue::try_from(job_sub_queue_redis_key(&queue_name).as_str())
+                .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?,
+            job_essential,
+        };
+        write_job_index(redis_client, &job_tag)
+            .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?;
+    }
+    Ok(base64::prelude::BASE64_STANDARD.encode(format!("{}-{}", form.friend_code, timestamp)))
 }
 
 fn input_check(input: &str) -> bool {

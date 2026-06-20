@@ -2,7 +2,12 @@ name: cargo-code-check
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: ["main"]
+    paths-ignore:
+      - '*.md'
+      - '.github/**'
+      - 'helm/**'
 
 env:
   CARGO_TERM_COLOR: always

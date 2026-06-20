@@ -3,14 +3,19 @@ use std::{collections::HashSet, env, hash::RandomState};
 use axum::{Json, extract::Query, response::IntoResponse};
 use base64::Engine;
 use cuscuta_common::{
-    api::xxxxxx::SongScore,
+    api::xxxxxx::{FriendInfo, SongScore},
     db::{
         job::{
-            SearchPositionResult, fetch_pending_tags, fetch_result, fetch_result_tags,
-            search_position,
+            eta::fetch_unit_eta,
+            fetch::{
+                SearchPositionResult, fetch_pending_tags, fetch_result, fetch_result_tags,
+                search_position,
+            },
         },
-        job_eta::fetch_unit_eta,
-        redis::{job_index_redis_key, job_output_index_redis_key},
+        redis::{
+            job_output_index_redis_key, job_pending_index_redis_key,
+            job_result_friend_info_redis_key, job_result_value_redis_key,
+        },
     },
 };
 use redis::{Client, TypedCommands};
@@ -29,12 +34,14 @@ enum QueryResult {
         success: bool,
         pending: bool,
         retries: usize,
+        friend_info: Option<FriendInfo>,
         result: Vec<SongScore>,
     },
     SuccessPending {
         success: bool,
         pending: bool,
         progress: f64,
+        friend_info: Option<FriendInfo>,
         eta: Option<f64>,
     },
     Failed {
@@ -66,6 +73,9 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
             .parse::<bool>()
             .unwrap_or(false);
         let evidence_check_result = check_evidence(redis_client, &token)?;
+        let friend_info =
+            fetch_result::<FriendInfo>(redis_client, &job_result_friend_info_redis_key(&token))
+                .map_or(None, |it| it.into_iter().next());
         match evidence_check_result {
             EvidenceCheckResult::Pending {
                 total_jobs,
@@ -88,16 +98,18 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
                     success: true,
                     pending: true,
                     eta,
+                    friend_info,
                     progress: percent,
                 })
             }
             EvidenceCheckResult::Finished { retries } => {
-                let result = fetch_result(redis_client, &token)
+                let result = fetch_result(redis_client, &job_result_value_redis_key(&token))
                     .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
                 Ok(QueryResult::SuccessFinished {
                     success: true,
                     pending: false,
                     retries,
+                    friend_info,
                     result,
                 })
             }
@@ -146,7 +158,7 @@ fn check_evidence(redis_client: &Client, postfix: &str) -> Result<EvidenceCheckR
         .get_connection()
         .map_err(|e| Error::Redis(ErrorType::FailedCheckEvidenceRedis, e))?;
     let total_jobs_len = connection
-        .llen(job_index_redis_key(postfix))
+        .llen(job_pending_index_redis_key(postfix))
         .map_err(|e| Error::Redis(ErrorType::FailedCheckEvidenceRedis, e))?;
     if total_jobs_len == 0 {
         return Ok(EvidenceCheckResult::Failed);

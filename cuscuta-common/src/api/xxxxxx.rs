@@ -40,7 +40,7 @@ pub struct FriendListResult1 {
 }
 
 /// xxxxxx api好友信息的适配数据模型
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct FriendInfo {
     /// 好友游戏名
     pub name: String,
@@ -53,6 +53,12 @@ pub struct FriendInfo {
 
     /// 好友设置的搭档
     pub character: i64,
+
+    /// 好友搭档状态1
+    pub is_char_uncapped: bool,
+
+    /// 好友搭档状态2
+    pub is_char_uncapped_override: bool,
 }
 
 /// xxxxxx api曲目成绩的适配数据模型（顶层）
@@ -119,9 +125,9 @@ pub struct SongScore {
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
 pub async fn api_login(
     bundle_data: &BundleData,
-    email: String,
-    password: String,
-    random_challenge: String,
+    email: &str,
+    password: &str,
+    random_challenge: &str,
 ) -> Result<LoginResult> {
     reqwest::Client::builder()
         .user_agent("curl/7.88.1")
@@ -131,7 +137,7 @@ pub async fn api_login(
         .header("X-Random-Challenge", random_challenge)
         .header("AppVersion", bundle_data.application_version_number.clone())
         .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(&email))
+        .header("DeviceId", generate_device_id(email))
         .basic_auth(email, Some(password))
         .form(&[("grant_type", "client_credentials")])
         .send()
@@ -154,9 +160,9 @@ pub async fn api_login(
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
 pub async fn api_list_friend(
     bundle_data: &BundleData,
-    email: String,
-    user_id: String,
-    token: String,
+    email: &str,
+    user_id: &str,
+    token: &str,
 ) -> Result<FriendListResult1> {
     reqwest::Client::builder()
         .user_agent("curl/7.88.1")
@@ -167,7 +173,7 @@ pub async fn api_list_friend(
         .header("Platform", "android")
         .header("AppVersion", bundle_data.application_version_number.clone())
         .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(&email))
+        .header("DeviceId", generate_device_id(email))
         .header("i", user_id)
         .bearer_auth(token)
         .send()
@@ -191,10 +197,10 @@ pub async fn api_list_friend(
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
 pub async fn api_add_friend(
     bundle_data: &BundleData,
-    email: String,
-    user_id: String,
-    token: String,
-    friend_code: String,
+    email: &str,
+    user_id: &str,
+    token: &str,
+    friend_code: &str,
 ) -> Result<FriendListResult1> {
     reqwest::Client::builder()
         .user_agent("curl/7.88.1")
@@ -205,7 +211,7 @@ pub async fn api_add_friend(
         .header("Platform", "android")
         .header("AppVersion", bundle_data.application_version_number.clone())
         .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(&email))
+        .header("DeviceId", generate_device_id(email))
         .header("i", user_id)
         .bearer_auth(token)
         .form(&[("friend_code", friend_code)])
@@ -230,10 +236,10 @@ pub async fn api_add_friend(
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
 pub async fn api_delete_friend(
     bundle_data: &BundleData,
-    email: String,
-    user_id: String,
-    token: String,
-    friend_id: String,
+    email: &str,
+    user_id: &str,
+    token: &str,
+    friend_id: &str,
 ) -> Result<FriendListResult1> {
     reqwest::Client::builder()
         .user_agent("curl/7.88.1")
@@ -244,7 +250,7 @@ pub async fn api_delete_friend(
         .header("Platform", "android")
         .header("AppVersion", bundle_data.application_version_number.clone())
         .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(&email))
+        .header("DeviceId", generate_device_id(email))
         .header("i", user_id)
         .bearer_auth(token)
         .form(&[("friend_id", friend_id)])
@@ -270,13 +276,13 @@ pub async fn api_delete_friend(
 #[allow(clippy::too_many_arguments)]
 pub async fn api_get_rank_list(
     bundle_data: &BundleData,
-    email: String,
-    user_id: String,
-    token: String,
-    song_id: String,
-    difficulty: String,
-    start: String,
-    limit: String,
+    email: &str,
+    user_id: &str,
+    token: &str,
+    song_id: &str,
+    difficulty: &str,
+    start: &str,
+    limit: &str,
 ) -> Result<Vec<SongScore>> {
     reqwest::Client::builder()
         .user_agent("curl/7.88.1")
@@ -293,7 +299,7 @@ pub async fn api_get_rank_list(
         .header("Platform", "android")
         .header("AppVersion", bundle_data.application_version_number.clone())
         .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(&email))
+        .header("DeviceId", generate_device_id(email))
         .header("i", user_id)
         .bearer_auth(token)
         .send()

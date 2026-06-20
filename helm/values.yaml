@@ -107,7 +107,6 @@ entry:
 
 # -- cuscuta-worker (job processor)
 worker:
-  replicas: 1
   keda:
     enabled: true
     pollingInterval: 10
