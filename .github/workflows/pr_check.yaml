@@ -3,6 +3,11 @@ name: cargo-code-check
 on:
   pull_request:
     branches: ["main"]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.github/**'
+      - 'helm/**'
 
 env:
   CARGO_TERM_COLOR: always
