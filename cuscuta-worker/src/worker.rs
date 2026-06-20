@@ -19,12 +19,15 @@ use cuscuta_common::{
             eta::record_eta,
             scan_sub_queue,
         },
-        redis::{job_pending_index_redis_key, job_output_index_redis_key, job_result_value_redis_key},
+        redis::{
+            job_output_index_redis_key, job_pending_index_redis_key,
+            job_result_friend_info_redis_key, job_result_value_redis_key,
+        },
     },
     quick_fetch::QuickFetch,
 };
 use redis::{
-    Client, TypedCommands,
+    Client, Connection, TypedCommands,
     streams::{StreamAutoClaimOptions, StreamId, StreamReadOptions},
 };
 use tokio::time::sleep;
@@ -52,6 +55,8 @@ pub enum Error {
     RedisExtend(cuscuta_common::db::redis::Error),
     #[error("job parse error: {0}")]
     JobParse(db::redis::Error),
+    #[error("json parsing error: {0}")]
+    JsonParse(serde_json::Error),
     #[error("api error: {0}")]
     Api(api::Error),
     #[error("bad state error: {0}")]
@@ -133,6 +138,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
         try_add_friends(
             &config,
             &bundle_data,
+            redis_client,
             &user_id,
             &token,
             &account_row,
@@ -141,16 +147,20 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
             friends,
         )
         .await?;
-        let rank_list = gather_rank_list(
-            &bundle_data,
-            &user_id,
-            &token,
-            &account_row,
-            &song_list,
-            *cursor,
-            &config,
-        )
-        .await?;
+        let rank_list = if current_segments.segment.is_empty() {
+            vec![]
+        } else {
+            gather_rank_list(
+                &bundle_data,
+                &user_id,
+                &token,
+                &account_row,
+                &song_list,
+                *cursor,
+                &config,
+            )
+            .await?
+        };
         let linked_result = process_job_with_result(current_jobs, &rank_list);
         write_result_to_redis(redis_client, &linked_result)?;
         refresh_redis_ttl(current_jobs, redis_client, &config)?;
@@ -217,6 +227,10 @@ fn refresh_redis_ttl(jobs: &[Job], redis_client: &Client, config: &Config) -> Re
         .expire(
             job_pending_index_redis_key(&job.get_stream_key_postfix()),
             config.redis_stream_refresh_ttl,
+        )
+        .expire(
+            job_result_friend_info_redis_key(&job.get_stream_key_postfix()),
+            config.redis_stream_refresh_ttl,
         );
     }
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
@@ -247,7 +261,7 @@ async fn clean_jobs(
     for finished_job in jobs.iter_mut() {
         let output_list_key = job_output_index_redis_key(&finished_job.get_stream_key_postfix());
         let JobState::Finished {
-            friend_user_id,
+            friend_info,
             start_timestamp,
         } = &finished_job.state
         else {
@@ -271,6 +285,7 @@ async fn clean_jobs(
             .map_err(Error::Redis)?;
         let _ = connection.expire(output_list_key, config.redis_stream_refresh_ttl);
         if !pending_friends.contains(&finished_job.essential.friend_code) {
+            let friend_user_id = friend_info.user_id.to_string();
             xxxxxx_safe_call(
                 config.worker_max_retry_count,
                 config.worker_exponential_backoff_base_millis,
@@ -282,19 +297,21 @@ async fn clean_jobs(
                         &account_row.account_email,
                         user_id,
                         token,
-                        friend_user_id,
+                        &friend_user_id,
                     )
                 },
             )
             .await
             .map_err(Error::Api)?;
-            friends.retain(|it| &it.user_id.to_string() != friend_user_id);
+            friends.retain(|it| it.user_id != friend_info.user_id);
         }
-        let _ = record_eta(
-            redis_client,
-            (Utc::now().timestamp_millis() - *start_timestamp)
-                / i64::from(finished_job.essential.cursor_length),
-        );
+        let cursor_length = i64::from(finished_job.essential.cursor_length);
+        if cursor_length != 0 {
+            let _ = record_eta(
+                redis_client,
+                (Utc::now().timestamp_millis() - *start_timestamp) / cursor_length,
+            );
+        }
         log::info!("job: {finished_job:?} finished");
         finished_job.state = JobState::Cleaned;
     }
@@ -307,23 +324,21 @@ fn process_job_with_result(jobs: &mut [Job], scores: &[SongScore]) -> Vec<(Strin
     for job in jobs.iter_mut() {
         let redis_key = job_result_value_redis_key(&job.get_stream_key_postfix());
         let JobState::Pending {
-            friend_user_id,
+            friend_info,
             current_length,
             start_timestamp,
         } = &mut job.state
         else {
             continue;
         };
-        let linked_score = scores
-            .iter()
-            .filter(|it| friend_user_id == &it.user_id.to_string());
+        let linked_score = scores.iter().filter(|it| friend_info.user_id == it.user_id);
         *current_length += 1;
         for linked_score in linked_score {
             job_links.push((redis_key.clone(), linked_score.clone()));
         }
         if *current_length >= job.essential.cursor_length.cast_unsigned() as usize {
             job.state = JobState::Finished {
-                friend_user_id: friend_user_id.clone(),
+                friend_info: friend_info.clone(),
                 start_timestamp: *start_timestamp,
             };
         }
@@ -391,10 +406,27 @@ async fn gather_rank_list<'a>(
     Ok(result)
 }
 
+fn push_friend_info(
+    connection: &mut Connection,
+    friend_info: &FriendInfo,
+    job: &Job,
+) -> Result<(), Error> {
+    let key = job_result_friend_info_redis_key(&job.get_stream_key_postfix());
+    connection
+        .lpush(
+            &key,
+            serde_json::to_string(friend_info).map_err(Error::JsonParse)?,
+        )
+        .map_err(Error::Redis)?;
+    connection.ltrim(&key, 0, 1).map_err(Error::Redis)?;
+    Ok(())
+}
+
 #[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 async fn try_add_friends(
     config: &Config,
     bundle_data: &BundleData,
+    redis_client: &Client,
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
@@ -402,15 +434,16 @@ async fn try_add_friends(
     cursor: usize,
     friends: &mut Vec<FriendInfo>,
 ) -> Result<(), Error> {
+    let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     let ids: Vec<_> = jobs
         .iter()
         .filter_map(|it| {
-            let (JobState::Pending { friend_user_id, .. }
-            | JobState::Finished { friend_user_id, .. }) = &it.state
+            let (JobState::Pending { friend_info, .. } | JobState::Finished { friend_info, .. }) =
+                &it.state
             else {
                 return None;
             };
-            Some((it.essential.friend_code.clone(), friend_user_id.clone()))
+            Some((it.essential.friend_code.clone(), friend_info.clone()))
         })
         .collect();
     for job in jobs.iter_mut() {
@@ -420,9 +453,11 @@ async fn try_add_friends(
         let option_existing_ids = ids
             .iter()
             .find(|(code, _)| code == &job.essential.friend_code);
-        if let Some((_, existing_friend_id)) = option_existing_ids {
+        if let Some((_, existing_friend_info)) = option_existing_ids {
+            let friend_info = existing_friend_info.clone();
+            push_friend_info(&mut connection, &friend_info, job)?;
             job.state = JobState::Pending {
-                friend_user_id: existing_friend_id.clone(),
+                friend_info: friend_info.clone(),
                 start_timestamp,
                 current_length: 0,
             };
@@ -474,9 +509,10 @@ async fn try_add_friends(
             }
         };
         *friends = friends_new;
+        push_friend_info(&mut connection, &friend_add, job)?;
         job.essential.cursor_start = cursor.cast_signed() as i32;
         job.state = JobState::Pending {
-            friend_user_id: friend_add.user_id.to_string(),
+            friend_info: friend_add,
             start_timestamp,
             current_length: 0,
         };

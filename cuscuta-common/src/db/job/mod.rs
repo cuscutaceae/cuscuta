@@ -5,7 +5,7 @@ use redis::{Client, FromRedisValue, ScanOptions, TypedCommands, streams::StreamI
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 
-use crate::db::redis::Error;
+use crate::{api::xxxxxx::FriendInfo, db::redis::Error};
 
 /// 剩余时间相关功能
 pub mod eta;
@@ -127,7 +127,8 @@ pub enum JobState {
     /// 任务已加好友，正在进行
     Pending {
         /// 任务的好友ID
-        friend_user_id: String,
+        // friend_user_id: String,
+        friend_info: FriendInfo,
 
         /// 任务目前进行的长度
         current_length: usize,
@@ -139,7 +140,7 @@ pub enum JobState {
     /// 任务已经完成，等待清理
     Finished {
         /// 任务的好友ID
-        friend_user_id: String,
+        friend_info: FriendInfo,
 
         /// 任务开始时的时间戳
         start_timestamp: i64,

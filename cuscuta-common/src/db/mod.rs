@@ -88,8 +88,8 @@ pub mod redis {
 
     /// 记录Job对应的好友信息的key
     #[must_use]
-    pub fn job_result_info_redis_key(postfix: &str) -> String {
-        format!("cuscuta:results:info:{postfix}")
+    pub fn job_result_friend_info_redis_key(postfix: &str) -> String {
+        format!("cuscuta:results:friend_info:{postfix}")
     }
 
     /// 记录子任务队列的key

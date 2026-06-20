@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::db::{
     job::{JobEssential, JobTag, fetch_job_tags},
-    redis::{Error, job_pending_index_redis_key, job_output_index_redis_key},
+    redis::{Error, job_output_index_redis_key, job_pending_index_redis_key},
 };
 
 /// 不保证同步性，搜索任务的完成index

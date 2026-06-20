@@ -3,7 +3,7 @@ use std::{collections::HashSet, env, hash::RandomState};
 use axum::{Json, extract::Query, response::IntoResponse};
 use base64::Engine;
 use cuscuta_common::{
-    api::xxxxxx::SongScore,
+    api::xxxxxx::{FriendInfo, SongScore},
     db::{
         job::{
             eta::fetch_unit_eta,
@@ -12,7 +12,10 @@ use cuscuta_common::{
                 search_position,
             },
         },
-        redis::{job_pending_index_redis_key, job_output_index_redis_key, job_result_value_redis_key},
+        redis::{
+            job_output_index_redis_key, job_pending_index_redis_key,
+            job_result_friend_info_redis_key, job_result_value_redis_key,
+        },
     },
 };
 use redis::{Client, TypedCommands};
@@ -31,12 +34,14 @@ enum QueryResult {
         success: bool,
         pending: bool,
         retries: usize,
+        friend_info: Option<FriendInfo>,
         result: Vec<SongScore>,
     },
     SuccessPending {
         success: bool,
         pending: bool,
         progress: f64,
+        friend_info: Option<FriendInfo>,
         eta: Option<f64>,
     },
     Failed {
@@ -68,6 +73,10 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
             .parse::<bool>()
             .unwrap_or(false);
         let evidence_check_result = check_evidence(redis_client, &token)?;
+        let friend_info =
+            fetch_result::<FriendInfo>(redis_client, &job_result_friend_info_redis_key(&token))
+                .map(|it| it.into_iter().next())
+                .unwrap_or(None);
         match evidence_check_result {
             EvidenceCheckResult::Pending {
                 total_jobs,
@@ -90,6 +99,7 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
                     success: true,
                     pending: true,
                     eta,
+                    friend_info,
                     progress: percent,
                 })
             }
@@ -100,6 +110,7 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
                     success: true,
                     pending: false,
                     retries,
+                    friend_info,
                     result,
                 })
             }

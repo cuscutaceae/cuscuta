@@ -40,7 +40,7 @@ pub struct FriendListResult1 {
 }
 
 /// xxxxxx api好友信息的适配数据模型
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct FriendInfo {
     /// 好友游戏名
     pub name: String,
@@ -53,6 +53,12 @@ pub struct FriendInfo {
 
     /// 好友设置的搭档
     pub character: i64,
+
+    /// 好友搭档状态1
+    pub is_char_uncapped: bool,
+
+    /// 好友搭档状态2
+    pub is_char_uncapped_override: bool,
 }
 
 /// xxxxxx api曲目成绩的适配数据模型（顶层）
