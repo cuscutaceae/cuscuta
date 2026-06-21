@@ -31,3 +31,10 @@ sqlx = { version = "0.8.6", features = ["postgres", "chrono", "runtime-tokio"] }
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["rt-multi-thread"] }
 tokio-util = "0.7.18"
+
+[workspace.lints.rust]
+missing_docs = "deny"
+
+[workspace.lints.clippy]
+pedantic = "deny"
+nursery = "deny"

@@ -26,9 +26,6 @@
 //! - `API_GET_RANK`
 //!
 
-#![deny(clippy::nursery)]
-#![deny(clippy::pedantic)]
-
 mod data;
 mod db;
 mod init;
