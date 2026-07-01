@@ -70,8 +70,7 @@ impl<T> QuickFetch<T> for OnceLock<RwLock<Option<T>>> {
     fn is_initialized(&self) -> bool {
         self.get_or_init(|| RwLock::new(Option::None))
             .try_read()
-            .ok()
-            .is_some_and(|it| it.is_some())
+            .is_ok_and(|it| it.is_some())
     }
 }
 

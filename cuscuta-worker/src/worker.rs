@@ -489,6 +489,7 @@ async fn try_add_friends(
                     continue;
                 }
                 log::warn!("failed to add friend: {e}");
+                //TODO add failure handle
                 continue;
             }
             Ok(it) => it.friends,

@@ -197,7 +197,7 @@ fn split_weighted_ranges_min(num: &[usize], m: usize) -> Result<usize, Error> {
         .ok_or(Error::NotReady(ErrorType::SongListNotReady))?;
     let mut r: usize = num.iter().sum();
     while l <= r {
-        let mid = (l + r) >> 1;
+        let mid = usize::midpoint(l, r);
         if check(mid, num, m) {
             r = mid - 1;
         } else {
