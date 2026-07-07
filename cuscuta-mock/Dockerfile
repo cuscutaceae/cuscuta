@@ -16,6 +16,7 @@ RUN mkdir -p cuscuta-chilo/src && echo "//! Dummy \nfn main() {}" > cuscuta-chil
 RUN mkdir -p cuscuta-mock/src && echo "//! Dummy \nfn main() {}" > cuscuta-mock/src/main.rs
 RUN mkdir -p cuscutactl/src && echo "//! Dummy \nfn main() {}" > cuscutactl/src/main.rs
 # Pre-build to cache dependencies
+COPY cuscuta-common/src cuscuta-common/src
 RUN cargo build --release -p cuscuta-mock
 # Copy real source and rebuild
 COPY cuscuta-mock/src cuscuta-mock/src

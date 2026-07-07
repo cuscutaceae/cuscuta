@@ -1,5 +1,6 @@
 use std::env;
 
+use cuscuta_common::api::xxxxxx::FriendInfo;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
@@ -24,16 +25,6 @@ pub struct FriendModifyResultFailed {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FriendsResult {
     pub friends: Vec<FriendInfo>,
-}
-
-/// 注意，为做简化，这里的user_id等同于friend_code
-/// 但是需要澄清，实际情况绝非如此
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FriendInfo {
-    pub name: String,
-    pub user_id: i64,
-    pub rating: i64,
-    pub character: i64,
 }
 
 #[derive(Deserialize)]

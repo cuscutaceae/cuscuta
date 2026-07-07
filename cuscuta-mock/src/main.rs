@@ -18,15 +18,16 @@ use axum::{
 };
 use base64::Engine;
 use chrono::Utc;
+use cuscuta_common::api::xxxxxx::FriendInfo;
 use rand::{RngExt, seq::SliceRandom};
 use serde_json::json;
 use tokio::net::TcpListener;
 
 use crate::data::{
-    FriendAddForm, FriendInfo, FriendModifyResult, FriendModifyResultFailed,
-    FriendModifyResultSuccess, FriendRemoveForm, FriendsResult, LoginResult, LoginResultFailed,
-    LoginResultSuccess, RankListFetchResult, RankListFetchResultFailed, RankListFetchResultSuccess,
-    RankListQuery, RankListResult, check_env_bool,
+    FriendAddForm, FriendModifyResult, FriendModifyResultFailed, FriendModifyResultSuccess,
+    FriendRemoveForm, FriendsResult, LoginResult, LoginResultFailed, LoginResultSuccess,
+    RankListFetchResult, RankListFetchResultFailed, RankListFetchResultSuccess, RankListQuery,
+    RankListResult, check_env_bool,
 };
 
 static FRIEND_INFO: OnceLock<RwLock<HashMap<String, Vec<FriendInfo>>>> = OnceLock::new();
@@ -76,6 +77,8 @@ fn initialize_friends() {
                 user_id: 9999999,
                 rating: 10,
                 character: 0,
+                is_char_uncapped: true,
+                is_char_uncapped_override: true,
             }],
         );
     }
@@ -186,28 +189,33 @@ async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoR
     };
     let i_header = i_header.to_str().unwrap().to_string();
     //TODO add random not found fail
-    let result = internal_write_friends(i_header.clone(), |it| {
-        let it = it.get_mut(&i_header).unwrap();
-        if it
-            .iter()
-            .any(|info| info.user_id.to_string() == form.friend_code)
-        {
-            log::warn!("add_friend: failed, duplicated addition");
-            return FriendModifyResult::Failed(FriendModifyResultFailed {
-                success: false,
-                error_code: 1,
-            })
-            .into();
-        }
-        it.push(FriendInfo {
-            name: format!("a_friend_{}", form.friend_code),
-            user_id: form.friend_code.parse::<i64>().unwrap(),
-            rating: 1234,
-            character: 0,
-        });
-        log::info!("add_friend: success, friend_code:{}", form.friend_code);
-        None
-    });
+    let result = internal_write_friends(
+        i_header.clone(),
+        |it: &mut HashMap<String, Vec<FriendInfo>>| {
+            let it = it.get_mut(&i_header).unwrap();
+            if it
+                .iter()
+                .any(|info| info.user_id.to_string() == form.friend_code)
+            {
+                log::warn!("add_friend: failed, duplicated addition");
+                return FriendModifyResult::Failed(FriendModifyResultFailed {
+                    success: false,
+                    error_code: 1,
+                })
+                .into();
+            }
+            it.push(FriendInfo {
+                name: format!("a_friend_{}", form.friend_code),
+                user_id: form.friend_code.parse::<i64>().unwrap(),
+                rating: 1234,
+                character: 0,
+                is_char_uncapped: true,
+                is_char_uncapped_override: true,
+            });
+            log::info!("add_friend: success, friend_code:{}", form.friend_code);
+            None
+        },
+    );
     let code = match &result {
         FriendModifyResult::Success(_) => StatusCode::OK,
         FriendModifyResult::Failed(_) => StatusCode::BAD_REQUEST,
@@ -237,32 +245,35 @@ async fn remove_friend(headers: HeaderMap, form: Form<FriendRemoveForm>) -> impl
     };
     let i_header = i_header.to_str().unwrap().to_string();
     //TODO add random not found fail
-    let result = internal_write_friends(i_header.clone(), |it| {
-        let it = it.get_mut(&i_header).unwrap();
-        let index = it
-            .iter()
-            .enumerate()
-            .find(|it| it.1.user_id.to_string() == form.friend_id)
-            .map(|it| it.0);
-        match index {
-            Some(index) => {
-                log::info!("remove_friend: success, {}", form.friend_id);
-                it.remove(index);
-                None
+    let result = internal_write_friends(
+        i_header.clone(),
+        |it: &mut HashMap<String, Vec<FriendInfo>>| {
+            let it = it.get_mut(&i_header).unwrap();
+            let index = it
+                .iter()
+                .enumerate()
+                .find(|it| it.1.user_id.to_string() == form.friend_id)
+                .map(|it| it.0);
+            match index {
+                Some(index) => {
+                    log::info!("remove_friend: success, {}", form.friend_id);
+                    it.remove(index);
+                    None
+                }
+                None => {
+                    log::warn!(
+                        "remove_friend: failed, friend not found: {} in {:?}",
+                        form.friend_id,
+                        it
+                    );
+                    Some(FriendModifyResult::Failed(FriendModifyResultFailed {
+                        success: false,
+                        error_code: 401,
+                    }))
+                }
             }
-            None => {
-                log::warn!(
-                    "remove_friend: failed, friend not found: {} in {:?}",
-                    form.friend_id,
-                    it
-                );
-                Some(FriendModifyResult::Failed(FriendModifyResultFailed {
-                    success: false,
-                    error_code: 401,
-                }))
-            }
-        }
-    });
+        },
+    );
     let code = match &result {
         FriendModifyResult::Success(_) => StatusCode::OK,
         FriendModifyResult::Failed(_) => StatusCode::NOT_FOUND,
