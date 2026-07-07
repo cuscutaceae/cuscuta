@@ -1,9 +1,6 @@
 use redis::{Client, TypedCommands};
 
-use crate::db::{
-    job::{JobEssential, JobTag},
-    redis::{Error, job_pending_index_redis_key, job_sub_queue_redis_key},
-};
+use crate::db::{job::JobEssential, redis::job_sub_queue_redis_key};
 
 /// 向任务队列写入新任务
 ///
@@ -41,21 +38,4 @@ pub fn write_job(
             ],
         )?
         .expect("XADD returns null when no 'NOMKSTREAM' declared, this should not happen"))
-}
-
-/// 将JobTag内容写入index，以便生成token供查询
-///
-/// # Errors
-/// 本函数的错误全部来自[`redis::RedisError`]
-pub fn write_job_index(redis_client: &Client, job_tag: &JobTag) -> Result<(), Error> {
-    let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
-    connection
-        .lpush(
-            job_pending_index_redis_key(&job_tag.job_essential.get_stream_key_postfix()),
-            serde_json::to_string(job_tag).map_err(|e| {
-                Error::BadData(format!("failed to serialize JobTag: {job_tag:?} :{e}"))
-            })?,
-        )
-        .map_err(Error::Redis)?;
-    Ok(())
 }

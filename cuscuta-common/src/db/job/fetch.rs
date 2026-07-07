@@ -1,30 +1,7 @@
 use redis::{Client, TypedCommands};
 use serde::Deserialize;
 
-use crate::db::{
-    job::{JobEssential, JobTag, fetch_job_tags},
-    redis::{Error, job_output_index_redis_key, job_pending_index_redis_key},
-};
-
-/// 不保证同步性，搜索任务的完成index
-///
-/// 这个函数被用于确认任务完成情况
-///
-/// # Errors
-/// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
-pub fn fetch_result_tags(redis_client: &Client, postfix: &str) -> Result<Vec<JobTag>, Error> {
-    fetch_job_tags(redis_client, &job_output_index_redis_key(postfix))
-}
-
-/// 不保证同步性，搜索任务的index
-///
-/// 这个函数被用于确认任务的预期结果
-///
-/// # Errors
-/// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
-pub fn fetch_pending_tags(redis_client: &Client, postfix: &str) -> Result<Vec<JobTag>, Error> {
-    fetch_job_tags(redis_client, &job_pending_index_redis_key(postfix))
-}
+use crate::db::{job::JobEssential, redis::Error};
 
 /// 不保证同步性，获取任意List中的JSON内容
 ///

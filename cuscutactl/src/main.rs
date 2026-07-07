@@ -34,10 +34,6 @@
 //! `legacy` is the default. `kubernetes` mode reads database URLs from the cluster
 //! Secret (`cuscuta-secret` by default) and opens a local `kubectl port-forward` tunnel.
 
-#![deny(clippy::nursery)]
-#![deny(clippy::pedantic)]
-#![deny(missing_docs)]
-
 use std::pin::Pin;
 
 use anyhow::bail;

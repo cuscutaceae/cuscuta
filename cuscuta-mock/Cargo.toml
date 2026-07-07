@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+cuscuta-common = { path = "../cuscuta-common" }
 axum = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }

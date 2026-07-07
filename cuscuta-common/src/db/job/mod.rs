@@ -16,6 +16,9 @@ pub mod fetch;
 /// 任务入列相关功能
 pub mod enqueue;
 
+/// 任跟踪相关功能
+pub mod track;
+
 /// 代表一个任务分片，对应Redis数据库中的分任务队列
 ///
 /// 一个任务队列的Key格式如下：\
@@ -33,54 +36,6 @@ pub struct SubQueue {
 
     /// 这个任务队列所占有的分块，对应队列名字的`from`和`to`
     pub segment: Range<usize>,
-}
-
-impl SubQueue {
-    /// 获取任务的后缀
-    #[must_use]
-    pub fn get_postfix(&self) -> String {
-        format!(
-            "chunk_{}_{}_{}_{}",
-            self.hash, self.timestamp, self.segment.start, self.segment.end
-        )
-    }
-}
-
-impl TryFrom<&str> for SubQueue {
-    type Error = Error;
-
-    fn try_from(name: &str) -> Result<Self, Self::Error> {
-        let chunk_info: Vec<&str> = name.split('_').collect();
-        if chunk_info.len() != 5 {
-            return Err(Error::BadData(format!("bad queue name: {name}")));
-        }
-        let segment_from = chunk_info[3].parse::<usize>().map_err(|e| {
-            Error::BadData(format!(
-                "bad segment start \"{}\" of {} ({e})",
-                chunk_info[3], name
-            ))
-        })?;
-        let segment_to = chunk_info[4].parse::<usize>().map_err(|e| {
-            Error::BadData(format!(
-                "bad segment end \"{}\" of {} ({e})",
-                chunk_info[4], name
-            ))
-        })?;
-        if segment_from > segment_to {
-            return Err(Error::BadData(format!("bad segment (end<start): {name}")));
-        }
-        Ok(Self {
-            name: name.to_string(),
-            hash: chunk_info[1].to_string(),
-            timestamp: chunk_info[2].parse::<u64>().map_err(|e| {
-                Error::BadData(format!(
-                    "bad timestamp \"{}\" of {} ({e})",
-                    chunk_info[2], name
-                ))
-            })?,
-            segment: segment_from..segment_to,
-        })
-    }
 }
 
 /// 一个Worker负责的`Job`实例，包含`Job`的关键信息和临时状态信息
@@ -101,22 +56,8 @@ pub struct Job {
     pub state: JobState,
 }
 
-impl PartialEq for Job {
-    fn eq(&self, other: &Self) -> bool {
-        self.essential == other.essential
-    }
-}
-
-impl Job {
-    /// 获取Job对应的结果类队列id
-    #[must_use]
-    pub fn get_stream_key_postfix(&self) -> String {
-        self.essential.get_stream_key_postfix()
-    }
-}
-
 /// 记录任务的状态
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum JobState {
     /// 任务刚刚被拉取，还没有加好友
     Pulled {
@@ -126,8 +67,7 @@ pub enum JobState {
 
     /// 任务已加好友，正在进行
     Pending {
-        /// 任务的好友ID
-        // friend_user_id: String,
+        /// 任务的好友信息
         friend_info: FriendInfo,
 
         /// 任务目前进行的长度
@@ -139,43 +79,97 @@ pub enum JobState {
 
     /// 任务已经完成，等待清理
     Finished {
-        /// 任务的好友ID
+        /// 任务的好友信息
         friend_info: FriendInfo,
 
         /// 任务开始时的时间戳
         start_timestamp: i64,
     },
 
+    /// 任务失败
+    Failed {
+        /// 任务的好友信息（可能有）
+        friend_info: Option<FriendInfo>,
+
+        /// 任务开始时的时间戳
+        start_timestamp: i64,
+
+        /// 任务失败情况
+        failure_info: JobFailure,
+    },
+
     /// 任务已被清理
     Cleaned,
 }
 
-/// 一个任务的index信息，会被存放至`cuscuta:result:index:...`和`cuscuta:pending:index:...`中
-#[derive(Debug, Serialize, Deserialize)]
-pub struct JobTag {
-    /// 这个任务最后一次成功完成时在Redis队列中的id
-    pub job_last_id: String,
+/// 任务的失败情况
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct JobFailure {
+    /// Job 失败的原因
+    pub fail_type: JobFailureType,
 
-    /// 这个任务对应的队列来源
-    pub queue: SubQueue,
+    /// Job 失败的恢复策略
+    pub resume_strategy: JobFailureResuming,
 
-    /// 这个任务的关键信息
-    pub job_essential: JobEssential,
+    /// Job 失败的时间
+    pub timestamp_millis: i64,
 }
 
-impl TryFrom<(SubQueue, StreamId)> for Job {
-    type Error = Error;
-    fn try_from((sub_queue, id): (SubQueue, StreamId)) -> Result<Self, Self::Error> {
-        let map = id.map;
-        let timestamp = Utc::now().timestamp_millis();
-        Ok(Self {
-            job_id: id.id,
-            essential: JobEssential::try_from(&map)?,
-            sub_queue,
-            state: JobState::Pulled {
-                start_timestamp: timestamp,
-            },
-        })
+/// 失败时的恢复策略
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum JobFailureResuming {
+    /// 任务直接失败
+    Drop,
+
+    /// 无操作
+    NoOp,
+}
+
+macro_rules! castable_enum {
+    (
+        $(#[$meta:meta])*
+        #repr($repr:ty)
+        $vis:vis enum $name:ident {
+            $(
+                $(#[$vmeta:meta])*
+                $Variant:ident$(($($v:tt)*))? = $code:expr,
+            )*
+        }
+    ) => {
+        $(#[$meta])*
+        $vis enum $name {
+            $(
+                $(#[$vmeta])*
+                $Variant $(($($v)*))?,
+            )*
+        }
+        impl $name {
+            #[allow(missing_docs)]
+            $vis const fn get_repr(&self) -> $repr {
+                match self {
+                    $(Self::$Variant {..} => $code,)*
+                }
+            }
+        }
+    };
+}
+
+castable_enum! {
+    /// 任务的失败信息
+    #[derive(Debug, Serialize, Deserialize, thiserror::Error, Clone)]
+    #repr(i32)
+    pub enum JobFailureType {
+        /// 好友找不到，一般是好友码无效
+        #[error("friend not found")]
+        FriendNotFound = -1,
+
+        /// 无法找到对应的tracking条目，尝试创建新的
+        #[error("worker failed to find exist target key: when {0}")]
+        TargetKeyNotFound(String) = -2,
+
+        /// Job 重新入队
+        #[error("job Reenqueued")]
+        Reenqueued = -3,
     }
 }
 
@@ -199,6 +193,59 @@ pub struct JobEssential {
 
     /// 任务的唯一ID，不应随任务重新入队而改变
     pub job_uid: String,
+}
+
+impl JobFailure {
+    /// 新建一个[`JobTrackFailure`]，自动填写当前时间戳
+    #[must_use]
+    pub fn new(fail_type: JobFailureType, resume_strategy: JobFailureResuming) -> Self {
+        Self {
+            fail_type,
+            resume_strategy,
+            timestamp_millis: Utc::now().timestamp_millis(),
+        }
+    }
+}
+
+impl TryFrom<(SubQueue, StreamId)> for Job {
+    type Error = Error;
+    fn try_from((sub_queue, id): (SubQueue, StreamId)) -> Result<Self, Self::Error> {
+        let map = id.map;
+        let timestamp = Utc::now().timestamp_millis();
+        Ok(Self {
+            job_id: id.id,
+            essential: JobEssential::try_from(&map)?,
+            sub_queue,
+            state: JobState::Pulled {
+                start_timestamp: timestamp,
+            },
+        })
+    }
+}
+
+impl PartialEq for Job {
+    fn eq(&self, other: &Self) -> bool {
+        self.essential == other.essential
+    }
+}
+
+impl Job {
+    /// 获取Job对应的结果类队列id
+    #[must_use]
+    pub fn get_stream_key_postfix(&self) -> String {
+        self.essential.get_stream_key_postfix()
+    }
+}
+
+impl SubQueue {
+    /// 获取任务的后缀
+    #[must_use]
+    pub fn get_postfix(&self) -> String {
+        format!(
+            "chunk_{}_{}_{}_{}",
+            self.hash, self.timestamp, self.segment.start, self.segment.end
+        )
+    }
 }
 
 impl JobEssential {
@@ -240,6 +287,43 @@ impl JobEssential {
     }
 }
 
+impl TryFrom<&str> for SubQueue {
+    type Error = Error;
+
+    fn try_from(name: &str) -> Result<Self, Self::Error> {
+        let chunk_info: Vec<&str> = name.split('_').collect();
+        if chunk_info.len() != 5 {
+            return Err(Error::BadData(format!("bad queue name: {name}")));
+        }
+        let segment_from = chunk_info[3].parse::<usize>().map_err(|e| {
+            Error::BadData(format!(
+                "bad segment start \"{}\" of {} ({e})",
+                chunk_info[3], name
+            ))
+        })?;
+        let segment_to = chunk_info[4].parse::<usize>().map_err(|e| {
+            Error::BadData(format!(
+                "bad segment end \"{}\" of {} ({e})",
+                chunk_info[4], name
+            ))
+        })?;
+        if segment_from > segment_to {
+            return Err(Error::BadData(format!("bad segment (end<start): {name}")));
+        }
+        Ok(Self {
+            name: name.to_string(),
+            hash: chunk_info[1].to_string(),
+            timestamp: chunk_info[2].parse::<u64>().map_err(|e| {
+                Error::BadData(format!(
+                    "bad timestamp \"{}\" of {} ({e})",
+                    chunk_info[2], name
+                ))
+            })?,
+            segment: segment_from..segment_to,
+        })
+    }
+}
+
 impl TryFrom<&HashMap<String, redis::Value>> for JobEssential {
     type Error = Error;
 
@@ -252,19 +336,6 @@ impl TryFrom<&HashMap<String, redis::Value>> for JobEssential {
             from_redis(map, "job:retry_count")?,
         ))
     }
-}
-
-/// 辅助函数，用于获取结果是`JobTag`的List的内容
-fn fetch_job_tags(redis_client: &Client, key: &str) -> Result<Vec<JobTag>, Error> {
-    let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
-    let range = connection.lrange(key, 0, -1).map_err(Error::Redis)?;
-    let mut out = Vec::<JobTag>::new();
-    for it in &range {
-        out.push(serde_json::from_str(it).map_err(|e| {
-            Error::BadData(format!("failed to deserialize string to json: {it}({e})"))
-        })?);
-    }
-    Ok(out)
 }
 
 /// 不保证同步性，搜索工作队列分片

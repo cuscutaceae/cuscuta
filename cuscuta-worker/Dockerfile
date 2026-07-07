@@ -9,12 +9,12 @@ COPY cuscuta-chilo/Cargo.toml cuscuta-chilo/
 COPY cuscuta-mock/Cargo.toml cuscuta-mock/
 COPY cuscutactl/Cargo.toml cuscutactl/
 # Dummy sources for unused members (allows dep caching)
-RUN mkdir -p cuscuta-common/src && echo "" > cuscuta-common/src/lib.rs
-RUN mkdir -p cuscuta-entry/src && echo "fn main() {}" > cuscuta-entry/src/main.rs
-RUN mkdir -p cuscuta-worker/src && echo "fn main() {}" > cuscuta-worker/src/main.rs
-RUN mkdir -p cuscuta-chilo/src && echo "fn main() {}" > cuscuta-chilo/src/main.rs
-RUN mkdir -p cuscuta-mock/src && echo "fn main() {}" > cuscuta-mock/src/main.rs
-RUN mkdir -p cuscutactl/src && echo "fn main() {}" > cuscutactl/src/main.rs
+RUN mkdir -p cuscuta-common/src && echo "//! Dummy" > cuscuta-common/src/lib.rs
+RUN mkdir -p cuscuta-entry/src && echo "//! Dummy \nfn main() {}" > cuscuta-entry/src/main.rs
+RUN mkdir -p cuscuta-worker/src && echo "//! Dummy \nfn main() {}" > cuscuta-worker/src/main.rs
+RUN mkdir -p cuscuta-chilo/src && echo "//! Dummy \nfn main() {}" > cuscuta-chilo/src/main.rs
+RUN mkdir -p cuscuta-mock/src && echo "//! Dummy \nfn main() {}" > cuscuta-mock/src/main.rs
+RUN mkdir -p cuscutactl/src && echo "//! Dummy \nfn main() {}" > cuscutactl/src/main.rs
 # Pre-build to cache dependencies
 RUN cargo build --release -p cuscuta-worker
 # Copy real source and rebuild

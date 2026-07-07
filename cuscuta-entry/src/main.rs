@@ -12,9 +12,6 @@
 //! - `REDIS_ADDR`
 //! - `ACCOUNTS_SQL_ADDR`
 
-#![deny(clippy::nursery)]
-#![deny(clippy::pedantic)]
-
 mod data;
 mod db;
 mod endpoints;
