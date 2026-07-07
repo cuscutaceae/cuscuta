@@ -13,13 +13,11 @@ use crate::{
 };
 
 use cuscuta_common::{
-    db::{
-        job::{
-            JobEssential, JobTag, SubQueue,
-            enqueue::{write_job, write_job_index},
-            scan_sub_queue,
-        },
-        redis::job_sub_queue_redis_key,
+    db::job::{
+        JobEssential, SubQueue,
+        enqueue::write_job,
+        scan_sub_queue,
+        track::{JobTrackQueueStatus, JobTrackTag, batch_write_job_tracking_tag},
     },
     quick_fetch::QuickFetch,
 };
@@ -107,6 +105,7 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
     } else {
         Utc::now().timestamp().to_string()
     };
+    let mut job_track_tags = Vec::new();
     for range in ranges {
         let target_queue = queues.iter().find(|q| q.segment == range);
         let (queue_name, exist) = target_queue.map_or_else(
@@ -137,15 +136,18 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
             config.redis_stream_refresh_ttl,
         )
         .map_err(|e| Error::Redis(ErrorType::FailedEnqueueRedis, e))?;
-        let job_tag = JobTag {
-            job_last_id: job_id,
-            queue: SubQueue::try_from(job_sub_queue_redis_key(&queue_name).as_str())
-                .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?,
+        let sub_queue = SubQueue::try_from(queue_name.as_str())
+            .expect("failed to resolve sub queue info, this should not happen");
+        job_track_tags.push(JobTrackTag {
+            status: JobTrackQueueStatus::Queueing,
+            job_ids: vec![job_id],
+            queue: sub_queue,
             job_essential,
-        };
-        write_job_index(redis_client, &job_tag)
-            .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?;
+            failures: vec![],
+        });
     }
+    batch_write_job_tracking_tag(redis_client, &job_track_tags)
+        .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?;
     Ok(base64::prelude::BASE64_STANDARD.encode(format!("{}-{}", form.friend_code, timestamp)))
 }
 

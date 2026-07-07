@@ -67,13 +67,6 @@ pub mod redis {
         BadData(String),
     }
 
-    // [Deprecated] TODO: Remove it
-    // /// 记录Job进行索引的key
-    // #[must_use]
-    // pub fn job_pending_index_redis_key(postfix: &str) -> String {
-    //     format!("cuscuta:pending:index:{postfix}")
-    // }
-
     /// 记录Job跟踪索引的key
     #[must_use]
     pub fn job_result_tracking_redis_key(postfix: &str) -> String {

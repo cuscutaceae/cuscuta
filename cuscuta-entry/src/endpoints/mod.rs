@@ -17,7 +17,6 @@ enum ErrorType {
     FailedScanRedis = -301,
     FailedEnqueueRedis = -302,
     FailedReadEtaRedis = -303,
-    FailedCheckEvidenceRedis = -304,
 
     InternalNoWorker = -400,
 

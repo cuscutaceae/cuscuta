@@ -1,5 +1,7 @@
-use cuscuta_common::db::job::JobTag;
-
+use cuscuta_common::db::{
+    job::track::fetch_all_job_track_tag,
+    redis::{job_result_tracking_redis_key, job_result_value_redis_key},
+};
 use redis::{ScanOptions, TypedCommands};
 
 /// List all active job streams with their message counts, pending messages,
@@ -59,7 +61,7 @@ pub fn find(redis_url: &str, friend_code: &str, max_count: usize) -> anyhow::Res
     let client = redis::Client::open(redis_url)?;
     let mut con = client.get_connection()?;
 
-    let pattern = format!("cuscuta:results:index:{friend_code}-*");
+    let pattern = job_result_tracking_redis_key(&format!("{friend_code}-*"));
     let keys: Vec<String> = con
         .scan_options(
             ScanOptions::default()
@@ -75,26 +77,22 @@ pub fn find(redis_url: &str, friend_code: &str, max_count: usize) -> anyhow::Res
 
     for key in &keys {
         println!("\n--- {key} ---");
-        let entries: Vec<String> = con.lrange(key, 0, -1)?;
-        for entry in &entries {
-            match serde_json::from_str::<JobTag>(entry) {
-                Ok(tag) => {
-                    println!("  uid:      {}", tag.job_essential.job_uid);
-                    println!("  queue:    {}", tag.queue.name);
-                    println!("  segment:  {:?}", tag.queue.segment);
-                    println!(
-                        "  cursor:   {}..{}",
-                        tag.job_essential.cursor_start, tag.job_essential.cursor_length
-                    );
-                    println!("  retries:  {}", tag.job_essential.retry_count);
-                    println!("  last_id:  {}", tag.job_last_id);
-                }
-                Err(_) => {
-                    println!("  (raw) {entry}");
-                }
-            }
+        let entries = fetch_all_job_track_tag(&client, key)?;
+        for tag in &entries {
+            println!("  status:   {:?}", tag.status);
+            println!("  uid:      {}", tag.job_essential.job_uid);
+            println!("  queue:    {}", tag.queue.name);
+            println!("  segment:  {:?}", tag.queue.segment);
+            println!(
+                "  cursor:   {}..{}",
+                tag.job_essential.cursor_start, tag.job_essential.cursor_length
+            );
+            println!("  retries:  {}", tag.job_essential.retry_count);
+            println!("  ids:      {}", tag.job_ids.join(","));
+            println!("  failures: {:?}", tag.failures);
         }
     }
+
     Ok(())
 }
 
@@ -112,7 +110,7 @@ pub fn result(
     let client = redis::Client::open(redis_url)?;
     let mut con = client.get_connection()?;
 
-    let pattern = format!("cuscuta:results:value:{friend_code}-*");
+    let pattern = job_result_value_redis_key(&format!("{friend_code}-*"));
     let keys: Vec<String> = con
         .scan_options(
             ScanOptions::default()
