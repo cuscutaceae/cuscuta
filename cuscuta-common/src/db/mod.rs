@@ -36,20 +36,19 @@ pub mod postgresql {
     /// - 当SQL全局变量未初始化或初始化未完全时，返回[`Error::NotReady`]
     /// - 当全局变量读取失败时，返回[`Error::TryLock`]
     /// - 当出现SQL错误时，返回[`Error::Sql`]
-    #[allow(clippy::significant_drop_tightening)]
     pub async fn try_open_transaction<'a>(
         postgresql_pool: &OnceLock<RwLock<Option<sqlx::PgPool>>>,
     ) -> Result<Transaction<'a, Postgres>, Error> {
-        let sql_pool_option = postgresql_pool
+        postgresql_pool
             .get()
             .ok_or(Error::NotReady { initialized: false })?
             .try_read()
-            .map_err(Error::TryLock)?;
-        let sql_pool = sql_pool_option
+            .map_err(Error::TryLock)?
             .as_ref()
-            .ok_or(Error::NotReady { initialized: true })?;
-        let transaction = sql_pool.begin().await.map_err(Error::Sql)?;
-        Ok(transaction)
+            .ok_or(Error::NotReady { initialized: true })?
+            .begin()
+            .await
+            .map_err(Error::Sql)
     }
 }
 
@@ -68,15 +67,16 @@ pub mod redis {
         BadData(String),
     }
 
-    /// 记录Job进行索引的key
-    #[must_use]
-    pub fn job_pending_index_redis_key(postfix: &str) -> String {
-        format!("cuscuta:pending:index:{postfix}")
-    }
+    // [Deprecated] TODO: Remove it
+    // /// 记录Job进行索引的key
+    // #[must_use]
+    // pub fn job_pending_index_redis_key(postfix: &str) -> String {
+    //     format!("cuscuta:pending:index:{postfix}")
+    // }
 
-    /// 记录Job完成索引的key
+    /// 记录Job跟踪索引的key
     #[must_use]
-    pub fn job_output_index_redis_key(postfix: &str) -> String {
+    pub fn job_result_tracking_redis_key(postfix: &str) -> String {
         format!("cuscuta:results:index:{postfix}")
     }
 

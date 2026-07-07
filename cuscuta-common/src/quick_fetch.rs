@@ -41,17 +41,16 @@ pub trait QuickFetch<T> {
 }
 
 impl<T> QuickFetch<T> for OnceLock<RwLock<Option<T>>> {
-    #[allow(clippy::significant_drop_tightening)]
     fn try_read<U, F>(&self, f: F) -> Result<U>
     where
         F: FnOnce(&T) -> U,
     {
-        let binding = self
+        Ok(f(self
             .get_or_init(|| RwLock::new(Option::None))
             .try_read()
-            .map_err(Error::TryLock)?;
-        let x = binding.as_ref().ok_or(Error::NotInitialize)?;
-        Ok(f(x))
+            .map_err(Error::TryLock)?
+            .as_ref()
+            .ok_or(Error::NotInitialize)?))
     }
 
     #[allow(clippy::significant_drop_tightening)]
