@@ -417,7 +417,7 @@ pub mod auto {
             exponential_backoff_base_millis,
             exponential_backoff_multiplier,
             exponential_backoff_max_delay_millis,
-            |it| !it.is_success(),
+            |_| false,
             f,
         )
         .await
