@@ -268,36 +268,6 @@ pub fn resume_state(worker_result: WorkerResult) {
                     )],
                 },
             )?;
-            // let track_tag = match fetch_job_track_tag(redis_client, &job) {
-            //     Ok(mut o) => {
-            //         o.status = JobTrackQueueStatus::Success;
-            //         o.job_ids.push(job_id);
-            //         o
-            //     }
-            //     Err(e) => {
-            //         log::warn!("job_clean: failed to read target key({e}), try creating new");
-            //         JobTrackTag {
-            //             status: JobTrackQueueStatus::Queueing,
-            //             job_ids: vec![job.job_id.clone(), job_id],
-            //             queue: job.sub_queue.clone(),
-            //             job_essential: job.essential.clone(),
-            //             failures: vec![JobTrackFailure::new(
-            //                 JobTrackFailureType::Reenqueued,
-            //                 JobTrackFailureResuming::NoOp,
-            //             )],
-            //         }
-            //     }
-            // };
-            // batch_write_job_tracking_tag(redis_client, &[track_tag]).map_err(Error::RedisExtend)?;
-            // write_job_index(
-            //     redis_client,
-            //     &JobTag {
-            //         job_last_id: job_id,
-            //         queue: job.sub_queue,
-            //         job_essential: job.essential,
-            //     },
-            // )
-            // .map_err(Error::RedisExtend)?;
         }
         Ok(())
     }
