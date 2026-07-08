@@ -1,0 +1,330 @@
+openapi: 3.0.1
+info:
+  title: cuscuta
+  description: 'cuscuta-entry 的 API 文档'
+  version: 0.1.0
+tags: []
+paths:
+  /v1/enqueue:
+    post:
+      summary: 任务入列
+      deprecated: false
+      description: 输入好友码，将任务加入队列
+      tags: []
+      parameters: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                friend_code:
+                  description: 好友码
+                  example: '123456789'
+                  type: string
+                info_only:
+                  type: boolean
+                  description: 是否仅获取玩家信息
+                  example: 'false'
+              required:
+                - friend_code
+                - info_only
+            examples: {}
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    title: 成功标志
+                  query_token:
+                    type: string
+                    title: 用于查询的token
+                required:
+                  - success
+                  - query_token
+          headers: {}
+        '500':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    title: 成功标志
+                  code:
+                    type: integer
+                    title: 失败码
+                  message:
+                    type: string
+                    title: 失败信息
+                required:
+                  - success
+                  - code
+                  - message
+              example:
+                success: false
+                code: -101
+                message: 'service unavailable: 0x020'
+          headers: {}
+      security: []
+  /v1/query:
+    get:
+      summary: 查询任务
+      deprecated: false
+      description: 使用token，查询任务的完成情况
+      tags: []
+      parameters:
+        - name: token
+          in: query
+          description: 查询token
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    title: 成功标志
+                  pending:
+                    type: boolean
+                    title: 成功标志
+                  friend_info:
+                    $ref: '#/components/schemas/%E5%A5%BD%E5%8F%8B%E4%BF%A1%E6%81%AF'
+                    title: 好友信息
+                  result:
+                    type: array
+                    items:
+                      $ref: >-
+                        #/components/schemas/%E5%88%86%E6%95%B0%E4%BF%A1%E6%81%AF
+                    title: 查询结果
+                required:
+                  - success
+                  - pending
+                  - friend_info
+                  - result
+              example:
+                success: true
+                pending: false
+                friend_info:
+                  name: shiyingla
+                  user_id: 7534870
+                  rating: -1
+                  character: 4
+                  is_char_uncapped: true
+                  is_char_uncapped_override: false
+                result:
+                  - song_id: altersist
+                    user_id: 987654321
+                    difficulty: 4
+                    score: 6718632442086092000
+                    score_below_max: 6390768444971588000
+                    shiny_perfect_count: -5314590532015043000
+                    perfect_count: -3556461597065652000
+                    near_count: -3871817977925547500
+                    miss_count: -5145629102212833000
+                    clear_type: 4574658129167467500
+                    best_clear_type: -190992820226022660
+                    health: -3728756331947260400
+                    time_played: 7181322008420690000
+                    name: a_friend_987654321
+          headers: {}
+        '206':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    title: 成功标志
+                  pending:
+                    type: boolean
+                    title: 正在查询标志
+                  total_jobs:
+                    type: integer
+                    title: 总任务数
+                    description: 任务的总分片数
+                  finished_jobs:
+                    type: integer
+                    title: 完成任务数
+                    description: 已经完成的分片数
+                  pending_jobs:
+                    type: integer
+                    title: 执行任务数
+                    description: 已被worker消费，正在执行的分片数
+                  queueing_jobs:
+                    type: integer
+                    title: 排队任务数
+                    description: 未被worker消费，仍在队列等待的分片数
+                  friend_info:
+                    $ref: '#/components/schemas/%E5%A5%BD%E5%8F%8B%E4%BF%A1%E6%81%AF'
+                    title: 好友信息
+                  eta:
+                    type: number
+                    title: 估算剩余时间
+                    nullable: true
+                required:
+                  - success
+                  - pending
+                  - total_jobs
+                  - finished_jobs
+                  - pending_jobs
+                  - queueing_jobs
+                  - friend_info
+                  - eta
+              example:
+                success: true
+                pending: true
+                total_jobs: 5
+                finished_jobs: 0
+                pending_jobs: 1
+                queueing_jobs: 4
+                friend_info:
+                  name: a_friend_123456789
+                  user_id: 123456789
+                  rating: 1234
+                  character: 0
+                  is_char_uncapped: true
+                  is_char_uncapped_override: true
+                eta: null
+          headers: {}
+        '400':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    title: 成功标志
+                  code:
+                    type: integer
+                    title: 失败码
+                  message:
+                    type: string
+                    title: 失败信息
+                required:
+                  - success
+                  - code
+                  - message
+              example:
+                success: false
+                code: -500
+                message: bad request
+          headers: {}
+        '500':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    title: 成功标志
+                  code:
+                    type: integer
+                    title: 失败码
+                  message:
+                    type: string
+                    title: 失败信息
+                required:
+                  - success
+                  - code
+                  - message
+              example:
+                success: false
+                code: -101
+                message: 'service unavailable: 0x020'
+          headers: {}
+      security: []
+components:
+  schemas:
+    分数信息:
+      type: object
+      properties:
+        song_id:
+          type: string
+          title: 曲目ID
+        user_id:
+          type: integer
+          title: 用户ID
+        difficulty:
+          type: integer
+          title: 难度序号
+        score:
+          type: number
+          title: 分数
+        score_below_max:
+          type: number
+        shiny_perfect_count:
+          type: integer
+          title: 大P数
+        perfect_count:
+          type: integer
+          title: 小P数
+        near_count:
+          type: integer
+          title: Far数
+        miss_count:
+          type: integer
+          title: Lost数
+        clear_type:
+          type: number
+          title: 通关类型
+        best_clear_type:
+          type: integer
+          title: 最佳通关类型
+        health:
+          type: integer
+        time_played:
+          type: number
+        name:
+          type: string
+          title: 玩家名
+    好友信息:
+      type: object
+      properties:
+        name:
+          type: string
+          title: 好友名
+        user_id:
+          type: integer
+          title: 用户ID
+        rating:
+          type: integer
+          title: 好友PTT
+          description: 实际值为本值/100
+        character:
+          type: integer
+          title: 好友搭档
+        is_char_uncapped:
+          type: boolean
+        is_char_uncapped_override:
+          type: boolean
+      required:
+        - name
+        - user_id
+        - rating
+        - character
+        - is_char_uncapped
+        - is_char_uncapped_override
+      nullable: true
+  securitySchemes: {}
+servers: []
