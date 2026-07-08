@@ -187,6 +187,15 @@ async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoR
             })),
         );
     };
+    if form.friend_code == "123456789" {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(FriendModifyResult::Failed(FriendModifyResultFailed {
+                success: false,
+                error_code: 404,
+            })),
+        );
+    }
     let i_header = i_header.to_str().unwrap().to_string();
     //TODO add random not found fail
     let result = internal_write_friends(

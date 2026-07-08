@@ -1,7 +1,7 @@
 use cuscuta_common::{
     api::{
         self,
-        xxxxxx::{FriendDelta, FriendInfo, auto::xxxxxx_safe_call, calc_friend_delta},
+        xxxxxx::{FriendDelta, FriendInfo, auto::xxxxxx_safe_call_ex, calc_friend_delta},
     },
     data::BundleData,
     db::{
@@ -11,6 +11,7 @@ use cuscuta_common::{
     },
 };
 use redis::{Client, Connection, TypedCommands};
+use reqwest::StatusCode;
 
 use crate::{data::Config, worker::Error};
 
@@ -56,11 +57,12 @@ pub async fn try_add_friends(
             job.essential.cursor_start = cursor.cast_signed() as i32;
             continue;
         }
-        let result = xxxxxx_safe_call(
+        let result = xxxxxx_safe_call_ex(
             config.worker_max_retry_count,
             config.worker_exponential_backoff_base_millis,
             config.worker_exponential_backoff_multiplier,
             config.worker_exponential_backoff_max_delay_millis,
+            |it| it != StatusCode::TOO_MANY_REQUESTS,
             || {
                 api::xxxxxx::api_add_friend(
                     bundle_data,
@@ -76,9 +78,11 @@ pub async fn try_add_friends(
             Err(e) => {
                 if let api::Error::BadStatus(code) = &e {
                     if *code == 400 {
-                        log::warn!("friend is already exist but cache is out-dated!");
+                        log::warn!(
+                            "pending_friends: friend is already exist but cache is out-dated!"
+                        );
                     } else {
-                        log::warn!("failed to add friend: {e}: code: {code}");
+                        log::warn!("pending_friends: failed to add friend: {e}: code: {code}");
                         job.state = JobState::Failed {
                             start_timestamp,
                             failure_info: JobFailure::new(
@@ -88,7 +92,9 @@ pub async fn try_add_friends(
                             friend_info: None,
                         };
                     }
+                    continue;
                 }
+                log::warn!("pending_friends: unexpected error: {e}");
                 continue;
             }
             Ok(it) => it.friends,

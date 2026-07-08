@@ -388,11 +388,13 @@ pub fn calc_friend_delta(
 pub mod auto {
     use std::time::Duration;
 
-    use tokio::time::sleep;
+    use reqwest::StatusCode;
+    use tokio::time::{Sleep, sleep};
 
     use crate::api;
 
-    /// 一个包装，用于为一定量的[`StatusCode::TOO_MANY_REQUESTS`]错误提供弹性
+    /// 一个包装，用于为一定量的[`StatusCode`]错误和网络错误提供弹性
+    /// 使用简化的错误判断，任何错误均重试
     ///
     /// # Errors
     /// 当本函数因重试次数过多而失败时，返回[`api::Error::TooManyRetries`]\
@@ -410,18 +412,71 @@ pub mod auto {
         R: Send + 'a,
         F: Fn() -> Fut,
     {
+        xxxxxx_safe_call_ex(
+            max_retries,
+            exponential_backoff_base_millis,
+            exponential_backoff_multiplier,
+            exponential_backoff_max_delay_millis,
+            |it| !it.is_success(),
+            f,
+        )
+        .await
+    }
+
+    /// 一个包装，用于为一定量的[`StatusCode`]错误和网络错误提供弹性
+    ///
+    /// # Errors
+    /// 当本函数因重试次数过多而失败时，返回[`api::Error::TooManyRetries`]\
+    /// 否则，返回的错误由指定函数所可能引发的错误决定
+    #[allow(clippy::cast_possible_truncation)]
+    pub async fn xxxxxx_safe_call_ex<'a, F, R, T, Fut>(
+        max_retries: u64,
+        exponential_backoff_base_millis: u64,
+        exponential_backoff_multiplier: u64,
+        exponential_backoff_max_delay_millis: u64,
+        fail_cond: T,
+        f: F,
+    ) -> Result<R, api::Error>
+    where
+        Fut: Future<Output = Result<R, api::Error>> + 'a + Send,
+        R: Send + 'a,
+        F: Fn() -> Fut,
+        T: Fn(StatusCode) -> bool,
+    {
         //TODO add re-login
+        fn wait(
+            exponential_backoff_base_millis: u64,
+            exponential_backoff_multiplier: u64,
+            exponential_backoff_max_delay_millis: u64,
+            retries: u64,
+        ) -> Sleep {
+            sleep(Duration::from_millis(
+                (exponential_backoff_base_millis
+                    * exponential_backoff_multiplier.pow(retries as u32))
+                .min(exponential_backoff_max_delay_millis),
+            ))
+        }
         let mut retries = 0;
         while retries <= max_retries {
             let result = f().await;
             match result {
                 Ok(result) => return Ok(result),
-                Err(api::Error::BadStatus(code)) if !code.is_success() => {
-                    sleep(Duration::from_millis(
-                        (exponential_backoff_base_millis
-                            * exponential_backoff_multiplier.pow(retries as u32))
-                        .min(exponential_backoff_max_delay_millis),
-                    ))
+                Err(api::Error::Network(_)) => {
+                    wait(
+                        exponential_backoff_base_millis,
+                        exponential_backoff_multiplier,
+                        exponential_backoff_max_delay_millis,
+                        retries,
+                    )
+                    .await;
+                }
+                Err(api::Error::BadStatus(code)) if !fail_cond(code) => {
+                    wait(
+                        exponential_backoff_base_millis,
+                        exponential_backoff_multiplier,
+                        exponential_backoff_max_delay_millis,
+                        retries,
+                    )
                     .await;
                 }
                 Err(e) => return Err(e),
