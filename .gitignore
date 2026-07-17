@@ -2,3 +2,4 @@ docker-compose-local.yaml
 tmp
 draft
 target
+*.vim
