@@ -59,7 +59,7 @@ pub async fn try_add_friends(
             continue;
         }
         let friends_new =
-            match add_friend(config, bundle_data, account_row, user_id, token, job).await {
+            match resolve_friend(config, bundle_data, account_row, user_id, token, job).await {
                 Ok(x) => x,
                 Err(e) => {
                     job.state = JobState::Failed {
@@ -82,9 +82,11 @@ pub async fn try_add_friends(
         let friend_add = match friend_delta {
             FriendDelta::Add(it) => it,
             FriendDelta::Remove(e) => {
-                return Err(Error::BadState(format!(
-                    "bad friend delta (the friend dropped... what?) {e:?}"
-                )));
+                worker_write_event!(
+                    WorkerEventType::Info,
+                    format!("friend conflict detected: {e:?}")
+                );
+                continue;
             }
             FriendDelta::Same => {
                 return Err(Error::BadState(
@@ -104,7 +106,7 @@ pub async fn try_add_friends(
     Ok(())
 }
 
-async fn add_friend(
+async fn resolve_friend(
     config: &Config,
     bundle_data: &BundleData,
     account_row: &AccountRow,
@@ -137,8 +139,7 @@ async fn add_friend(
                     log::warn!(
                         "pending_friends: friend is already exist but cache is out-of-date! trying readd"
                     );
-                    delete_and_readd_friend(config, bundle_data, account_row, user_id, token, job)
-                        .await
+                    delete_friend(config, bundle_data, account_row, user_id, token, job).await
                 } else {
                     log::warn!("pending_friends: failed to add friend: {e}: code: {code}");
                     Err(e)
@@ -152,7 +153,7 @@ async fn add_friend(
     }
 }
 
-async fn delete_and_readd_friend(
+async fn delete_friend(
     config: &Config,
     bundle_data: &BundleData,
     account_row: &AccountRow,
@@ -168,23 +169,6 @@ async fn delete_and_readd_friend(
         |it| it != StatusCode::TOO_MANY_REQUESTS,
         || {
             api::xxxxxx::api_delete_friend(
-                bundle_data,
-                &account_row.account_email,
-                user_id,
-                token,
-                &job.essential.friend_code,
-            )
-        },
-    )
-    .await?;
-    xxxxxx_safe_call_ex(
-        config.worker_max_retry_count,
-        config.worker_exponential_backoff_base_millis,
-        config.worker_exponential_backoff_multiplier,
-        config.worker_exponential_backoff_max_delay_millis,
-        |it| it != StatusCode::TOO_MANY_REQUESTS,
-        || {
-            api::xxxxxx::api_add_friend(
                 bundle_data,
                 &account_row.account_email,
                 user_id,
