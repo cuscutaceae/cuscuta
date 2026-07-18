@@ -1,6 +1,6 @@
 use std::env;
 
-use reqwest::StatusCode;
+use reqwest::{Response, StatusCode};
 
 /// Github Api
 pub mod github;
@@ -23,8 +23,8 @@ pub enum Error {
     Network(reqwest::Error),
 
     /// Api的`HTTP`返回码不为2xx或1xx
-    #[error("bad return status: {0}")]
-    BadStatus(StatusCode),
+    #[error("bad return status: {0}: {1}")]
+    BadStatus(StatusCode, String),
 
     /// Json反序列化失败
     #[error("failed to decode response: {0}")]
@@ -35,10 +35,33 @@ pub enum Error {
     Env(env::VarError, String),
 
     /// 重试次数过多
-    #[error("too many retries")]
-    TooManyRetries,
+    #[error("too many retries: inner: {0}")]
+    TooManyRetries(String),
 }
 
 fn try_get_env_var(var: &str) -> Result<String, Error> {
     env::var(var).map_err(|e| Error::Env(e, var.to_string()))
+}
+
+trait ErrorForStatusWithResponse
+where
+    Self: Sized,
+{
+    fn error_for_status_with_response(
+        self,
+    ) -> impl Future<Output = Result<Self, (String, reqwest::Error)>>;
+}
+
+impl ErrorForStatusWithResponse for Response {
+    async fn error_for_status_with_response(self) -> Result<Self, (String, reqwest::Error)> {
+        match self.error_for_status_ref() {
+            Ok(_) => Ok(self),
+            Err(e) => Err((
+                self.text()
+                    .await
+                    .unwrap_or_else(|e| format!("[FAILED TO GET BODY] {e}")),
+                e,
+            )),
+        }
+    }
 }

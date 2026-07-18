@@ -16,6 +16,7 @@ use cuscuta_common::{
                 JobTrackQueueStatus, JobTrackTag, batch_write_job_tracking_tag, fetch_job_track_tag,
             },
         },
+        log::{WorkerEventType, status::update_worker_status},
         redis::{
             job_result_friend_info_redis_key, job_result_tracking_redis_key,
             job_result_value_redis_key,
@@ -28,7 +29,7 @@ use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, Config, SONG_LIST},
+    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, Config, SONG_LIST, WORKER_ID},
     db::redis::REDIS_CLIENT,
     worker::{
         clean::clean_jobs,
@@ -36,8 +37,10 @@ use crate::{
         pending_gather::{gather_rank_list, process_job_with_result, write_result_to_redis},
         pull::scan_sub_queue_and_pull_job,
     },
+    worker_write_event,
 };
 
+#[derive(Debug)]
 pub struct WorkerResult {
     pub friends: Vec<FriendInfo>,
     pub jobs: Vec<Job>,
@@ -68,9 +71,14 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
     let mut friends = Vec::<FriendInfo>::new();
     let mut current_jobs = Vec::<Job>::new();
     let mut cursor = 0;
-    let random = rand::random::<u64>().to_string();
+    let worker_id = format!(
+        "{}-{}",
+        gethostname::gethostname().to_str().unwrap_or("unknown"),
+        rand::random::<u64>()
+    );
+    WORKER_ID.get_or_init(|| worker_id.clone());
     while !cancellation_token.is_cancelled() {
-        if let Err(e) = internal_loop(&mut current_jobs, &mut cursor, &mut friends, &random).await {
+        if let Err(e) = internal_loop(&mut current_jobs, &mut cursor, &mut friends).await {
             if let Error::Api(api_error) = &e {
                 match api_error {
                     api::Error::Network(_) => {}
@@ -84,24 +92,31 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
                     }
                 }
             }
-            log::warn!("worker_loop: worker loop failed: {e}");
+            worker_write_event!(WorkerEventType::Warn, format!("worker loop failed: {e}"));
             sleep(Duration::from_secs(1)).await;
         }
     }
-    WorkerResult {
+    let worker_result = WorkerResult {
         friends,
         jobs: current_jobs,
         cursor,
         error: None,
-    }
+    };
+    worker_write_event!(
+        WorkerEventType::Fatal,
+        format!("worker down: {worker_result:?}")
+    );
+    worker_result
 }
 
 async fn internal_loop(
     current_jobs: &mut Vec<Job>,
     cursor: &mut usize,
     friends: &mut Vec<FriendInfo>,
-    random: &str,
 ) -> anyhow::Result<(), Error> {
+    let worker_id = WORKER_ID
+        .get()
+        .ok_or(Error::NotReady("worker_id... what?".to_string()))?;
     let redis_client = REDIS_CLIENT
         .get()
         .ok_or(Error::NotReady("redis client".to_string()))?;
@@ -127,14 +142,25 @@ async fn internal_loop(
         cursor,
         &config,
         &song_list,
-        random,
+        worker_id,
     )
     .await?
     else {
+        if let Err(e) = update_worker_status(redis_client, worker_id, *cursor, None, current_jobs) {
+            log::warn!("worker_loop: failed to update worker status #1: {e}");
+        }
         sleep(Duration::from_secs(1)).await;
         return Ok(());
     };
-
+    if let Err(e) = update_worker_status(
+        redis_client,
+        worker_id,
+        *cursor,
+        Some(&current_segments),
+        current_jobs,
+    ) {
+        log::warn!("worker_loop: failed to update worker status #2: {e}");
+    }
     if current_jobs.is_empty() {
         log::debug!("worker_loop: no jobs, skip");
         sleep(Duration::from_secs(2)).await;
@@ -268,36 +294,6 @@ pub fn resume_state(worker_result: WorkerResult) {
                     )],
                 },
             )?;
-            // let track_tag = match fetch_job_track_tag(redis_client, &job) {
-            //     Ok(mut o) => {
-            //         o.status = JobTrackQueueStatus::Success;
-            //         o.job_ids.push(job_id);
-            //         o
-            //     }
-            //     Err(e) => {
-            //         log::warn!("job_clean: failed to read target key({e}), try creating new");
-            //         JobTrackTag {
-            //             status: JobTrackQueueStatus::Queueing,
-            //             job_ids: vec![job.job_id.clone(), job_id],
-            //             queue: job.sub_queue.clone(),
-            //             job_essential: job.essential.clone(),
-            //             failures: vec![JobTrackFailure::new(
-            //                 JobTrackFailureType::Reenqueued,
-            //                 JobTrackFailureResuming::NoOp,
-            //             )],
-            //         }
-            //     }
-            // };
-            // batch_write_job_tracking_tag(redis_client, &[track_tag]).map_err(Error::RedisExtend)?;
-            // write_job_index(
-            //     redis_client,
-            //     &JobTag {
-            //         job_last_id: job_id,
-            //         queue: job.sub_queue,
-            //         job_essential: job.essential,
-            //     },
-            // )
-            // .map_err(Error::RedisExtend)?;
         }
         Ok(())
     }

@@ -229,7 +229,7 @@ pub async fn row_query(pg_url: &str, id: i64) -> anyhow::Result<()> {
             println!("email:    {}", r.account_email);
             println!(
                 "password: {}...",
-                &r.account_password.chars().take(4).collect::<String>()
+                r.account_password.chars().take(4).collect::<String>()
             );
             println!(
                 "user_id:  {}",

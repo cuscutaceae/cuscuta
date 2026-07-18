@@ -79,7 +79,7 @@ pub fn fetch_job_track_tag(redis_client: &Client, job: &Job) -> Result<JobTrackT
         .ok_or_else(|| {
             Error::BadData(format!(
                 "data note found in hash: key:{} field:{}",
-                &job.get_stream_key_postfix(),
+                job.get_stream_key_postfix(),
                 job.essential.job_uid
             ))
         })?;

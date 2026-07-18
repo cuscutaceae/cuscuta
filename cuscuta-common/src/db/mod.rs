@@ -4,6 +4,9 @@ pub mod account;
 /// 工作队列相关
 pub mod job;
 
+/// Worker状态监控相关
+pub mod log;
+
 /// 定义了`PostgreSQL`所需要使用的函数和错误
 pub mod postgresql {
     use std::sync::OnceLock;
@@ -89,6 +92,18 @@ pub mod redis {
     #[must_use]
     pub fn job_sub_queue_redis_key(postfix: &str) -> String {
         format!("cuscuta:jobs:{postfix}")
+    }
+
+    /// 记录Worker状态的key
+    #[must_use]
+    pub fn worker_status_redis_key(worker_id: &str) -> String {
+        format!("cuscuta:stat:worker_{worker_id}")
+    }
+
+    /// 记录Worker事件的key
+    #[must_use]
+    pub fn worker_event_redis_key() -> String {
+        "cuscuta:stat:event".to_owned()
     }
 
     /// 记录Job运行时间的key

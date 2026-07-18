@@ -7,13 +7,14 @@ use cuscuta_common::{
     db::{
         account::AccountRow,
         job::{Job, JobFailure, JobFailureResuming, JobFailureType, JobState},
+        log::WorkerEventType,
         redis::job_result_friend_info_redis_key,
     },
 };
 use redis::{Client, Connection, TypedCommands};
 use reqwest::StatusCode;
 
-use crate::{data::Config, worker::Error};
+use crate::{data::Config, worker::Error, worker_write_event};
 
 #[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 pub async fn try_add_friends(
@@ -57,48 +58,25 @@ pub async fn try_add_friends(
             job.essential.cursor_start = cursor.cast_signed() as i32;
             continue;
         }
-        let result = xxxxxx_safe_call_ex(
-            config.worker_max_retry_count,
-            config.worker_exponential_backoff_base_millis,
-            config.worker_exponential_backoff_multiplier,
-            config.worker_exponential_backoff_max_delay_millis,
-            |it| it != StatusCode::TOO_MANY_REQUESTS,
-            || {
-                api::xxxxxx::api_add_friend(
-                    bundle_data,
-                    &account_row.account_email,
-                    user_id,
-                    token,
-                    &job.essential.friend_code,
-                )
-            },
-        )
-        .await;
-        let friends_new = match result {
-            Err(e) => {
-                if let api::Error::BadStatus(code) = &e {
-                    if *code == 400 {
-                        log::warn!(
-                            "pending_friends: friend is already exist but cache is out-dated!"
-                        );
-                    } else {
-                        log::warn!("pending_friends: failed to add friend: {e}: code: {code}");
-                        job.state = JobState::Failed {
-                            start_timestamp,
-                            failure_info: JobFailure::new(
-                                JobFailureType::FriendNotFound,
-                                JobFailureResuming::Drop,
-                            ),
-                            friend_info: None,
-                        };
-                    }
+        let friends_new =
+            match add_friend(config, bundle_data, account_row, user_id, token, job).await {
+                Ok(x) => x,
+                Err(e) => {
+                    job.state = JobState::Failed {
+                        start_timestamp,
+                        failure_info: JobFailure::new(
+                            JobFailureType::FriendNotFound,
+                            JobFailureResuming::Drop,
+                        ),
+                        friend_info: None,
+                    };
+                    worker_write_event!(
+                        WorkerEventType::Warn,
+                        format!("failed to add friend: {e:?}",)
+                    );
                     continue;
                 }
-                log::warn!("pending_friends: unexpected error: {e}");
-                continue;
-            }
-            Ok(it) => it.friends,
-        };
+            };
         let friend_delta = calc_friend_delta(friends, &friends_new)
             .map_err(|e| Error::BadState(format!("failed to resolve friend delta: {e}")))?;
         let friend_add = match friend_delta {
@@ -124,6 +102,99 @@ pub async fn try_add_friends(
         };
     }
     Ok(())
+}
+
+async fn add_friend(
+    config: &Config,
+    bundle_data: &BundleData,
+    account_row: &AccountRow,
+    user_id: &str,
+    token: &str,
+    job: &Job,
+) -> Result<Vec<FriendInfo>, api::Error> {
+    let result = xxxxxx_safe_call_ex(
+        config.worker_max_retry_count,
+        config.worker_exponential_backoff_base_millis,
+        config.worker_exponential_backoff_multiplier,
+        config.worker_exponential_backoff_max_delay_millis,
+        |it| it != StatusCode::TOO_MANY_REQUESTS,
+        || {
+            api::xxxxxx::api_add_friend(
+                bundle_data,
+                &account_row.account_email,
+                user_id,
+                token,
+                &job.essential.friend_code,
+            )
+        },
+    )
+    .await;
+    match result {
+        Err(e) => {
+            if let api::Error::BadStatus(code, message) = &e {
+                log::warn!("pending_friends: failed to call friend_add: {message}");
+                if *code == 400 {
+                    log::warn!(
+                        "pending_friends: friend is already exist but cache is out-of-date! trying readd"
+                    );
+                    delete_and_readd_friend(config, bundle_data, account_row, user_id, token, job)
+                        .await
+                } else {
+                    log::warn!("pending_friends: failed to add friend: {e}: code: {code}");
+                    Err(e)
+                }
+            } else {
+                log::warn!("pending_friends: unexpected error: {e}");
+                Err(e)
+            }
+        }
+        Ok(it) => Ok(it.friends),
+    }
+}
+
+async fn delete_and_readd_friend(
+    config: &Config,
+    bundle_data: &BundleData,
+    account_row: &AccountRow,
+    user_id: &str,
+    token: &str,
+    job: &Job,
+) -> Result<Vec<FriendInfo>, api::Error> {
+    xxxxxx_safe_call_ex(
+        config.worker_max_retry_count,
+        config.worker_exponential_backoff_base_millis,
+        config.worker_exponential_backoff_multiplier,
+        config.worker_exponential_backoff_max_delay_millis,
+        |it| it != StatusCode::TOO_MANY_REQUESTS,
+        || {
+            api::xxxxxx::api_delete_friend(
+                bundle_data,
+                &account_row.account_email,
+                user_id,
+                token,
+                &job.essential.friend_code,
+            )
+        },
+    )
+    .await?;
+    xxxxxx_safe_call_ex(
+        config.worker_max_retry_count,
+        config.worker_exponential_backoff_base_millis,
+        config.worker_exponential_backoff_multiplier,
+        config.worker_exponential_backoff_max_delay_millis,
+        |it| it != StatusCode::TOO_MANY_REQUESTS,
+        || {
+            api::xxxxxx::api_add_friend(
+                bundle_data,
+                &account_row.account_email,
+                user_id,
+                token,
+                &job.essential.friend_code,
+            )
+        },
+    )
+    .await
+    .map(|it| it.friends)
 }
 
 fn push_friend_info(

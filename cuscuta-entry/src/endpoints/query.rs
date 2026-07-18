@@ -254,8 +254,6 @@ async fn calc_eta_millis(
     else {
         return Ok(None);
     };
-    // let pending_jobs = fetch_pending_tags(redis_client, postfix)
-    //     .map_err(|e| Error::RedisExtend(ErrorType::FailedReadEtaRedis, e))?;
     let avg_job_eta = job_track_tags
         .iter()
         .map(|it| it.queue.segment.len())

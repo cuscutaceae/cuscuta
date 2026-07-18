@@ -9,6 +9,7 @@ use cuscuta_common::{
             eta::record_eta,
             track::{JobTrackQueueStatus, JobTrackTag},
         },
+        log::WorkerEventType,
     },
 };
 use redis::{Client, TypedCommands};
@@ -16,9 +17,10 @@ use redis::{Client, TypedCommands};
 use crate::{
     data::Config,
     worker::{Error, update_job_track_info},
+    worker_write_event,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub async fn clean_jobs(
     jobs: &mut Vec<Job>,
     friends: &mut Vec<FriendInfo>,
@@ -115,8 +117,18 @@ pub async fn clean_jobs(
             );
         }
         if let Some(failure_info) = failure_info {
-            log::warn!("job: {finished_job:?} finished with error: {failure_info:?}");
+            worker_write_event!(
+                WorkerEventType::Warn,
+                format!("job finished with error: {failure_info:?}")
+            );
+            log::warn!(
+                "job: {finished_job:?} finished with error: {finished_job:?} : {failure_info:?}"
+            );
         } else {
+            worker_write_event!(
+                WorkerEventType::Trace,
+                format!("job finished: {finished_job:?}")
+            );
             log::info!("job: {finished_job:?} finished");
         }
         finished_job.state = JobState::Cleaned;

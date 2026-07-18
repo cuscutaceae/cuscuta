@@ -2,7 +2,7 @@ use base64::Engine;
 use reqwest::StatusCode;
 use serde::{Deserialize, de::DeserializeOwned};
 
-use crate::api::Error;
+use crate::api::{Error, ErrorForStatusWithResponse};
 
 #[derive(Debug, Deserialize)]
 struct GitHubFileInternal {
@@ -37,8 +37,9 @@ where
         .send()
         .await
         .map_err(Error::Network)?
-        .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
+        .error_for_status_with_response()
+        .await
+        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
         .json::<GitHubFileInternal>()
         .await
         .map_err(|e| Error::Decode(format!("phase1: {e}")))?;
@@ -51,8 +52,9 @@ where
             .send()
             .await
             .map_err(Error::Network)?
-            .error_for_status()
-            .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
+            .error_for_status_with_response()
+            .await
+            .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
             .json::<T>()
             .await
             .map_err(|e| Error::Decode(format!("phase b_1: {e}")))

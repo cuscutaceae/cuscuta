@@ -554,7 +554,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-chilo"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "axum",
  "base64",
@@ -571,7 +571,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-common"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "base64",
  "chrono",
@@ -589,7 +589,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-entry"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "axum",
@@ -629,13 +629,14 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-worker"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "axum",
  "chrono",
  "cuscuta-common",
  "env_logger",
+ "gethostname",
  "log",
  "rand 0.10.1",
  "redis",
@@ -935,6 +936,16 @@ checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
  "typenum",
  "version_check",
+]
+
+[[package]]
+name = "gethostname"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bd49230192a3797a9a4d6abe9b3eed6f7fa4c8a8a4947977c6f80025f92cbd8"
+dependencies = [
+ "rustix",
+ "windows-link",
 ]
 
 [[package]]

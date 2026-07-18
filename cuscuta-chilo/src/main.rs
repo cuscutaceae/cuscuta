@@ -491,7 +491,6 @@ async fn main() {
     LOGIN_C32
         .set(read_hex("BIN_LOGIN_C32"))
         .expect("failed to set C32");
-    // let halt_token = CancellationToken::new();
     let service = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
@@ -501,7 +500,6 @@ async fn main() {
         .expect("failed to bind 0.0.0.0:8080");
     log::info!("listening in 0.0.0.0:8080...");
     axum::serve(addr, service)
-        // .with_graceful_shutdown(shutdown_signal(halt_token))
         .await
         .unwrap_or_else(|e| panic!("{e:?}"));
 }

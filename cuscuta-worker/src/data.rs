@@ -24,3 +24,5 @@ pub static CONFIG: OnceLock<RwLock<Option<Config>>> = OnceLock::new();
 pub static SONG_LIST: OnceLock<RwLock<Option<Vec<Song>>>> = OnceLock::new();
 
 pub static ACCOUNT_ROW: OnceLock<RwLock<Option<AccountRow>>> = OnceLock::new();
+
+pub static WORKER_ID: OnceLock<String> = OnceLock::new();

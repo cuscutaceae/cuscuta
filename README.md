@@ -9,82 +9,32 @@
 
 欢迎来到cuscuta的Sekai！ヾ(^▽^*) ……虽然这里乏味而无趣（并且还未完成）
 
-cuscuta是一系列小型image的集合，组合起来的话……可以用来干一些事情……当然，实验性……
-
-### 依赖
-
-cuscuta不能独立工作，它依赖一些其它组件和外部服务工作：
-
-+ PostgreSQL：用来存放worker需要使用的信息
-+ Redis：工作队列与缓存
-+ 外部服务：就是外部服务……嗯对（在内部测试时可以使用mock代替）
+cuscuta是一个分布式爬虫，用于爬取xxxxxx的成绩数据
 
 ### 部署
 
+cuscuta提供了Docker compose和Helm两种部署方法，推荐使用Helm部署方法
+
 部署指南参见[部署（简体中文）](Deployment.md) | [Deployment (English)](Deployment.en.md)
 
-### 组件
+### 接入
 
-cuscuta内含了一些组件
+cuscuta是一个Web服务，使用RESTful API暴露服务，若欲调用现有的cuscuta服务，请参考[OpenAPI文档](docs/openapi.yaml)
 
-| 名称           | 状态   | 约束                                                                                | 用途                                                                                    |
-| -------------- | ------ | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| cuscuta-entry  | 不稳定 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`                           | 处理入站流量，暴露服务，分发任务，目前理论 **不可扩展（仅单例）**                       |
-| cuscuta-worker | 不稳定 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`                           | 实际处理任务，理论可扩展                                                                |
-| cuscuta-common | 较稳定 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`, `#![deny(missing_docs)]` | entry和worker的通用组件                                                                 |
-| cuscuta-chilo  | 不稳定 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`                           | [chilo](https://github.com/cuscutaceae/chilo)的一个WebAPI包装，被worker依赖，理论可扩展 |
-| cuscuta-mock   | 不稳定 | 无                                                                                  | worker的mock用镜像                                                                      |
-| cuscutactl     | 待验证 | `#![deny(clippy::pedantic)]`, `#![deny(clippy::nursery)]`, `#![deny(missing_docs)]` | cuscuta集群的一个简易命令行管理工具（使用AI生成）                                       |
+### 详情
 
-### 计划表
+cuscuta包括一些组件
 
-#### cuscuta-worker
+| 名称           | 用途                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------- |
+| cuscuta-entry  | 处理入站流量，暴露服务，分发任务，目前理论 **不可扩展（仅单例）**                       |
+| cuscuta-worker | 实际处理任务，理论可扩展                                                                |
+| cuscuta-common | entry和worker的通用组件                                                                 |
+| cuscuta-chilo  | [chilo](https://github.com/cuscutaceae/chilo)的一个WebAPI包装，被worker依赖，理论可扩展 |
+| cuscuta-mock   | worker的mock用镜像                                                                      |
+| cuscutactl     | cuscuta集群的一个简易命令行管理工具（半数以上使用AI生成）                               |
 
-- [x] 基础查分服务
-- [ ] 错误恢复
-  - [ ] 优雅停机时的错误恢复
-    - [x] 实现
-    - [ ] 测试
-  - [ ] 非优雅停机时的错误恢复
-    - [x] 实现
-    - [ ] 测试
-- [ ] 未来功能（可能有）（画饼）
-  - [ ] B30专攻快速查询
-
-#### cuscuta-entry
-
-- [ ] 基础端点
-  - [x] 任务入列
-    - [x] 基本实现
-    - [x] 测试
-  - [ ] 任务查询
-    - [x] 基础查询
-    - [x] token检查
-      - [ ] 测试
-- [ ] 额外端点
-  - [ ] chilo状态
-
-#### cuscuta-chilo
-
-- [x] 基础调用
-- [ ] chilo热更新 **（重要）**
-
-#### 部署
-
-- [x] docker compose
-- [x] helm
-
-#### cuscutactl（什）
-
-- [ ] 功能
-  - [x] 查询队列状态
-  - [x] 基本数据库CRUD
-  - [ ] 查询chilo状态
-- [x] 多连接模式
-  - [x] 数据库直连模式
-  - [x] Kubernetes代理模式
-
-### 设计
+### 设计与原理
 
 关于cuscuta的设计，参见[cuscuta的草稿 - 4](https://blog.nofyso.cc/2026/05/27/cuscuta-4/)
 
