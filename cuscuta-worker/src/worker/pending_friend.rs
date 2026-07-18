@@ -14,11 +14,7 @@ use cuscuta_common::{
 use redis::{Client, Connection, TypedCommands};
 use reqwest::StatusCode;
 
-use crate::{
-    data::Config,
-    worker::Error,
-    worker_write_event,
-};
+use crate::{data::Config, worker::Error, worker_write_event};
 
 #[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 pub async fn try_add_friends(

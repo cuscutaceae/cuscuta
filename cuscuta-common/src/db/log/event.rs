@@ -36,7 +36,7 @@ pub fn write_event(
 }
 
 /// 使用`REDIS_CLIENT`尝试向事件列表写入新事件
-/// 
+///
 /// 很不卫生对吧，但是很好用
 #[macro_export]
 macro_rules! try_write_event {

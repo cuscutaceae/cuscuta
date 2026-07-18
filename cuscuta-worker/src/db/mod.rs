@@ -21,9 +21,9 @@ pub mod postgresql {
 #[macro_export]
 macro_rules! worker_write_event {
     ($event_type:expr, $message:expr) => {{
+        use cuscuta_common::try_write_event;
         use $crate::data::WORKER_ID;
         use $crate::db::redis::REDIS_CLIENT;
-        use cuscuta_common::try_write_event;
         try_write_event!(REDIS_CLIENT, WORKER_ID, $event_type, $message);
     }};
 }
