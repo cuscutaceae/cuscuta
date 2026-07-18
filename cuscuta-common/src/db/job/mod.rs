@@ -39,7 +39,7 @@ pub struct SubQueue {
 }
 
 /// 一个Worker负责的`Job`实例，包含`Job`的关键信息和临时状态信息
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
     // From Redis
     /// 任务在Redis队列（Stream）中的id
@@ -57,7 +57,7 @@ pub struct Job {
 }
 
 /// 记录任务的状态
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum JobState {
     /// 任务刚刚被拉取，还没有加好友
     Pulled {

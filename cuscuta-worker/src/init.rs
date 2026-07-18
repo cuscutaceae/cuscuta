@@ -94,6 +94,7 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
             account_row,
             friends,
         } = get_friend_result(&bundle_data, &account_row).await?;
+        log::info!("init: found {} existing friends", friends.friends.len());
         for friend in friends.friends {
             api_delete_friend(
                 &bundle_data,
@@ -164,6 +165,9 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
         }
         return;
     }
+    log::info!("  ┏━╸╻ ╻┏━┓┏━╸╻ ╻╺┳╸┏━┓  ");
+    log::info!("  ┃  ┃ ┃┗━┓┃  ┃ ┃ ┃ ┣━┫  ");
+    log::info!("  ┗━╸┗━┛┗━┛┗━╸┗━┛ ╹ ╹ ╹  ");
     log::info!("init: let the cuscuta spread...");
     init_token.cancel();
 }
@@ -174,11 +178,12 @@ async fn try_update_token(
     account_dirty: bool,
 ) -> Result<TokenUpdateResult, (Level, String)> {
     let friends_result = check_and_update_token(bundle_data, account_row, account_dirty).await;
-    if let Err(db::account::auto::Error::Api(api::Error::BadStatus(code))) = friends_result {
+    if let Err(db::account::auto::Error::Api(api::Error::BadStatus(code, message))) = friends_result
+    {
         if code == 500 {
             return Err((
                 Level::Halt,
-                format!("bad hash({code}), is chilo out of dated?"),
+                format!("bad hash({code}: {message}), is chilo out of dated?"),
             ));
         }
         update_account_rate(

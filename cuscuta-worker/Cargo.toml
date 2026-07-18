@@ -18,6 +18,7 @@ sqlx = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["signal"] }
 tokio-util = { workspace = true }
+gethostname = "1.1.0"
 
 [lints]
 workspace = true

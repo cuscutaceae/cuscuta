@@ -29,7 +29,10 @@ pub async fn perform_login(
         api::chilo::ChiloResult::Success { value, .. } => value,
         api::chilo::ChiloResult::Failed { message, .. } => {
             log::warn!("login_interface: failed to generate challenge: {message}");
-            return Err(api::Error::BadStatus(StatusCode::INTERNAL_SERVER_ERROR));
+            return Err(api::Error::BadStatus(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                message,
+            ));
         }
     };
     log::info!("login_interface: challenge: {random_challenge}");

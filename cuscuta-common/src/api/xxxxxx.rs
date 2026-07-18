@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    api::{Error, try_get_env_var},
+    api::{Error, ErrorForStatusWithResponse, try_get_env_var},
     data::BundleData,
 };
 
@@ -143,8 +143,9 @@ pub async fn api_login(
         .send()
         .await
         .map_err(Error::Network)?
-        .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
+        .error_for_status_with_response()
+        .await
+        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
         .json::<LoginResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -179,8 +180,9 @@ pub async fn api_list_friend(
         .send()
         .await
         .map_err(Error::Network)?
-        .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
+        .error_for_status_with_response()
+        .await
+        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
         .json::<FriendListResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -218,8 +220,9 @@ pub async fn api_add_friend(
         .send()
         .await
         .map_err(Error::Network)?
-        .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
+        .error_for_status_with_response()
+        .await
+        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
         .json::<FriendListResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -257,8 +260,9 @@ pub async fn api_delete_friend(
         .send()
         .await
         .map_err(Error::Network)?
-        .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
+        .error_for_status_with_response()
+        .await
+        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
         .json::<FriendListResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -305,8 +309,9 @@ pub async fn api_get_rank_list(
         .send()
         .await
         .map_err(Error::Network)?
-        .error_for_status()
-        .map_err(|e| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default)))?
+        .error_for_status_with_response()
+        .await
+        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
         .json::<SongScoreResult>()
         .await
         .map_err(|e| Error::Decode(e.to_string()))
@@ -457,8 +462,12 @@ pub mod auto {
             ))
         }
         let mut retries = 0;
+        let mut latest_error = None;
         while retries <= max_retries {
             let result = f().await;
+            if let Err(err) = &result {
+                latest_error = Some(format!("{err:?}"));
+            }
             match result {
                 Ok(result) => return Ok(result),
                 Err(api::Error::Network(_)) => {
@@ -470,7 +479,7 @@ pub mod auto {
                     )
                     .await;
                 }
-                Err(api::Error::BadStatus(code)) if !fail_cond(code) => {
+                Err(api::Error::BadStatus(code, _)) if !fail_cond(code) => {
                     wait(
                         exponential_backoff_base_millis,
                         exponential_backoff_multiplier,
@@ -483,6 +492,8 @@ pub mod auto {
             }
             retries += 1;
         }
-        Err(api::Error::TooManyRetries)
+        Err(api::Error::TooManyRetries(latest_error.unwrap_or_else(
+            || "too many retries without message, this should not happen".to_owned(),
+        )))
     }
 }
