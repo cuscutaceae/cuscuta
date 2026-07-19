@@ -373,3 +373,105 @@ where
     )
     .map_err(|e| Error::BadData(format!("failed to parse redis value: {key} : {e}")))
 }
+
+#[cfg(any(test, feature = "tests"))]
+/// 生成各种结构体的简易mock
+pub mod mock {
+    use crate::{
+        api::xxxxxx::FriendInfo,
+        db::job::{
+            Job, JobEssential, JobFailure, JobFailureResuming, JobFailureType, JobState, SubQueue,
+        },
+        test::mock::SimpleMockable,
+    };
+
+    impl SimpleMockable for Job {
+        fn mock() -> Self {
+            Self {
+                job_id: "mock".to_owned(),
+                essential: JobEssential::mock(),
+                sub_queue: SubQueue::mock(),
+                state: JobState::mock_cleaned(),
+            }
+        }
+    }
+
+    impl JobState {
+        /// 生成一个mock的[`JobState`]
+        #[must_use]
+        pub const fn mock_cleaned() -> Self {
+            Self::Cleaned
+        }
+
+        /// 生成一个mock的[`JobState`]
+        #[must_use]
+        pub const fn mock_pulled() -> Self {
+            Self::Pulled {
+                start_timestamp: 1_784_475_024,
+            }
+        }
+
+        /// 生成一个mock的[`JobState`]
+        #[must_use]
+        pub fn mock_pending() -> Self {
+            Self::Pending {
+                friend_info: FriendInfo::mock(),
+                current_length: 0,
+                start_timestamp: 1_784_475_024,
+            }
+        }
+
+        /// 生成一个mock的[`JobState`]
+        #[must_use]
+        pub fn mock_finished() -> Self {
+            Self::Finished {
+                friend_info: FriendInfo::mock(),
+                start_timestamp: 1_784_475_024,
+            }
+        }
+
+        /// 生成一个mock的[`JobState`]
+        #[must_use]
+        pub fn mock_failed() -> Self {
+            Self::Failed {
+                friend_info: Some(FriendInfo::mock()),
+                start_timestamp: 1_784_475_024,
+                failure_info: JobFailure::mock(),
+            }
+        }
+    }
+
+    impl SimpleMockable for JobFailure {
+        fn mock() -> Self {
+            Self {
+                fail_type: JobFailureType::FriendNotFound,
+                resume_strategy: JobFailureResuming::Drop,
+                timestamp_millis: 1_784_475_024,
+            }
+        }
+    }
+
+    impl SimpleMockable for SubQueue {
+        fn mock() -> Self {
+            Self {
+                name: "mock".to_owned(),
+                hash: "mock".to_owned(),
+                timestamp: 1_784_475_024,
+                segment: 0..5,
+            }
+        }
+    }
+
+    impl SimpleMockable for JobEssential {
+        fn mock() -> Self {
+            Self {
+                friend_code: "123456789".to_owned(),
+                timestamp: "1784475024".to_owned(),
+                cursor_start: 0,
+                cursor_length: 0,
+                retry_count: 0,
+                job_uid: "abcde".to_owned(),
+            }
+        }
+    }
+}

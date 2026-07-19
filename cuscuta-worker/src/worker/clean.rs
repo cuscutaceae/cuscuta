@@ -111,8 +111,9 @@ pub async fn clean_jobs(
                     WorkerEventType::Warn,
                     format!("failed to delete friend: {e}")
                 );
+            } else {
+                friends.retain(|it| it.user_id != friend_info.user_id);
             }
-            friends.retain(|it| it.user_id != friend_info.user_id);
         }
         let cursor_length = i64::from(finished_job.essential.cursor_length);
         if cursor_length != 0 {

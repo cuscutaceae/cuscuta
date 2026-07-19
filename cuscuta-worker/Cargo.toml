@@ -4,7 +4,7 @@ version.workspace = true
 edition = "2024"
 
 [dependencies]
-cuscuta-common = { path = "../cuscuta-common" }
+cuscuta-common = { path = "../cuscuta-common", features = ["tests"] }
 anyhow = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }

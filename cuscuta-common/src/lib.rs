@@ -20,3 +20,7 @@ pub mod quick_fetch;
 
 /// 定时操作相关
 pub mod scheduled_job;
+
+/// 测试相关
+#[cfg(any(test, feature = "tests"))]
+pub mod test;

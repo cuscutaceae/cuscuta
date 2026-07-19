@@ -241,3 +241,50 @@ fn valid_jobs(jobs: &[Job]) -> usize {
         .filter(|it| !matches!(it.state, JobState::Cleaned))
         .count()
 }
+
+#[cfg(test)]
+mod test {
+    use cuscuta_common::{
+        db::job::{Job, JobState},
+        test::mock::SimpleMockable,
+    };
+
+    use crate::worker::pull::valid_jobs;
+
+    #[test]
+    fn valid_jobs_count_test() {
+        assert_eq!(
+            valid_jobs(&[
+                Job {
+                    state: JobState::mock_cleaned(),
+                    ..Job::mock()
+                },
+                Job {
+                    state: JobState::mock_cleaned(),
+                    ..Job::mock()
+                },
+                Job {
+                    state: JobState::mock_cleaned(),
+                    ..Job::mock()
+                },
+                Job {
+                    state: JobState::mock_failed(),
+                    ..Job::mock()
+                },
+                Job {
+                    state: JobState::mock_finished(),
+                    ..Job::mock()
+                },
+                Job {
+                    state: JobState::mock_pending(),
+                    ..Job::mock()
+                },
+                Job {
+                    state: JobState::mock_pulled(),
+                    ..Job::mock()
+                },
+            ]),
+            4
+        );
+    }
+}
