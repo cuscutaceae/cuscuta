@@ -43,17 +43,18 @@ pub struct WorkerEvent {
 }
 
 /// Worker事件种类
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[repr(u8)]
 pub enum WorkerEventType {
     /// 最严重的错误（例如Worker离线）
-    Fatal,
+    Fatal = 9,
 
     /// Worker一般信息
-    Info,
+    Info = 1,
 
     /// Worker痕迹信息（例如拉取到任务，任务完成——会出现很多）
-    Trace,
+    Trace = 0,
 
     /// Worker警告（例如工作循环失败）
-    Warn,
+    Warn = 2,
 }

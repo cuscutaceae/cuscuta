@@ -1,5 +1,5 @@
 use chrono::Utc;
-use redis::Client;
+use redis::{Client, TypedCommands};
 
 use crate::db::{
     log::{WorkerEvent, WorkerEventType},
@@ -33,6 +33,32 @@ pub fn write_event(
     pipe.ltrim(worker_event_redis_key(), 0, 100_000);
     pipe.exec(&mut connection).map_err(Error::Redis)?;
     Ok(())
+}
+
+/// 从事件列表读取事件
+///
+/// # Errors
+/// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
+///
+#[allow(clippy::cast_possible_wrap)]
+pub fn read_events(
+    redis_client: &Client,
+    start: usize,
+    limit: usize,
+) -> Result<Vec<WorkerEvent>, Error> {
+    redis_client
+        .get_connection()
+        .map_err(Error::Redis)?
+        .lrange(
+            worker_event_redis_key(),
+            start as isize,
+            (start + limit - 1) as isize,
+        )
+        .map_err(Error::Redis)?
+        .into_iter()
+        .map(|it| serde_json::from_str::<WorkerEvent>(&it))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| Error::BadData(format!("failed to parse json to struct: ({e})")))
 }
 
 /// 使用`REDIS_CLIENT`尝试向事件列表写入新事件
