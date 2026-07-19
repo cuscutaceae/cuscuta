@@ -46,7 +46,7 @@ pub fn event(redis_url: &str, show_level: ShowLevel, limit: usize) -> anyhow::Re
                 .collect::<Vec<_>>(),
         );
         lines += len;
-        if lines >= limit {
+        if out.len() >= limit {
             break;
         }
     }
