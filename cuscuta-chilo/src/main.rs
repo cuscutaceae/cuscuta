@@ -481,8 +481,10 @@ static LOGIN_C32: OnceLock<Vec<u8>> = OnceLock::new();
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
-    log::info!("starting...");
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+    tracing::info!("starting...");
     C1.set(read_hex("BIN_C1")).expect("failed to set C1");
     C2.set(read_hex("BIN_C2")).expect("failed to set C2");
     LOGIN_C31
@@ -498,7 +500,7 @@ async fn main() {
     let addr = TcpListener::bind("0.0.0.0:8080")
         .await
         .expect("failed to bind 0.0.0.0:8080");
-    log::info!("listening in 0.0.0.0:8080...");
+    tracing::info!("listening in 0.0.0.0:8080...");
     axum::serve(addr, service)
         .await
         .unwrap_or_else(|e| panic!("{e:?}"));
@@ -524,7 +526,7 @@ enum GenerateResult {
 }
 
 async fn generate(Query(query): Query<GenerateQuery>) -> impl IntoResponse {
-    log::info!("Generated from: {query:?}");
+    tracing::info!("Generated from: {query:?}");
     let (c31, c32): (&[u8], &[u8]) = match query.kind.as_str() {
         "login" => (
             LOGIN_C31

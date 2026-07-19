@@ -8,8 +8,8 @@ cuscuta-common = { path = "../cuscuta-common" }
 anyhow = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }
-env_logger = { workspace = true }
-log = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true }
 rand = { workspace = true }
 redis = { workspace = true }
 reqwest = { workspace = true }

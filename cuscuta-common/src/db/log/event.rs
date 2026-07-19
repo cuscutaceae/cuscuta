@@ -68,12 +68,11 @@ pub fn read_events(
 macro_rules! try_write_event {
     ($redis_client:expr, $worker_id:expr, $event_type:expr, $message:expr) => {{
         use cuscuta_common::db::log::event::write_event;
-        use log;
         if let Some(redis_client) = $redis_client.get()
             && let Some(worker_id) = $worker_id.get()
             && let Err(ie) = write_event(redis_client, $event_type, worker_id.to_string(), $message)
         {
-            log::warn!("failed to write event: {ie}");
+            tracing::warn!("failed to write event: {ie}");
         }
     }};
 }

@@ -55,7 +55,7 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
         }
     }
     async fn try_init() -> Result<(), Error> {
-        log::info!("init: cuscuta-worker initializing...");
+        tracing::info!("init: cuscuta-worker initializing...");
         let bundle_data = BUNDLE_DATA
             .try_read(std::clone::Clone::clone)
             .map_err(|e| (Level::Retry, format!("failed to read BUNDLE_DATA: {e}")))?;
@@ -86,7 +86,7 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
             )
         })?
         .ok_or_else(|| (Level::Halt, "no account found".to_string()))?;
-        log::info!("init: locked {}", account_row.id);
+        tracing::info!("init: locked {}", account_row.id);
         ACCOUNT_ROW
             .try_write(|_| Some(account_row.clone()))
             .map_err(|e| (Level::Retry, format!("failed to write ACCOUNT_ROW: {e}")))?;
@@ -94,7 +94,7 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
             account_row,
             friends,
         } = get_friend_result(&bundle_data, &account_row).await?;
-        log::info!("init: found {} existing friends", friends.friends.len());
+        tracing::info!("init: found {} existing friends", friends.friends.len());
         for friend in friends.friends {
             api_delete_friend(
                 &bundle_data,
@@ -111,7 +111,7 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
             )
             .await
             .map_err(|e| (Level::Halt, format!("failed to clean friends: {e}")))?;
-            log::info!("init: removed friend: {friend:?}");
+            tracing::info!("init: removed friend: {friend:?}");
         }
         ACCOUNT_ROW
             .try_write(|_| Some(account_row.clone()))
@@ -131,31 +131,31 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
                 .try_write(|_| None)
                 .map_err(|e| (Level::Retry, format!("failed to clear account row: {e}")))?;
         } else {
-            log::info!("init_resume: no account found, skip");
+            tracing::info!("init_resume: no account found, skip");
         }
         Ok(())
     }
     if let Err(Error { level, description }) = try_init().await {
         if level == Level::Halt {
-            log::error!("init: serious error occurred in initializing: {description}, halting");
+            tracing::error!("init: serious error occurred in initializing: {description}, halting");
             init_token.cancel();
             service_token.cancel();
             return;
         }
-        log::warn!("init: failed to initialize temporary, level:{level:?}, desc:{description}");
-        log::info!("init_resume: resuming states");
+        tracing::warn!("init: failed to initialize temporary, level:{level:?}, desc:{description}");
+        tracing::info!("init_resume: resuming states");
         let mut resume_retries = 0;
         loop {
             if let Err(Error { level, description }) = try_failed_resume().await {
                 if resume_retries >= 5 || level == Level::Halt {
-                    log::error!(
+                    tracing::error!(
                         "init_resume: serious error occurred in initialize resuming: {description}, halting"
                     );
                     init_token.cancel();
                     service_token.cancel();
                     return;
                 }
-                log::warn!(
+                tracing::warn!(
                     "init_resume: failed to resume temporary, level:{level:?}, desc:{description}"
                 );
             } else {
@@ -165,10 +165,10 @@ pub async fn cuscuta_init(service_token: &CancellationToken, init_token: &Cancel
         }
         return;
     }
-    log::info!("  ┏━╸╻ ╻┏━┓┏━╸╻ ╻╺┳╸┏━┓  ");
-    log::info!("  ┃  ┃ ┃┗━┓┃  ┃ ┃ ┃ ┣━┫  ");
-    log::info!("  ┗━╸┗━┛┗━┛┗━╸┗━┛ ╹ ╹ ╹  ");
-    log::info!("init: let the cuscuta spread...");
+    tracing::info!("  ┏━╸╻ ╻┏━┓┏━╸╻ ╻╺┳╸┏━┓  ");
+    tracing::info!("  ┃  ┃ ┃┗━┓┃  ┃ ┃ ┃ ┣━┫  ");
+    tracing::info!("  ┗━╸┗━┛┗━┛┗━╸┗━┛ ╹ ╹ ╹  ");
+    tracing::info!("init: let the cuscuta spread...");
     init_token.cancel();
 }
 

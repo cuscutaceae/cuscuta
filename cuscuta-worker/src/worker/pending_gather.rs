@@ -38,7 +38,7 @@ pub fn process_job_with_result(jobs: &mut [Job], scores: &[SongScore]) -> Vec<(S
             };
         }
     }
-    log::debug!(
+    tracing::debug!(
         "linked {} results for {:?}",
         job_links.len(),
         scores.first().map(|it| it.song_id.clone())

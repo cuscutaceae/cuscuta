@@ -147,7 +147,7 @@ async fn internal_loop(
     .await?
     else {
         if let Err(e) = update_worker_status(redis_client, worker_id, *cursor, None, current_jobs) {
-            log::warn!("worker_loop: failed to update worker status #1: {e}");
+            tracing::warn!("worker_loop: failed to update worker status #1: {e}");
         }
         sleep(Duration::from_secs(1)).await;
         return Ok(());
@@ -159,10 +159,10 @@ async fn internal_loop(
         Some(&current_segments),
         current_jobs,
     ) {
-        log::warn!("worker_loop: failed to update worker status #2: {e}");
+        tracing::warn!("worker_loop: failed to update worker status #2: {e}");
     }
     if current_jobs.is_empty() {
-        log::debug!("worker_loop: no jobs, skip");
+        tracing::debug!("worker_loop: no jobs, skip");
         sleep(Duration::from_secs(2)).await;
         return Ok(());
     }
@@ -264,7 +264,7 @@ pub fn resume_state(worker_result: WorkerResult) {
             .unwrap_or(300);
         let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
         for job in worker_result.jobs {
-            log::info!("resuming_jobs: reenqueueing job: {job:?}");
+            tracing::info!("resuming_jobs: reenqueueing job: {job:?}");
             connection
                 .xack(&job.sub_queue.name, "default_group", &[&job.job_id])
                 .map_err(Error::Redis)?;
@@ -298,6 +298,6 @@ pub fn resume_state(worker_result: WorkerResult) {
         Ok(())
     }
     if let Err(e) = resume_jobs(worker_result) {
-        log::error!("resuming: failed to resume jobs: {e}");
+        tracing::error!("resuming: failed to resume jobs: {e}");
     }
 }

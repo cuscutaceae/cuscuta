@@ -83,7 +83,7 @@ pub async fn clean_jobs(
                 .collect(),
             },
         ) {
-            log::warn!("job_clean: failed to write track tag: {e}");
+            tracing::warn!("job_clean: failed to write track tag: {e}");
             continue;
         }
         if let Some(friend_info) = friend_info
@@ -121,7 +121,7 @@ pub async fn clean_jobs(
                 WorkerEventType::Warn,
                 format!("job finished with error: {failure_info:?}")
             );
-            log::warn!(
+            tracing::warn!(
                 "job: {finished_job:?} finished with error: {finished_job:?} : {failure_info:?}"
             );
         } else {
@@ -129,7 +129,7 @@ pub async fn clean_jobs(
                 WorkerEventType::Trace,
                 format!("job finished: {finished_job:?}")
             );
-            log::info!("job: {finished_job:?} finished");
+            tracing::info!("job: {finished_job:?} finished");
         }
         finished_job.state = JobState::Cleaned;
     }

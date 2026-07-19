@@ -86,7 +86,7 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
                     match calc_eta_millis(redis_client, &token, &job_track_tags).await {
                         Ok(v) => v.map(|it| round_fixed(it / 1000.0, 2)),
                         Err(e) => {
-                            log::warn!("eta: failed to calc eta: {e}");
+                            tracing::warn!("eta: failed to calc eta: {e}");
                             None
                         }
                     }
@@ -135,7 +135,7 @@ pub async fn query(Query(query): Query<QueryQuery>) -> impl IntoResponse {
             (status_code, Json(token))
         }
         Err(e) => {
-            log::warn!("endpoint enqueue failed: {e}");
+            tracing::warn!("endpoint enqueue failed: {e}");
             (
                 e.get_status_code(),
                 Json(QueryResult::Failed {
@@ -269,7 +269,7 @@ async fn calc_eta_millis(
                 &it.queue.name,
             );
             if let Err(e) = &x {
-                log::warn!("eta_debug: failed to search_position: {e}");
+                tracing::warn!("eta_debug: failed to search_position: {e}");
             }
             x.ok()
         })

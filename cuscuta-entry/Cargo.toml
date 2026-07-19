@@ -9,9 +9,9 @@ anyhow = { workspace = true }
 axum = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
-env_logger = { workspace = true }
+tracing-subscriber = { workspace = true }
 itertools = "0.14.0"
-log = { workspace = true }
+tracing = { workspace = true }
 rand = { workspace = true }
 redis = { workspace = true }
 reqwest = { workspace = true }
@@ -21,6 +21,8 @@ sqlx = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["signal"] }
 tokio-util = { workspace = true }
+tower = "0.5.3"
+tower-http = { version = "0.7.0", features = ["trace"] }
 
 [lints]
 workspace = true
