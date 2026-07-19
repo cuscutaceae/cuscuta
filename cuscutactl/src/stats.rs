@@ -46,6 +46,9 @@ pub fn event(redis_url: &str, show_level: ShowLevel, limit: usize) -> anyhow::Re
                 .collect::<Vec<_>>(),
         );
         lines += len;
+        if lines >= limit {
+            break;
+        }
     }
     for it in out {
         let opt = Utc.timestamp_opt(it.timestamp / 1000, 0);
