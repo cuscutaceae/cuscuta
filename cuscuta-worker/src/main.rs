@@ -61,8 +61,10 @@ use crate::{
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
-    log::info!("starting...");
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+    tracing::info!("starting...");
     let halt_token = CancellationToken::new();
     let service = Router::new()
         .route("/healthz", get(healthz))
@@ -70,7 +72,7 @@ async fn main() {
     let addr = TcpListener::bind("0.0.0.0:8080")
         .await
         .expect("failed to bind 0.0.0.0:8080");
-    log::info!("listening in 0.0.0.0:8080...");
+    tracing::info!("listening in 0.0.0.0:8080...");
     tokio::spawn(register_individual_job(
         halt_token.clone(),
         CancellationToken::new(),
@@ -100,10 +102,10 @@ async fn main() {
 async fn start_loop(cancellation_token: CancellationToken) {
     let worker_loop_result = worker_loop(&cancellation_token).await;
     if let Some(e) = &worker_loop_result.error {
-        log::error!("worker_loop_shell: serious error occurred in worker loop, halting: {e}");
+        tracing::error!("worker_loop_shell: serious error occurred in worker loop, halting: {e}");
     }
-    log::warn!("worker_loop_shell: worker loop halted, trying resuming states...");
-    log::warn!(
+    tracing::warn!("worker_loop_shell: worker loop halted, trying resuming states...");
+    tracing::warn!(
         "worker_loop_shell: friends: {}, pending jobs: {}, last_cursor: {}",
         worker_loop_result.friends.len(),
         worker_loop_result.jobs.len(),
@@ -132,13 +134,13 @@ async fn shutdown_signal(cancellation_token: CancellationToken) {
     #[cfg(target_os = "windows")]
     {
         use tokio::signal;
-        log::info!("咱其实挺想知道谁会在Windows上跑这个的……");
+        tracing::info!("咱其实挺想知道谁会在Windows上跑这个的……");
         tokio::select! {
             _ = signal::ctrl_c() => {},
             _ = cancellation_token.cancelled() => {},
         }
     }
-    log::error!("cuscuta halting...");
+    tracing::error!("cuscuta halting...");
     cancellation_token.cancel();
     halt_progress().await;
 }
@@ -157,7 +159,7 @@ async fn halt_progress() {
         Ok(())
     }
     if let Err(e) = reset_account_state().await {
-        log::error!("halt_release: failed to release account: {e}");
+        tracing::error!("halt_release: failed to release account: {e}");
     }
 }
 

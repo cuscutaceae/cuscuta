@@ -42,8 +42,10 @@ static VALID_ACCOUNT: &[(&str, &str, &str)] = &[
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
-    log::info!("initializing mocker");
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+    tracing::info!("initializing mocker");
     initialize_friends();
     let router = Router::new()
         .route("/", get(hello))
@@ -56,7 +58,7 @@ async fn main() {
     let addr = TcpListener::bind("0.0.0.0:8080")
         .await
         .expect("failed to bind 0.0.0.0:8080");
-    log::info!("listening in 0.0.0.0:8080...");
+    tracing::info!("listening in 0.0.0.0:8080...");
     axum::serve(addr, router).await.unwrap();
 }
 
@@ -145,7 +147,7 @@ async fn login(headers: HeaderMap) -> impl IntoResponse {
 
     if let Some(account) = account {
         let token = get_current_token();
-        log::info!("login: success: id:{}, token:{token}", account.2);
+        tracing::info!("login: success: id:{}, token:{token}", account.2);
         (
             StatusCode::OK,
             Json(LoginResult::Success(LoginResultSuccess {
@@ -156,7 +158,7 @@ async fn login(headers: HeaderMap) -> impl IntoResponse {
             })),
         )
     } else {
-        log::info!("login: failed, always:{always_fail}");
+        tracing::info!("login: failed, always:{always_fail}");
         (
             StatusCode::NOT_FOUND,
             Json(LoginResult::Failed(LoginResultFailed {
@@ -169,7 +171,7 @@ async fn login(headers: HeaderMap) -> impl IntoResponse {
 
 async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoResponse {
     if !check_token(&headers) {
-        log::warn!("add_friend: check_token failed");
+        tracing::warn!("add_friend: check_token failed");
         return (
             StatusCode::UNAUTHORIZED,
             Json(FriendModifyResult::Failed(FriendModifyResultFailed {
@@ -206,7 +208,7 @@ async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoR
                 .iter()
                 .any(|info| info.user_id.to_string() == form.friend_code)
             {
-                log::warn!("add_friend: failed, duplicated addition");
+                tracing::warn!("add_friend: failed, duplicated addition");
                 return FriendModifyResult::Failed(FriendModifyResultFailed {
                     success: false,
                     error_code: 1,
@@ -221,7 +223,7 @@ async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoR
                 is_char_uncapped: true,
                 is_char_uncapped_override: true,
             });
-            log::info!("add_friend: success, friend_code:{}", form.friend_code);
+            tracing::info!("add_friend: success, friend_code:{}", form.friend_code);
             None
         },
     );
@@ -234,7 +236,7 @@ async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoR
 
 async fn remove_friend(headers: HeaderMap, form: Form<FriendRemoveForm>) -> impl IntoResponse {
     if !check_token(&headers) {
-        log::warn!("remove_friend: check_token failed");
+        tracing::warn!("remove_friend: check_token failed");
         return (
             StatusCode::UNAUTHORIZED,
             Json(FriendModifyResult::Failed(FriendModifyResultFailed {
@@ -265,12 +267,12 @@ async fn remove_friend(headers: HeaderMap, form: Form<FriendRemoveForm>) -> impl
                 .map(|it| it.0);
             match index {
                 Some(index) => {
-                    log::info!("remove_friend: success, {}", form.friend_id);
+                    tracing::info!("remove_friend: success, {}", form.friend_id);
                     it.remove(index);
                     None
                 }
                 None => {
-                    log::warn!(
+                    tracing::warn!(
                         "remove_friend: failed, friend not found: {} in {:?}",
                         form.friend_id,
                         it
@@ -292,7 +294,7 @@ async fn remove_friend(headers: HeaderMap, form: Form<FriendRemoveForm>) -> impl
 
 async fn list_friend(headers: HeaderMap) -> impl IntoResponse {
     if !check_token(&headers) {
-        log::warn!("list_friend: check_token failed");
+        tracing::warn!("list_friend: check_token failed");
         return (
             StatusCode::UNAUTHORIZED,
             Json(FriendModifyResult::Failed(FriendModifyResultFailed {
@@ -314,11 +316,11 @@ async fn list_friend(headers: HeaderMap) -> impl IntoResponse {
     let result = internal_read_friends(i_header);
     let status_code = match &result {
         FriendModifyResult::Success(result) => {
-            log::info!("list_friend: success, {:?}", result.value);
+            tracing::info!("list_friend: success, {:?}", result.value);
             StatusCode::OK
         }
         FriendModifyResult::Failed(_) => {
-            log::error!("list_friend: failed, this should never happen...");
+            tracing::error!("list_friend: failed, this should never happen...");
             StatusCode::FORBIDDEN
         } //this never happen...
     };

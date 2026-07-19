@@ -40,6 +40,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
+use tower_http::trace::TraceLayer;
 
 use crate::{
     endpoints::enqueue,
@@ -49,18 +50,21 @@ use crate::{
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
-    log::info!("starting...");
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+    tracing::info!("starting...");
     let halt_token = CancellationToken::new();
     let service = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/v1/enqueue", post(enqueue))
-        .route("/v1/query", get(query));
+        .route("/v1/query", get(query))
+        .layer(TraceLayer::new_for_http());
     let addr = TcpListener::bind("0.0.0.0:8081")
         .await
         .expect("failed to bind 0.0.0.0:8081");
-    log::info!("listening in 0.0.0.0:8081...");
+    tracing::info!("listening in 0.0.0.0:8081...");
     tokio::spawn(register_individual_job(
         halt_token.clone(),
         CancellationToken::new(),
@@ -121,12 +125,12 @@ async fn shutdown_signal(cancellation_token: CancellationToken) {
     #[cfg(target_os = "windows")]
     {
         use tokio::signal;
-        log::info!("咱其实挺想知道谁会在Windows上跑这个的……");
+        tracing::info!("咱其实挺想知道谁会在Windows上跑这个的……");
         tokio::select! {
             _ = signal::ctrl_c() => {},
             _ = cancellation_token.cancelled() => {},
         }
     }
-    log::error!("cuscuta-entry halting...");
+    tracing::error!("cuscuta-entry halting...");
     cancellation_token.cancel();
 }

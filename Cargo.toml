@@ -10,7 +10,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.6"
+version = "0.1.7"
 
 [workspace.dependencies]
 anyhow = "1.0.102"
@@ -18,9 +18,7 @@ axum = "0.8.9"
 base64 = "0.22.1"
 chrono = { version = "0.4.44", features = ["serde"] }
 comfy-table = "7.1"
-env_logger = "0.11.10"
 hex = "0.4.3"
-log = "0.4.29"
 rand = "0.10.1"
 redis = { version = "1.2.0", features = ["streams"] }
 reqwest = { version = "0.13.2", features = ["json", "query", "form"] }
@@ -31,6 +29,8 @@ sqlx = { version = "0.8.6", features = ["postgres", "chrono", "runtime-tokio"] }
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["rt-multi-thread"] }
 tokio-util = "0.7.18"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [workspace.lints.rust]
 missing_docs = "deny"

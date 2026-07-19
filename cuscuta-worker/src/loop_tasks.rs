@@ -37,20 +37,20 @@ pub async fn sync_bundle_data(_: &CancellationToken) {
         Ok(bundle_data)
     }
     if BUNDLE_DATA.is_initialized() {
-        log::trace!("bundle data sync");
+        tracing::trace!("bundle data sync");
         return;
     }
-    log::info!("sync_bundle_data: trying sync bundle data");
+    tracing::info!("sync_bundle_data: trying sync bundle data");
     match try_sync().await {
         Ok(bundle_data) => {
-            log::info!(
+            tracing::info!(
                 "sync_bundle_data: bundle data initialized: appVer:{}, ver:{}",
                 bundle_data.application_version_number,
                 bundle_data.version_number
             );
         }
         Err(e) => {
-            log::error!("sync_bundle_data: failed to sync bundle data: {e}");
+            tracing::error!("sync_bundle_data: failed to sync bundle data: {e}");
         }
     }
 }
@@ -91,15 +91,15 @@ pub async fn sync_config(_: &CancellationToken) {
         Ok(())
     }
     if CONFIG.is_initialized() {
-        log::trace!("config sync");
+        tracing::trace!("config sync");
         return;
     }
-    log::info!("sync_config: trying sync config");
+    tracing::info!("sync_config: trying sync config");
     if let Err(e) = try_sync() {
-        log::error!("sync_config: failed to sync config: {e}");
+        tracing::error!("sync_config: failed to sync config: {e}");
         return;
     }
-    log::info!("sync_config: config initialized");
+    tracing::info!("sync_config: config initialized");
 }
 
 pub async fn sync_song_list(_: &CancellationToken) {
@@ -124,22 +124,22 @@ pub async fn sync_song_list(_: &CancellationToken) {
         Ok((music_len, chart_len))
     }
     if SONG_LIST.is_initialized() {
-        log::trace!("song list sync");
+        tracing::trace!("song list sync");
         return;
     }
-    log::info!("sync_song_list: trying sync song list");
+    tracing::info!("sync_song_list: trying sync song list");
     match try_sync().await {
-        Ok((music_len, chart_len)) => log::info!(
+        Ok((music_len, chart_len)) => tracing::info!(
             "sync_song_list: song list initialized (music:{music_len}, charts:{chart_len})"
         ),
-        Err(e) => log::error!("sync_song_list: failed to sync song list: {e}"),
+        Err(e) => tracing::error!("sync_song_list: failed to sync song list: {e}"),
     }
 }
 
 pub async fn open_redis_client(_: &CancellationToken) {
     fn try_connect() -> Result<(), String> {
         let addr = env::var("REDIS_ADDR").map_err(|_| "failed to read env: REDIS_ADDR")?;
-        log::debug!("redis_open: redis: {addr}");
+        tracing::debug!("redis_open: redis: {addr}");
         let redis = redis::Client::open(addr)
             .map_err(|e| format!("failed to open redis client(phase 1): {e}"))?;
         let mut con = redis
@@ -155,19 +155,19 @@ pub async fn open_redis_client(_: &CancellationToken) {
     if REDIS_CLIENT.get().is_some() {
         return;
     }
-    log::debug!("redis_open: trying to connect to redis server...");
+    tracing::debug!("redis_open: trying to connect to redis server...");
     if let Err(e) = try_connect() {
-        log::error!("redis_open: failed to connect to redis server: {e}");
+        tracing::error!("redis_open: failed to connect to redis server: {e}");
         return;
     }
-    log::info!("redis_open: redis client created successfully");
+    tracing::info!("redis_open: redis client created successfully");
 }
 
 pub async fn open_postgresql_client(_: &CancellationToken) {
     async fn try_connect() -> Result<(), String> {
         let addr = env::var("ACCOUNTS_SQL_ADDR")
             .map_err(|e| format!("failed to read ACCOUNTS_SQL_ADDR: {e}"))?;
-        log::debug!("postgresql_open: {addr}");
+        tracing::debug!("postgresql_open: {addr}");
         let x = PgPoolOptions::new()
             .max_connections(5)
             .connect(addr.as_str())
@@ -181,12 +181,12 @@ pub async fn open_postgresql_client(_: &CancellationToken) {
     if POSTGRESQL_POOL.is_initialized() {
         return;
     }
-    log::debug!("postgresql_open: trying to connect to postgresql server...");
+    tracing::debug!("postgresql_open: trying to connect to postgresql server...");
     if let Err(e) = try_connect().await {
-        log::error!("postgresql_open: failed to connect to postgresql server: {e}");
+        tracing::error!("postgresql_open: failed to connect to postgresql server: {e}");
         return;
     }
-    log::info!("postgresql_open: postgresql pool created successfully");
+    tracing::info!("postgresql_open: postgresql pool created successfully");
 }
 
 pub async fn update_lease_time(_: &CancellationToken) {
@@ -209,19 +209,19 @@ pub async fn update_lease_time(_: &CancellationToken) {
         .map_err(|e| format!("failed to update lease time: {e}"))?;
         Ok(lease_time)
     }
-    log::debug!("update_lease_time: trying update lease time");
+    tracing::debug!("update_lease_time: trying update lease time");
     match try_update().await {
         Ok(lease_time) => {
             if let Some(lease_time) = lease_time {
-                log::debug!("update_lease_time: updated lease time: {lease_time}");
+                tracing::debug!("update_lease_time: updated lease time: {lease_time}");
             } else {
-                log::warn!(
+                tracing::warn!(
                     "update_lease_time: failed to update account lease time: no returns found, id may not exist"
                 );
             }
         }
         Err(e) => {
-            log::warn!("update_lease_time: failed to update account lease time: {e}");
+            tracing::warn!("update_lease_time: failed to update account lease time: {e}");
         }
     }
 }

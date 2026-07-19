@@ -136,9 +136,9 @@ async fn try_modify_remote_friend(
     match result {
         Err(e) => {
             if let api::Error::BadStatus(code, message) = &e {
-                log::warn!("pending_friends: failed to call friend_add: {message}");
+                tracing::warn!("pending_friends: failed to call friend_add: {message}");
                 if *code == 400 {
-                    log::warn!(
+                    tracing::warn!(
                         "pending_friends: friend is already exist but cache is out-of-date! trying readd"
                     );
                     xxxxxx_safe_call_ex(
@@ -160,11 +160,11 @@ async fn try_modify_remote_friend(
                     .await
                     .map(|it| it.friends)
                 } else {
-                    log::warn!("pending_friends: failed to add friend: {e}: code: {code}");
+                    tracing::warn!("pending_friends: failed to add friend: {e}: code: {code}");
                     Err(e)
                 }
             } else {
-                log::warn!("pending_friends: unexpected error: {e}");
+                tracing::warn!("pending_friends: unexpected error: {e}");
                 Err(e)
             }
         }

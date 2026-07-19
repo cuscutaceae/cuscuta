@@ -67,7 +67,7 @@ pub async fn scan_sub_queue_and_pull_job(
     };
     if let Some(new_jobs) = new_jobs {
         for it in new_jobs {
-            log::info!("worker_loop: pulled job: {it:?}");
+            tracing::info!("worker_loop: pulled job: {it:?}");
             worker_write_event!(WorkerEventType::Trace, format!("pulled: {it:?}"));
             update_job_track_info(
                 redis_client,
@@ -175,7 +175,7 @@ fn pull_jobs(
     ) {
         Ok(o) => o,
         Err(e) => {
-            log::warn!("worker_loop_pull_jobs: failed to claim jobs: {e}");
+            tracing::warn!("worker_loop_pull_jobs: failed to claim jobs: {e}");
             Vec::new()
         }
     };
@@ -188,7 +188,7 @@ fn pull_jobs(
     ) {
         Ok(o) => o,
         Err(e) => {
-            log::warn!("worker_loop_pull_jobs: failed to fetch jobs: {e}");
+            tracing::warn!("worker_loop_pull_jobs: failed to fetch jobs: {e}");
             Vec::new()
         }
     };

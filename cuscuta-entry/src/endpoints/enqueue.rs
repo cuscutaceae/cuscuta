@@ -53,7 +53,7 @@ pub async fn enqueue(Form(form): Form<EnqueueBody>) -> impl IntoResponse {
             }),
         ),
         Err(e) => {
-            log::warn!("endpoint enqueue failed: {e}");
+            tracing::warn!("endpoint enqueue failed: {e}");
             (
                 e.get_status_code(),
                 Json(EnqueueResult::Failed {
