@@ -40,7 +40,8 @@ use reqwest::StatusCode;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{self, TraceLayer};
+use tracing::Level;
 
 use crate::{
     endpoints::enqueue,
@@ -55,12 +56,15 @@ async fn main() {
         .init();
     tracing::info!("starting...");
     let halt_token = CancellationToken::new();
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+        .on_request(trace::DefaultOnRequest::new().level(Level::INFO))
+        .on_response(trace::DefaultOnResponse::new().level(Level::INFO));
     let service = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
-        .route("/v1/enqueue", post(enqueue))
-        .route("/v1/query", get(query))
-        .layer(TraceLayer::new_for_http());
+        .route("/v1/enqueue", post(enqueue).layer(trace_layer.clone()))
+        .route("/v1/query", get(query).layer(trace_layer));
     let addr = TcpListener::bind("0.0.0.0:8081")
         .await
         .expect("failed to bind 0.0.0.0:8081");

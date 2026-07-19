@@ -554,7 +554,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-chilo"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "axum",
  "base64",
@@ -571,7 +571,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-common"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "base64",
  "chrono",
@@ -589,7 +589,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-entry"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "axum",
@@ -631,7 +631,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-worker"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "axum",

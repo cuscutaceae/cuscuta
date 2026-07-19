@@ -79,6 +79,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
     WORKER_ID.get_or_init(|| worker_id.clone());
     while !cancellation_token.is_cancelled() {
         if let Err(e) = internal_loop(&mut current_jobs, &mut cursor, &mut friends).await {
+            worker_write_event!(WorkerEventType::Warn, format!("worker loop failed: {e}"));
             if let Error::Api(api_error) = &e {
                 match api_error {
                     api::Error::Network(_) => {}
@@ -92,7 +93,6 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
                     }
                 }
             }
-            worker_write_event!(WorkerEventType::Warn, format!("worker loop failed: {e}"));
             sleep(Duration::from_secs(1)).await;
         }
     }

@@ -90,7 +90,7 @@ pub async fn clean_jobs(
             && !pending_friends_code.contains(&finished_job.essential.friend_code)
         {
             let friend_user_id = friend_info.user_id.to_string();
-            xxxxxx_safe_call(
+            if let Err(e) = xxxxxx_safe_call(
                 config.worker_max_retry_count,
                 config.worker_exponential_backoff_base_millis,
                 config.worker_exponential_backoff_multiplier,
@@ -106,7 +106,12 @@ pub async fn clean_jobs(
                 },
             )
             .await
-            .map_err(Error::Api)?;
+            {
+                worker_write_event!(
+                    WorkerEventType::Warn,
+                    format!("failed to delete friend: {e}")
+                );
+            }
             friends.retain(|it| it.user_id != friend_info.user_id);
         }
         let cursor_length = i64::from(finished_job.essential.cursor_length);
