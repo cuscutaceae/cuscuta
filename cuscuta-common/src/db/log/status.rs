@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use chrono::Utc;
-use redis::Client;
+use redis::{Client, TypedCommands};
 
 use crate::db::{
     job::{Job, SubQueue},
@@ -37,4 +37,29 @@ pub fn update_worker_status(
     pipe.expire(worker_status_redis_key(worker_id), 60);
     pipe.exec(&mut connection).map_err(Error::Redis)?;
     Ok(())
+}
+
+/// 搜索Worker状态
+///
+/// # Errors
+/// 这个函数产生的错误来自Redis的错误[`redis::RedisError`]，以及读取内容不符合预期的错误
+///
+pub fn search_worker_status(
+    redis_client: &Client,
+) -> Result<Vec<(String, WorkerStatus<'_>)>, Error> {
+    let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
+    connection
+        .scan_match::<_, String>(worker_status_redis_key("*"))
+        .map_err(Error::Redis)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Error::Redis)?
+        .into_iter()
+        .map(|it| connection.get(&it).map(|r| (it, r)))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Error::Redis)?
+        .into_iter()
+        .filter_map(|(key, option_value)| option_value.map(|it| (key, it)))
+        .map(|(k, v)| serde_json::from_str::<WorkerStatus>(&v).map(|it| (k, it)))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| Error::BadData(format!("failed to parse json to struct: ({e})")))
 }

@@ -54,6 +54,7 @@ mod config;
 mod doctor;
 mod jobs;
 mod kube;
+mod stats;
 mod url;
 
 trait Handler {
@@ -140,6 +141,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 async fn run_command(
     cli: &Cli,
     pg_url: Result<String, String>,
@@ -225,6 +227,22 @@ async fn run_command(
                 },
                 SubCommandAccounts::Release { id, force } => {
                     accounts::release(&pg_url, *id, *force).await?;
+                }
+            }
+        }
+        SubCommands::Stats { command } => {
+            let redis_url = match redis_url {
+                Ok(x) => x,
+                Err(e) => {
+                    eprintln!("Configuration error: {e:?}");
+                    eprintln!("Hint: use --mode legacy --redis-url <URL>");
+                    bail!(e);
+                }
+            };
+            match command {
+                command::SubCommandStats::Worker {} => stats::worker(&redis_url)?,
+                command::SubCommandStats::Event { show_level, limit } => {
+                    stats::event(&redis_url, *show_level, *limit)?;
                 }
             }
         }

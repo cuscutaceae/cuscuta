@@ -1,4 +1,6 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use cuscuta_common::db::log::WorkerEventType;
+use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 
@@ -30,6 +32,13 @@ pub enum SubCommands {
     Accounts {
         #[command(subcommand)]
         command: SubCommandAccounts,
+    },
+
+    /// Worker stat query
+    #[command(visible_alias = "stat")]
+    Stats {
+        #[command(subcommand)]
+        command: SubCommandStats,
     },
 }
 
@@ -156,4 +165,41 @@ pub enum SubCommandAccountsRate {
 
     /// Query current rating
     Query,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SubCommandStats {
+    /// Query worker state
+    Worker {},
+
+    /// Query worker event
+    Event {
+        #[arg(short, long, value_enum, default_value_t = ShowLevel::Info)]
+        show_level: ShowLevel,
+
+        #[arg(long, short)]
+        limit: usize,
+    },
+}
+
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Default, Serialize, Deserialize,
+)]
+pub enum ShowLevel {
+    Trace,
+    #[default]
+    Info,
+    Warn,
+    Fatal,
+}
+
+impl From<ShowLevel> for WorkerEventType {
+    fn from(value: ShowLevel) -> Self {
+        match value {
+            ShowLevel::Trace => Self::Trace,
+            ShowLevel::Info => Self::Info,
+            ShowLevel::Warn => Self::Warn,
+            ShowLevel::Fatal => Self::Fatal,
+        }
+    }
 }

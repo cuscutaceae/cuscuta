@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use cuscuta_common::{
     api::{
         self,
@@ -29,7 +31,7 @@ pub async fn try_add_friends(
     friends: &mut Vec<FriendInfo>,
 ) -> Result<(), Error> {
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
-    let ids: Vec<_> = jobs
+    let mut ids: HashMap<_, _> = jobs
         .iter()
         .filter_map(|it| {
             let (JobState::Pending { friend_info, .. } | JobState::Finished { friend_info, .. }) =
@@ -44,10 +46,7 @@ pub async fn try_add_friends(
         let JobState::Pulled { start_timestamp } = job.state else {
             continue;
         };
-        let option_existing_ids = ids
-            .iter()
-            .find(|(code, _)| code == &job.essential.friend_code);
-        if let Some((_, existing_friend_info)) = option_existing_ids {
+        if let Some(existing_friend_info) = ids.get(&job.essential.friend_code) {
             let friend_info = existing_friend_info.clone();
             push_friend_info(&mut connection, &friend_info, job)?;
             job.state = JobState::Pending {
@@ -59,7 +58,9 @@ pub async fn try_add_friends(
             continue;
         }
         let friends_new =
-            match resolve_friend(config, bundle_data, account_row, user_id, token, job).await {
+            match try_modify_remote_friend(config, bundle_data, account_row, user_id, token, job)
+                .await
+            {
                 Ok(x) => x,
                 Err(e) => {
                     job.state = JobState::Failed {
@@ -94,6 +95,7 @@ pub async fn try_add_friends(
                 ));
             }
         };
+        ids.insert(job.essential.friend_code.clone(), friend_add.clone());
         *friends = friends_new;
         push_friend_info(&mut connection, &friend_add, job)?;
         job.essential.cursor_start = cursor.cast_signed() as i32;
@@ -106,7 +108,7 @@ pub async fn try_add_friends(
     Ok(())
 }
 
-async fn resolve_friend(
+async fn try_modify_remote_friend(
     config: &Config,
     bundle_data: &BundleData,
     account_row: &AccountRow,
@@ -139,7 +141,24 @@ async fn resolve_friend(
                     log::warn!(
                         "pending_friends: friend is already exist but cache is out-of-date! trying readd"
                     );
-                    delete_friend(config, bundle_data, account_row, user_id, token, job).await
+                    xxxxxx_safe_call_ex(
+                        config.worker_max_retry_count,
+                        config.worker_exponential_backoff_base_millis,
+                        config.worker_exponential_backoff_multiplier,
+                        config.worker_exponential_backoff_max_delay_millis,
+                        |it| it != StatusCode::TOO_MANY_REQUESTS,
+                        || {
+                            api::xxxxxx::api_delete_friend(
+                                bundle_data,
+                                &account_row.account_email,
+                                user_id,
+                                token,
+                                &job.essential.friend_code,
+                            )
+                        },
+                    )
+                    .await
+                    .map(|it| it.friends)
                 } else {
                     log::warn!("pending_friends: failed to add friend: {e}: code: {code}");
                     Err(e)
@@ -151,34 +170,6 @@ async fn resolve_friend(
         }
         Ok(it) => Ok(it.friends),
     }
-}
-
-async fn delete_friend(
-    config: &Config,
-    bundle_data: &BundleData,
-    account_row: &AccountRow,
-    user_id: &str,
-    token: &str,
-    job: &Job,
-) -> Result<Vec<FriendInfo>, api::Error> {
-    xxxxxx_safe_call_ex(
-        config.worker_max_retry_count,
-        config.worker_exponential_backoff_base_millis,
-        config.worker_exponential_backoff_multiplier,
-        config.worker_exponential_backoff_max_delay_millis,
-        |it| it != StatusCode::TOO_MANY_REQUESTS,
-        || {
-            api::xxxxxx::api_delete_friend(
-                bundle_data,
-                &account_row.account_email,
-                user_id,
-                token,
-                &job.essential.friend_code,
-            )
-        },
-    )
-    .await
-    .map(|it| it.friends)
 }
 
 fn push_friend_info(
