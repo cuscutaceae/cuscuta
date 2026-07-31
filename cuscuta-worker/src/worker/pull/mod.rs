@@ -51,7 +51,9 @@ pub async fn scan_sub_queue_and_pull_job(
     } else {
         let sub_queues = scan_sub_queue(redis_client).map_err(|e| match e {
             db::redis::Error::Redis(redis_error) => Error::Redis(redis_error),
-            db::redis::Error::BadData(e) => Error::BadState(format!("bad data: {e}")),
+            db::redis::Error::BadData(e) => Error::BadState {
+                message: format!("bad data: {e}"),
+            },
         })?;
         let Some((jobs, sub_queue)) = discover_sub_queue_for_jobs(
             current_jobs,

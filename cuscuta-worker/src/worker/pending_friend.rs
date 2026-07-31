@@ -78,8 +78,10 @@ pub async fn try_add_friends(
                     continue;
                 }
             };
-        let friend_delta = calc_friend_delta(friends, &friends_new)
-            .map_err(|e| Error::BadState(format!("failed to resolve friend delta: {e}")))?;
+        let friend_delta =
+            calc_friend_delta(friends, &friends_new).map_err(|e| Error::BadState {
+                message: format!("failed to resolve friend delta: {e}"),
+            })?;
         // TODO:
         // TODO: 添加异常空好友列表处理
         // TODO: 为了防止自己忘记，先写一下空好友的处理逻辑
@@ -96,9 +98,9 @@ pub async fn try_add_friends(
                 continue;
             }
             FriendDelta::Same => {
-                return Err(Error::BadState(
-                    "bad friend delta (nothing changed)".to_string(),
-                ));
+                return Err(Error::BadState {
+                    message: "bad friend delta (nothing changed)".to_string(),
+                });
             }
         };
         ids.insert(job.essential.friend_code.clone(), friend_add.clone());
