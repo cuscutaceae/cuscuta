@@ -40,5 +40,7 @@ pub async fn chilo_generate(timestamp: &str, path: &str, kind: &str) -> Result<C
         .map_err(Error::Network)?
         .json::<ChiloResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
 }

@@ -243,14 +243,14 @@ pub struct SongScore {
 
 impl From<ApiError> for Error {
     fn from(value: ApiError) -> Self {
-        let code = value.error_code;
-        Self::ApiError(
-            code,
-            ERROR_MAP.get(&code).copied().map_or_else(
-                || format!("failed to map error description: code {code}"),
+        let error_code = value.error_code;
+        Self::ApiError {
+            error_code,
+            message: ERROR_MAP.get(&error_code).copied().map_or_else(
+                || format!("failed to map error description: code {error_code}"),
                 &str::to_string,
             ),
-        )
+        }
     }
 }
 
@@ -286,7 +286,9 @@ pub async fn api_login(
         .await?
         .json::<LoginResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
 }
 
 /// 通过xxxxxx api查询好友
@@ -322,7 +324,9 @@ pub async fn api_list_friend(
         .await?
         .json::<FriendListResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
         .map(|it| it.value)
 }
 
@@ -361,7 +365,9 @@ pub async fn api_add_friend(
         .await?
         .json::<FriendListResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
         .map(|it| it.value)
 }
 
@@ -400,7 +406,9 @@ pub async fn api_delete_friend(
         .await?
         .json::<FriendListResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
         .map(|it| it.value)
 }
 
@@ -448,7 +456,9 @@ pub async fn api_get_rank_list(
         .await?
         .json::<SongScoreResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
         .map(|it| it.value)
 }
 
@@ -537,12 +547,16 @@ impl ErrorForStatusWithResponseXxxxxx for Response {
         match self.error_for_status_ref() {
             Ok(_) => Ok(self),
             Err(e) => {
-                let status = self.status();
-                let text = self.text().await.map_err(|it| {
-                    Error::BadStatus(status, format!("[FAILED TO GET BODY: {it} {e}]"))
+                let status_code = self.status();
+                let text = self.text().await.map_err(|it| Error::BadStatus {
+                    status_code,
+                    message: format!("[FAILED TO GET BODY: {it} {e}]"),
                 })?;
                 let err = serde_json::from_str::<ApiError>(text.as_str()).map_err(|it| {
-                    Error::BadStatus(status, format!("[FAILED TO PARSE JSON: {it} {e}]"))
+                    Error::BadStatus {
+                        status_code,
+                        message: format!("[FAILED TO PARSE JSON: {it} {e}]"),
+                    }
                 })?;
                 Err(err.into())
             }
@@ -594,6 +608,13 @@ pub mod auto {
     /// # Errors
     /// 当本函数因重试次数过多而失败时，返回[`api::Error::TooManyRetries`]\
     /// 否则，返回的错误由指定函数所可能引发的错误决定
+    ///
+    /// # Panics
+    /// 本函数不会因为除不合理传入`max_retries`或`exponential_backoff_multiplier`以外的情况下panic，
+    /// 本函数的panic来自最后返回的`expect`，当`latest_error`为`None`时panic，
+    /// 但由于`retries < max_retries.max(1)`，故循环体至少会被执行一次，
+    /// 故在最后一行可达的情况下，`latest_error`不可能为`None`，
+    /// 故一般使用情况下，本函数不会panic ~（除非调用者故意找茬）~
     #[allow(clippy::cast_possible_truncation)]
     pub async fn xxxxxx_safe_call_ex<'a, F, R, T, Fut>(
         max_retries: u64,
@@ -618,43 +639,43 @@ pub mod auto {
         ) -> Sleep {
             sleep(Duration::from_millis(
                 (exponential_backoff_base_millis
-                    * exponential_backoff_multiplier.pow(retries as u32))
+                    * exponential_backoff_multiplier.saturating_pow(retries as u32))
                 .min(exponential_backoff_max_delay_millis),
             ))
         }
         let mut retries = 0;
         let mut latest_error = None;
-        while retries <= max_retries {
+        while retries < max_retries.max(1) {
             let result = f().await;
-            if let Err(err) = &result {
-                latest_error = Some(format!("{err:?}"));
-            }
             match result {
                 Ok(result) => return Ok(result),
-                Err(api::Error::Network(_)) => {
-                    wait(
-                        exponential_backoff_base_millis,
-                        exponential_backoff_multiplier,
-                        exponential_backoff_max_delay_millis,
-                        retries,
-                    )
-                    .await;
+                Err(e) => {
+                    match &e {
+                        api::Error::Network(_) => {
+                            wait(
+                                exponential_backoff_base_millis,
+                                exponential_backoff_multiplier,
+                                exponential_backoff_max_delay_millis,
+                                retries,
+                            )
+                            .await;
+                        }
+                        api::Error::BadStatus { status_code, .. } if !fail_cond(*status_code) => {
+                            wait(
+                                exponential_backoff_base_millis,
+                                exponential_backoff_multiplier,
+                                exponential_backoff_max_delay_millis,
+                                retries,
+                            )
+                            .await;
+                        }
+                        _ => return Err(e),
+                    }
+                    latest_error = Some(e);
                 }
-                Err(api::Error::BadStatus(code, _)) if !fail_cond(code) => {
-                    wait(
-                        exponential_backoff_base_millis,
-                        exponential_backoff_multiplier,
-                        exponential_backoff_max_delay_millis,
-                        retries,
-                    )
-                    .await;
-                }
-                Err(e) => return Err(e),
             }
             retries += 1;
         }
-        Err(api::Error::TooManyRetries(latest_error.unwrap_or_else(
-            || "too many retries without message, this should not happen".to_owned(),
-        )))
+        Err(latest_error.expect("this should not happen"))
     }
 }

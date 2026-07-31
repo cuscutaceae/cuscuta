@@ -15,9 +15,11 @@ pub async fn perform_login(
     bundle_data: &BundleData,
     account_row: &AccountRow,
 ) -> Result<LoginResult, api::Error> {
-    let url =
-        Url::from_str(&env::var("API_LOGIN").map_err(|e| api::Error::Env(e, "API_LOGIN".into()))?)
-            .unwrap_or_else(|_| Url::from_str("http://nofyso:11451/auth/login").unwrap());
+    let url = Url::from_str(&env::var("API_LOGIN").map_err(|error| api::Error::Env {
+        error,
+        message: "API_LOGIN".into(),
+    })?)
+    .unwrap_or_else(|_| Url::from_str("http://nofyso:11451/auth/login").unwrap());
     let timestamp = Local::now().timestamp_millis().to_string();
     let random_challenge = match chilo_generate(
         &timestamp,
@@ -29,10 +31,10 @@ pub async fn perform_login(
         api::chilo::ChiloResult::Success { value, .. } => value,
         api::chilo::ChiloResult::Failed { message, .. } => {
             tracing::warn!("login_interface: failed to generate challenge: {message}");
-            return Err(api::Error::BadStatus(
-                StatusCode::INTERNAL_SERVER_ERROR,
+            return Err(api::Error::BadStatus {
+                status_code: StatusCode::INTERNAL_SERVER_ERROR,
                 message,
-            ));
+            });
         }
     };
     tracing::info!("login_interface: challenge: {random_challenge}");

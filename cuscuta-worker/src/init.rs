@@ -178,12 +178,15 @@ async fn try_update_token(
     account_dirty: bool,
 ) -> Result<TokenUpdateResult, (Level, String)> {
     let friends_result = check_and_update_token(bundle_data, account_row, account_dirty).await;
-    if let Err(db::account::auto::Error::Api(api::Error::BadStatus(code, message))) = friends_result
+    if let Err(db::account::auto::Error::Api(api::Error::BadStatus {
+        status_code,
+        message: description,
+    })) = friends_result
     {
-        if code == 500 {
+        if status_code == 500 {
             return Err((
                 Level::Halt,
-                format!("bad hash({code}: {message}), is chilo out of dated?"),
+                format!("bad hash({status_code}: {description}), is chilo out of dated?"),
             ));
         }
         update_account_rate(
@@ -201,7 +204,7 @@ async fn try_update_token(
             } else {
                 Level::DirtyAccount
             },
-            format!("failed to login: {code}"),
+            format!("failed to login: {status_code}"),
         ));
     }
     match friends_result {

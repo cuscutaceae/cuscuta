@@ -80,6 +80,12 @@ pub async fn try_add_friends(
             };
         let friend_delta = calc_friend_delta(friends, &friends_new)
             .map_err(|e| Error::BadState(format!("failed to resolve friend delta: {e}")))?;
+        // TODO:
+        // TODO: 添加异常空好友列表处理
+        // TODO: 为了防止自己忘记，先写一下空好友的处理逻辑
+        // TODO: 首先，如果获取到的好友列表为空，就可以直接判定为风控
+        // TODO: 然后，由于对方返回200，所以我需要重新尝试删除好友，然后等待若干秒
+        // TODO:
         let friend_add = match friend_delta {
             FriendDelta::Add(it) => it,
             FriendDelta::Remove(e) => {
@@ -135,12 +141,16 @@ async fn try_modify_remote_friend(
     .await;
     match result {
         Err(e) => {
-            if let api::Error::BadStatus(code, message) = &e {
-                tracing::warn!("pending_friends: failed to call friend_add: {message}");
-                if *code == 400 {
+            if let api::Error::BadStatus {
+                status_code,
+                message: description,
+            } = &e
+            {
+                tracing::warn!("pending_friends: failed to call friend_add: {description}");
+                if *status_code == 400 {
                     worker_write_event!(
                         WorkerEventType::Warn,
-                        format!("failed to add friend: {code}: {message}")
+                        format!("failed to add friend: {status_code}: {description}")
                     );
                     tracing::warn!(
                         "pending_friends: friend is already exist but cache is out-of-date! trying readd"
@@ -164,7 +174,9 @@ async fn try_modify_remote_friend(
                     .await
                     .map(|it| it.friends)
                 } else {
-                    tracing::warn!("pending_friends: failed to add friend: {e}: code: {code}");
+                    tracing::warn!(
+                        "pending_friends: failed to add friend: {e}: code: {status_code}"
+                    );
                     Err(e)
                 }
             } else {
