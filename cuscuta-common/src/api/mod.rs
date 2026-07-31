@@ -12,6 +12,9 @@ pub mod xxxxxx;
 pub mod chilo;
 
 /// Api调用可能引发的错误
+///
+/// 注：这里的错误处理可能很脏，因为这个错误类型包含了过于特意化的[`Self::TooManyRetries`]
+/// 以及[`Self::`]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// `reqwest`客户端初始化失败
@@ -37,6 +40,10 @@ pub enum Error {
     /// 重试次数过多
     #[error("too many retries: inner: {0}")]
     TooManyRetries(String),
+
+    /// 具有更多信息的Api错误
+    #[error("bad api return: {0}: {1}")]
+    ApiError(i64, String),
 }
 
 fn try_get_env_var(var: &str) -> Result<String, Error> {
