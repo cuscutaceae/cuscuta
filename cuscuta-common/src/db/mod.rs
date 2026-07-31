@@ -111,4 +111,15 @@ pub mod redis {
     pub fn job_eta_redis_key() -> String {
         "cuscuta:eta:record".to_string()
     }
+
+    /// 任务分片后缀
+    #[must_use]
+    pub fn sub_queue_postfix(
+        hash: &str,
+        timestamp: &str,
+        range_start: usize,
+        range_end: usize,
+    ) -> String {
+        format!("chunk_{hash}_{timestamp}_{range_start}_{range_end}")
+    }
 }

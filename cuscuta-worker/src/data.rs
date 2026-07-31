@@ -26,3 +26,26 @@ pub static SONG_LIST: OnceLock<RwLock<Option<Vec<Song>>>> = OnceLock::new();
 pub static ACCOUNT_ROW: OnceLock<RwLock<Option<AccountRow>>> = OnceLock::new();
 
 pub static WORKER_ID: OnceLock<String> = OnceLock::new();
+
+#[cfg(test)]
+pub mod mock {
+    use cuscuta_test::mock::SimpleMockable;
+
+    use crate::data::Config;
+
+    impl SimpleMockable for Config {
+        fn mock() -> Self {
+            Self {
+                worker_max_jobs: 8,
+                worker_max_retry_count: 5,
+                worker_exponential_backoff_base_millis: 100,
+                worker_exponential_backoff_multiplier: 2,
+                worker_exponential_backoff_max_delay_millis: 500,
+                redis_stream_refresh_ttl: 600,
+                worker_account_lease_time_secs: 60,
+                _worker_account_lease_time_refresh_gap_secs: 5,
+                worker_job_max_work_time_secs: 600,
+            }
+        }
+    }
+}

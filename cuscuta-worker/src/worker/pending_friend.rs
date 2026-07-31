@@ -138,6 +138,10 @@ async fn try_modify_remote_friend(
             if let api::Error::BadStatus(code, message) = &e {
                 tracing::warn!("pending_friends: failed to call friend_add: {message}");
                 if *code == 400 {
+                    worker_write_event!(
+                        WorkerEventType::Warn,
+                        format!("failed to add friend: {code}: {message}")
+                    );
                     tracing::warn!(
                         "pending_friends: friend is already exist but cache is out-of-date! trying readd"
                     );

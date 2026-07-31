@@ -5,7 +5,7 @@ members = [
     "cuscuta-worker",
     "cuscuta-chilo",
     "cuscuta-mock",
-    "cuscutactl",
+    "cuscutactl", "cuscuta-test",
 ]
 resolver = "2"
 

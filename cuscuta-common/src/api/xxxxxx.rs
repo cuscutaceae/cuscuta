@@ -497,22 +497,3 @@ pub mod auto {
         )))
     }
 }
-
-#[cfg(any(test, feature = "tests"))]
-/// 生成各种结构体的简易mock
-pub mod mock {
-    use crate::{api::xxxxxx::FriendInfo, test::mock::SimpleMockable};
-
-    impl SimpleMockable for FriendInfo {
-        fn mock() -> Self {
-            Self {
-                name: "nofyso".to_owned(),
-                user_id: 123_456,
-                rating: 16,
-                character: 0,
-                is_char_uncapped: false,
-                is_char_uncapped_override: false,
-            }
-        }
-    }
-}

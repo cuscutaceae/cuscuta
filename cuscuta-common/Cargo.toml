@@ -3,9 +3,6 @@ name = "cuscuta-common"
 version.workspace = true
 edition = "2024"
 
-[features]
-tests = []
-
 [lib]
 
 [dependencies]
@@ -21,6 +18,9 @@ sqlx = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["signal", "macros"] }
 tokio-util = { workspace = true }
+
+[dev-dependencies]
+cuscuta-test = { path = "../cuscuta-test" }
 
 [lints]
 workspace = true
