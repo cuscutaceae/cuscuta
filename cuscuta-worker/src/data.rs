@@ -17,6 +17,7 @@ pub struct Config {
     pub worker_account_lease_time_secs: u64,
     pub _worker_account_lease_time_refresh_gap_secs: u64,
     pub worker_job_max_work_time_secs: u64,
+    pub worker_empty_friends_delay_time_secs: u64,
 }
 
 pub static BUNDLE_DATA: OnceLock<RwLock<Option<BundleData>>> = OnceLock::new();
@@ -45,6 +46,7 @@ pub mod mock {
                 worker_account_lease_time_secs: 60,
                 _worker_account_lease_time_refresh_gap_secs: 5,
                 worker_job_max_work_time_secs: 600,
+                worker_empty_friends_delay_time_secs: 10,
             }
         }
     }

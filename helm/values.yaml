@@ -124,6 +124,7 @@ worker:
   accountLeaseTimeSecs: 120
   accountLeaseTimeRefreshGapSecs: 30
   jobMaxWorkTimeSecs: 1200
+  emptyFriendsDelayTimeSecs: 10
 
 # -- cuscuta-mock (mock API server for testing; disable in production)
 mock:

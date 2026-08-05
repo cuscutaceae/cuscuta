@@ -134,12 +134,24 @@ pub mod redis {
         hash: &str,
         friend_code: &str,
         job_timestamp: &str,
-        queue_timestamp: &str
+        queue_timestamp: &str,
     ) -> Result<Vec<String>, redis::RedisError> {
         [
             JobEssential::new(friend_code.to_string(), job_timestamp.to_string(), 0, 10, 0),
-            JobEssential::new(friend_code.to_string(), job_timestamp.to_string(), 10, 10, 0),
-            JobEssential::new(friend_code.to_string(), job_timestamp.to_string(), 20, 10, 0),
+            JobEssential::new(
+                friend_code.to_string(),
+                job_timestamp.to_string(),
+                10,
+                10,
+                0,
+            ),
+            JobEssential::new(
+                friend_code.to_string(),
+                job_timestamp.to_string(),
+                20,
+                10,
+                0,
+            ),
         ]
         .map(|it| {
             write_job(

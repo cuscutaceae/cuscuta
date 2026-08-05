@@ -5,7 +5,7 @@ use redis::{Client, FromRedisValue, ScanOptions, TypedCommands, streams::StreamI
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 
-use crate::{api::xxxxxx::FriendInfo, db::redis::Error};
+use crate::{api::xxxxxx::FriendInfo, castable_enum_with_arg, db::redis::Error};
 
 /// 剩余时间相关功能
 pub mod eta;
@@ -125,39 +125,10 @@ pub enum JobFailureResuming {
     NoOp,
 }
 
-macro_rules! castable_enum {
-    (
-        $(#[$meta:meta])*
-        #repr($repr:ty)
-        $vis:vis enum $name:ident {
-            $(
-                $(#[$vmeta:meta])*
-                $Variant:ident$(($($v:tt)*))? = $code:expr,
-            )*
-        }
-    ) => {
-        $(#[$meta])*
-        $vis enum $name {
-            $(
-                $(#[$vmeta])*
-                $Variant $(($($v)*))?,
-            )*
-        }
-        impl $name {
-            #[allow(missing_docs)]
-            $vis const fn get_repr(&self) -> $repr {
-                match self {
-                    $(Self::$Variant {..} => $code,)*
-                }
-            }
-        }
-    };
-}
-
-castable_enum! {
+castable_enum_with_arg! {
     /// 任务的失败信息
     #[derive(Debug, Serialize, Deserialize, thiserror::Error, Clone, PartialEq, Eq)]
-    #repr(i32)
+    #repr(i64)
     pub enum JobFailureType {
         /// 好友找不到，一般是好友码无效
         #[error("friend not found")]

@@ -55,6 +55,9 @@ pub enum Error {
     /// Api错误，且具有更多信息
     #[error("bad api return: {error_code}: {message}")]
     ApiError {
+        /// HTTP 返回码
+        http_status_code: StatusCode,
+
         /// 错误代码
         error_code: i64,
 

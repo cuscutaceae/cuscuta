@@ -79,6 +79,8 @@ spec:
               value: {{ .Values.worker.accountLeaseTimeRefreshGapSecs | quote }}  
             - name: WORKER_JOB_MAX_WORK_TIME_SECS
               value: {{ .Values.worker.jobMaxWorkTimeSecs | quote }}
+            - name: WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS
+              value: {{ .Values.worker.emptyFriendsDelayTimeSecs | quote }}
             - name: REDIS_STREAM_REFRESH_TTL
               value: {{ .Values.redisStreamRefreshTtl | quote }}
             - name: ETA_ENABLE

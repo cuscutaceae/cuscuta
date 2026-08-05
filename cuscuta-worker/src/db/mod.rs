@@ -24,6 +24,6 @@ macro_rules! worker_write_event {
         use cuscuta_common::try_write_event;
         use $crate::data::WORKER_ID;
         use $crate::db::redis::REDIS_CLIENT;
-        try_write_event!(REDIS_CLIENT, WORKER_ID, $event_type, $message);
+        try_write_event!(REDIS_CLIENT, WORKER_ID, $event_type, $message.to_string());
     }};
 }

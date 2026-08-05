@@ -1,11 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::Write;
-use std::sync::LazyLock;
 
-use reqwest::Response;
+use reqwest::{Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::castable_enum;
 use crate::{
     api::{Error, try_get_env_var},
     data::BundleData,
@@ -13,123 +13,160 @@ use crate::{
 
 type Result<T> = core::result::Result<T, Error>;
 
-static ERROR_MAP: LazyLock<HashMap<i64, &str>> = LazyLock::new(|| {
-    HashMap::from([
-        (
-            0,
-            "An error occurred completing purchases. Please try restarting your device or Arcaea and ensuring that you\"re logged in ,to.",
-        ),
-        (1, "This item is currently unavailable to purchase."),
-        (2, "All songs are already downloaded!"),
-        (
-            3,
-            "You have been logged out by another device. Please restart Arcaea.",
-        ),
-        (4, "Could not connect to online server."),
-        (5, "Incorrect app version."),
-        (6, "An unknown error has occurred."),
-        (7, "An unknown error has occurred."),
-        (8, "An unknown error has occurred."),
-        (9, "The Arcaea network is currently under maintenance."),
-        (10, "An unknown error has occured."),
-        (11, "An unknown error has occured."),
-        (12, "Please update Arcaea to the latest version."),
-        (
-            100,
-            "Registrations from this IP address are restricted.\nTry again later or contact support@lowiro.com.",
-        ),
-        (101, "This username is already in use."),
-        (102, "This email address is already in use."),
-        (103, "An account has already been made from this device."),
-        (104, "Username or password incorrect."),
-        (
-            105,
-            "You\"ve logged into over 2 devices in 24 hours. Please wait before using this new device.",
-        ),
-        (106, "This account is locked."),
-        (107, "You do not have enough stamina."),
-        (108, "An unknown error has occurred."),
-        (109, "An unknown error has occurred."),
-        (110, "An unknown error has occurred."),
-        (111, "An unknown error has occurred."),
-        (112, "World map not unlocked."),
-        (113, "This event map has ended and is no longer available."),
-        (114, "An unknown error has occurred."),
-        (115, "An unknown error has occurred."),
-        (116, "An unknown error has occurred."),
-        (117, "An unknown error has occurred."),
-        (118, "An unknown error has occurred."),
-        (119, "An unknown error has occurred."),
-        (
-            120,
-            "WARNING! You are using a modified version of Arcaea.\nContinued use will result in the banning of your account.\nThis ,is a final warning.",
-        ),
-        (121, "This account is locked."),
-        (
-            122,
-            "A temporary hold has been placed on your account.\nPlease visit the official website to resolve the issue.",
-        ),
-        (
-            150,
-            "This feature has been restricted for your account.\nIf you are unsure why, please contact support@lowiro.com",
-        ),
-        (401, "This user does not exist."),
-        (403, "Could not connect to online server."),
-        (501, "This item is currently unavailable to purchase."),
-        (502, "This item is currently unavailable to purchase."),
-        (503, "An unknown error has occured."),
-        (504, "Invalid Code"),
-        (505, "This code has already been claimed."),
-        (506, "You already own this item."),
-        (604, "You can\"t be friends with yourself ;-;"),
-        (601, "Your friends list is full."),
-        (602, "This user is already your friend."),
-        (
-            801,
-            "There was a problem receiving the server response. Please check your progress after re-entering World Mode.",
-        ),
-        (
-            802,
-            "This score could not be submitted online. Please restart or update Arcaea.",
-        ),
-        (
-            803,
-            "There was a problem submitting this score online. WARNING!Stamina has already been consumed. Exiting will lose World ,Mode progress.",
-        ),
-        (
-            804,
-            "Password reset expired. Please request a new reset link.",
-        ),
-        (805, ""),
-        (
-            903,
-            "Max downloads exceeded. Please wait 24 hours and try again.",
-        ),
-        (905, "Please wait 24 hours before using this feature again."),
-        (
-            9701,
-            "Game data is out of sync due to another device. Please check your progress after re-entering World Mode.",
-        ),
-        (
-            9801,
-            "An error occured downloading the song.Please try again.",
-        ),
-        (
-            9802,
-            "There was a problem saving the song.Please check storage.",
-        ),
-        (9905, "No data found to sync."),
-        (
-            9906,
-            "Sync failed due to conflicting data from another device. Please perform sync from Main Menu > Network.",
-        ),
-        (9907, "A problem occured updating data..."),
-        (
-            9908,
-            "There is a new version of Arcaea available.Please update.",
-        ),
-    ])
-});
+castable_enum!(
+    /// 各种Api错误的转换
+    #[allow(missing_docs)]
+    #[derive(Debug, thiserror::Error, PartialEq, Eq)]
+    #repr(i64)
+    pub enum ApiErrorMap {
+        #[error(
+            "An error occurred completing purchases. Please try restarting your device or Xxxxxx and ensuring that you\"re logged in ,to."
+        )]
+        PurchaseFailed = 0,
+        #[error("This item is currently unavailable to purchase.")]
+        PurchaseUnavailable = 1,
+        #[error("All songs are already downloaded!")]
+        AllSongsAlreadyDownloaded = 2,
+        #[error("You have been logged out by another device. Please restart Xxxxxx.")]
+        LoggedOutByOtherDevice = 3,
+        #[error("Could not connect to online server.")]
+        CouldNotConnectToServer4 = 4,
+        #[error("Incorrect app version.")]
+        IncorrectAppVersion = 5,
+        #[error("An unknown error has occurred.")]
+        Unknown6 = 6,
+        #[error("An unknown error has occurred.")]
+        Unknown7 = 7,
+        #[error("An unknown error has occurred.")]
+        Unknown8 = 8,
+        #[error("The Xxxxxx network is currently under maintenance.")]
+        ServerInMaintenance = 9,
+        #[error("An unknown error has occured.")]
+        Unknown10 = 10,
+        #[error("An unknown error has occured.")]
+        Unknown11 = 11,
+        #[error("Please update Xxxxxx to the latest version.")]
+        UpdateVersionRequested12 = 12,
+        #[error(
+            "Registrations from this IP address are restricted.\nTry again later or contact support@yyyyyy.com."
+        )]
+        RegistrationsIPRestricted = 100,
+        #[error("This username is already in use.")]
+        DuplicatedUserName = 101,
+        #[error("This email address is already in use.")]
+        DuplicatedUserEmail = 102,
+        #[error("An account has already been made from this device.")]
+        RegistrationsDevicesRestricted = 103,
+        #[error("Username or password incorrect.")]
+        IncorrectUsernameOrPassword = 104,
+        #[error(
+            "You\"ve logged into over 2 devices in 24 hours. Please wait before using this new device."
+        )]
+        TooManyDevicesLogged = 105,
+        #[error("This account is locked.")]
+        UserLocked106 = 106,
+        #[error("You do not have enough stamina.")]
+        NoEnoughStamina = 107,
+        #[error("An unknown error has occurred.")]
+        Unknown108 = 108,
+        #[error("An unknown error has occurred.")]
+        Unknown109 = 109,
+        #[error("An unknown error has occurred.")]
+        Unknown110 = 110,
+        #[error("An unknown error has occurred.")]
+        Unknown111 = 111,
+        #[error("World map not unlocked.")]
+        WorldMapLocked = 112,
+        #[error("This event map has ended and is no longer available.")]
+        EventMapEnded = 113,
+        #[error("An unknown error has occurred.")]
+        Unknown114 = 114,
+        #[error("An unknown error has occurred.")]
+        Unknown115 = 115,
+        #[error("An unknown error has occurred.")]
+        Unknown116 = 116,
+        #[error("An unknown error has occurred.")]
+        Unknown117 = 117,
+        #[error("An unknown error has occurred.")]
+        Unknown118 = 118,
+        #[error("An unknown error has occurred.")]
+        Unknown119 = 119,
+        #[error(
+            "WARNING! You are using a modified version of Xxxxxx.\nContinued use will result in the banning of your account.\nThis ,is a final warning."
+        )]
+        ModifiedAppDetected = 120,
+        #[error("This account is locked.")]
+        UserLocked121 = 121,
+        #[error(
+            "A temporary hold has been placed on your account.\nPlease visit the official website to resolve the issue."
+        )]
+        UserTemporaryLocked = 122,
+        #[error(
+            "This feature has been restricted for your account.\nIf you are unsure why, please contact support@yyyyyy.com"
+        )]
+        FeatureRestricted = 150,
+        #[error("This user does not exist.")]
+        UserNotExist = 401,
+        #[error("Could not connect to online server.")]
+        CouldNotConnectToServer403 = 403,
+        #[error("This item is currently unavailable to purchase.")]
+        ItemUnavailableToPurchase501 = 501,
+        #[error("This item is currently unavailable to purchase.")]
+        ItemUnavailableToPurchase502 = 502,
+        #[error("An unknown error has occured.")]
+        Unknown503 = 503,
+        #[error("Invalid Code")]
+        InvalidCode = 504,
+        #[error("This code has already been claimed.")]
+        CodeAlreadyClaimed = 505,
+        #[error("You already own this item.")]
+        ItemAlreadyOwn = 506,
+        #[error("You can\"t be friends with yourself ;-;")]
+        AddSelfAsFriend = 604,
+        #[error("Your friends list is full.")]
+        FriendListIsFull = 601,
+        #[error("This user is already your friend.")]
+        UserIsAlreadyFriend = 602,
+        #[error(
+            "There was a problem receiving the server response. Please check your progress after re-entering World Mode."
+        )]
+        WorldServerProblem = 801,
+        #[error("This score could not be submitted online. Please restart or update Xxxxxx.")]
+        ScoreCouldNotBeSubmitted = 802,
+        #[error(
+            "There was a problem submitting this score online. WARNING!Stamina has already been consumed. Exiting will lose World ,Mode progress."
+        )]
+        ScoreCouldNotBeSubmittedWithStaminaLost = 803,
+        #[error("Password reset expired. Please request a new reset link.")]
+        PasswordResetExpired = 804,
+        #[error("")]
+        Unknown805 = 805,
+        #[error("Max downloads exceeded. Please wait 24 hours and try again.")]
+        MaxDownloadExceeded = 903,
+        #[error("Please wait 24 hours before using this feature again.")]
+        FeatureCoolingDown = 905,
+        #[error(
+            "Game data is out of sync due to another device. Please check your progress after re-entering World Mode."
+        )]
+        WorldDataOutOfSync = 9701,
+        #[error("An error occured downloading the song.Please try again.")]
+        DownloadSongFailed = 9801,
+        #[error("There was a problem saving the song.Please check storage.")]
+        SaveSongFailed = 9802,
+        #[error("No data found to sync.")]
+        NoDataFoundToSync = 9905,
+        #[error(
+            "Sync failed due to conflicting data from another device. Please perform sync from Main Menu > Network."
+        )]
+        SyncFailedDueToConflictingData = 9906,
+        #[error("A problem occured updating data...")]
+        UpdatingDataFailed = 9907,
+        #[error("There is a new version of Xxxxxx available.Please update.")]
+        UpdateVersionRequested9908 = 9908,
+        #[error("cuscuta does not know this error")]
+        Unknown = -1,
+    }
+);
 
 /// xxxxxx api的通用错误
 #[derive(Debug, Deserialize, Clone)]
@@ -239,19 +276,6 @@ pub struct SongScore {
     /// 玩家名字
     #[serde(rename = "name")]
     pub player_name: String,
-}
-
-impl From<ApiError> for Error {
-    fn from(value: ApiError) -> Self {
-        let error_code = value.error_code;
-        Self::ApiError {
-            error_code,
-            message: ERROR_MAP.get(&error_code).copied().map_or_else(
-                || format!("failed to map error description: code {error_code}"),
-                &str::to_string,
-            ),
-        }
-    }
 }
 
 /// 通过xxxxxx api登录
@@ -544,6 +568,19 @@ where
 
 impl ErrorForStatusWithResponseXxxxxx for Response {
     async fn error_for_status_with_response(self) -> std::result::Result<Self, Error> {
+        fn parse(api_error: &ApiError, status_code: StatusCode) -> Error {
+            let error_code = api_error.error_code;
+            let error_map = ApiErrorMap::from(error_code);
+            Error::ApiError {
+                http_status_code: status_code,
+                error_code,
+                message: if error_map == ApiErrorMap::Unknown {
+                    format!("failed to map error description: code {error_code}")
+                } else {
+                    error_map.to_string()
+                },
+            }
+        }
         match self.error_for_status_ref() {
             Ok(_) => Ok(self),
             Err(e) => {
@@ -552,13 +589,13 @@ impl ErrorForStatusWithResponseXxxxxx for Response {
                     status_code,
                     message: format!("[FAILED TO GET BODY: {it} {e}]"),
                 })?;
-                let err = serde_json::from_str::<ApiError>(text.as_str()).map_err(|it| {
+                let api_error = serde_json::from_str::<ApiError>(text.as_str()).map_err(|it| {
                     Error::BadStatus {
                         status_code,
                         message: format!("[FAILED TO PARSE JSON: {it} {e}]"),
                     }
                 })?;
-                Err(err.into())
+                Err(parse(&api_error, status_code))
             }
         }
     }
