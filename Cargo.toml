@@ -5,12 +5,12 @@ members = [
     "cuscuta-worker",
     "cuscuta-chilo",
     "cuscuta-mock",
-    "cuscutactl",
+    "cuscutactl", "cuscuta-test",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.8"
+version = "0.1.9"
 
 [workspace.dependencies]
 anyhow = "1.0.102"

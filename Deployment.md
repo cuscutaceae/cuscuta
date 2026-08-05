@@ -169,6 +169,7 @@ cuscuta 所有组件均通过环境变量注入配置。
 | `WORKER_ACCOUNT_LEASE_TIME_SECS` | 120 | 账号租约时长（秒） |
 | `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 30 | 租约续期间隔（秒） |
 | `WORKER_JOB_MAX_WORK_TIME_SECS` | 1200 | 任务的最长运行时间（秒） |
+| `WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS` | 10 | 风控应对延迟（秒） |
 | `ETA_ENABLE` | true | 是否启用 ETA 预估 |
 | `API_CHILO` | — | chilo 服务地址 |
 | `API_LOGIN` | — | 登录 API 地址 |

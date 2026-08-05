@@ -20,5 +20,9 @@ tokio = { workspace = true, features = ["signal"] }
 tokio-util = { workspace = true }
 gethostname = "1.1.0"
 
+[dev-dependencies]
+testcontainers = "0.27.3"
+cuscuta-test = { path = "../cuscuta-test" }
+
 [lints]
 workspace = true

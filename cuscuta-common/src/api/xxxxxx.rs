@@ -1,16 +1,179 @@
 use std::collections::HashSet;
 use std::fmt::Write;
 
-use reqwest::StatusCode;
+use reqwest::{Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::castable_enum;
 use crate::{
-    api::{Error, ErrorForStatusWithResponse, try_get_env_var},
+    api::{Error, try_get_env_var},
     data::BundleData,
 };
 
 type Result<T> = core::result::Result<T, Error>;
+
+castable_enum!(
+    /// 各种Api错误的转换
+    #[allow(missing_docs)]
+    #[derive(Debug, thiserror::Error, PartialEq, Eq)]
+    #repr(i64)
+    pub enum ApiErrorMap {
+        #[error(
+            "An error occurred completing purchases. Please try restarting your device or Xxxxxx and ensuring that you\"re logged in ,to."
+        )]
+        PurchaseFailed = 0,
+        #[error("This item is currently unavailable to purchase.")]
+        PurchaseUnavailable = 1,
+        #[error("All songs are already downloaded!")]
+        AllSongsAlreadyDownloaded = 2,
+        #[error("You have been logged out by another device. Please restart Xxxxxx.")]
+        LoggedOutByOtherDevice = 3,
+        #[error("Could not connect to online server.")]
+        CouldNotConnectToServer4 = 4,
+        #[error("Incorrect app version.")]
+        IncorrectAppVersion = 5,
+        #[error("An unknown error has occurred.")]
+        Unknown6 = 6,
+        #[error("An unknown error has occurred.")]
+        Unknown7 = 7,
+        #[error("An unknown error has occurred.")]
+        Unknown8 = 8,
+        #[error("The Xxxxxx network is currently under maintenance.")]
+        ServerInMaintenance = 9,
+        #[error("An unknown error has occured.")]
+        Unknown10 = 10,
+        #[error("An unknown error has occured.")]
+        Unknown11 = 11,
+        #[error("Please update Xxxxxx to the latest version.")]
+        UpdateVersionRequested12 = 12,
+        #[error(
+            "Registrations from this IP address are restricted.\nTry again later or contact support@yyyyyy.com."
+        )]
+        RegistrationsIPRestricted = 100,
+        #[error("This username is already in use.")]
+        DuplicatedUserName = 101,
+        #[error("This email address is already in use.")]
+        DuplicatedUserEmail = 102,
+        #[error("An account has already been made from this device.")]
+        RegistrationsDevicesRestricted = 103,
+        #[error("Username or password incorrect.")]
+        IncorrectUsernameOrPassword = 104,
+        #[error(
+            "You\"ve logged into over 2 devices in 24 hours. Please wait before using this new device."
+        )]
+        TooManyDevicesLogged = 105,
+        #[error("This account is locked.")]
+        UserLocked106 = 106,
+        #[error("You do not have enough stamina.")]
+        NoEnoughStamina = 107,
+        #[error("An unknown error has occurred.")]
+        Unknown108 = 108,
+        #[error("An unknown error has occurred.")]
+        Unknown109 = 109,
+        #[error("An unknown error has occurred.")]
+        Unknown110 = 110,
+        #[error("An unknown error has occurred.")]
+        Unknown111 = 111,
+        #[error("World map not unlocked.")]
+        WorldMapLocked = 112,
+        #[error("This event map has ended and is no longer available.")]
+        EventMapEnded = 113,
+        #[error("An unknown error has occurred.")]
+        Unknown114 = 114,
+        #[error("An unknown error has occurred.")]
+        Unknown115 = 115,
+        #[error("An unknown error has occurred.")]
+        Unknown116 = 116,
+        #[error("An unknown error has occurred.")]
+        Unknown117 = 117,
+        #[error("An unknown error has occurred.")]
+        Unknown118 = 118,
+        #[error("An unknown error has occurred.")]
+        Unknown119 = 119,
+        #[error(
+            "WARNING! You are using a modified version of Xxxxxx.\nContinued use will result in the banning of your account.\nThis ,is a final warning."
+        )]
+        ModifiedAppDetected = 120,
+        #[error("This account is locked.")]
+        UserLocked121 = 121,
+        #[error(
+            "A temporary hold has been placed on your account.\nPlease visit the official website to resolve the issue."
+        )]
+        UserTemporaryLocked = 122,
+        #[error(
+            "This feature has been restricted for your account.\nIf you are unsure why, please contact support@yyyyyy.com"
+        )]
+        FeatureRestricted = 150,
+        #[error("This user does not exist.")]
+        UserNotExist = 401,
+        #[error("Could not connect to online server.")]
+        CouldNotConnectToServer403 = 403,
+        #[error("This item is currently unavailable to purchase.")]
+        ItemUnavailableToPurchase501 = 501,
+        #[error("This item is currently unavailable to purchase.")]
+        ItemUnavailableToPurchase502 = 502,
+        #[error("An unknown error has occured.")]
+        Unknown503 = 503,
+        #[error("Invalid Code")]
+        InvalidCode = 504,
+        #[error("This code has already been claimed.")]
+        CodeAlreadyClaimed = 505,
+        #[error("You already own this item.")]
+        ItemAlreadyOwn = 506,
+        #[error("You can\"t be friends with yourself ;-;")]
+        AddSelfAsFriend = 604,
+        #[error("Your friends list is full.")]
+        FriendListIsFull = 601,
+        #[error("This user is already your friend.")]
+        UserIsAlreadyFriend = 602,
+        #[error(
+            "There was a problem receiving the server response. Please check your progress after re-entering World Mode."
+        )]
+        WorldServerProblem = 801,
+        #[error("This score could not be submitted online. Please restart or update Xxxxxx.")]
+        ScoreCouldNotBeSubmitted = 802,
+        #[error(
+            "There was a problem submitting this score online. WARNING!Stamina has already been consumed. Exiting will lose World ,Mode progress."
+        )]
+        ScoreCouldNotBeSubmittedWithStaminaLost = 803,
+        #[error("Password reset expired. Please request a new reset link.")]
+        PasswordResetExpired = 804,
+        #[error("")]
+        Unknown805 = 805,
+        #[error("Max downloads exceeded. Please wait 24 hours and try again.")]
+        MaxDownloadExceeded = 903,
+        #[error("Please wait 24 hours before using this feature again.")]
+        FeatureCoolingDown = 905,
+        #[error(
+            "Game data is out of sync due to another device. Please check your progress after re-entering World Mode."
+        )]
+        WorldDataOutOfSync = 9701,
+        #[error("An error occured downloading the song.Please try again.")]
+        DownloadSongFailed = 9801,
+        #[error("There was a problem saving the song.Please check storage.")]
+        SaveSongFailed = 9802,
+        #[error("No data found to sync.")]
+        NoDataFoundToSync = 9905,
+        #[error(
+            "Sync failed due to conflicting data from another device. Please perform sync from Main Menu > Network."
+        )]
+        SyncFailedDueToConflictingData = 9906,
+        #[error("A problem occured updating data...")]
+        UpdatingDataFailed = 9907,
+        #[error("There is a new version of Xxxxxx available.Please update.")]
+        UpdateVersionRequested9908 = 9908,
+        #[error("cuscuta does not know this error")]
+        Unknown = -1,
+    }
+);
+
+/// xxxxxx api的通用错误
+#[derive(Debug, Deserialize, Clone)]
+pub struct ApiError {
+    /// 错误码
+    pub error_code: i64,
+}
 
 /// xxxxxx api登录成功时的适配数据模型
 #[derive(Debug, Deserialize, Clone)]
@@ -144,11 +307,12 @@ pub async fn api_login(
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
-        .await
-        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
+        .await?
         .json::<LoginResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
 }
 
 /// 通过xxxxxx api查询好友
@@ -181,11 +345,12 @@ pub async fn api_list_friend(
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
-        .await
-        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
+        .await?
         .json::<FriendListResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
         .map(|it| it.value)
 }
 
@@ -221,11 +386,12 @@ pub async fn api_add_friend(
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
-        .await
-        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
+        .await?
         .json::<FriendListResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
         .map(|it| it.value)
 }
 
@@ -261,11 +427,12 @@ pub async fn api_delete_friend(
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
-        .await
-        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
+        .await?
         .json::<FriendListResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
         .map(|it| it.value)
 }
 
@@ -310,11 +477,12 @@ pub async fn api_get_rank_list(
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
-        .await
-        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
+        .await?
         .json::<SongScoreResult>()
         .await
-        .map_err(|e| Error::Decode(e.to_string()))
+        .map_err(|e| Error::Decode {
+            message: e.to_string(),
+        })
         .map(|it| it.value)
 }
 
@@ -389,6 +557,52 @@ pub fn calc_friend_delta(
     Ok(FriendDelta::Same)
 }
 
+trait ErrorForStatusWithResponseXxxxxx
+where
+    Self: Sized,
+{
+    fn error_for_status_with_response(
+        self,
+    ) -> impl Future<Output = std::result::Result<Self, Error>>;
+}
+
+impl ErrorForStatusWithResponseXxxxxx for Response {
+    async fn error_for_status_with_response(self) -> std::result::Result<Self, Error> {
+        fn parse(api_error: &ApiError, status_code: StatusCode) -> Error {
+            let error_code = api_error.error_code;
+            let error_map = ApiErrorMap::from(error_code);
+            Error::BadStatus {
+                status_code,
+                extra_error_code: Some(error_code),
+                message: if error_map == ApiErrorMap::Unknown {
+                    format!("failed to map error description: code {error_code}")
+                } else {
+                    error_map.to_string()
+                },
+            }
+        }
+        match self.error_for_status_ref() {
+            Ok(_) => Ok(self),
+            Err(e) => {
+                let status_code = self.status();
+                let text = self.text().await.map_err(|it| Error::BadStatus {
+                    status_code,
+                    message: format!("[FAILED TO GET BODY: {it} {e}]"),
+                    extra_error_code: None,
+                })?;
+                let api_error = serde_json::from_str::<ApiError>(text.as_str()).map_err(|it| {
+                    Error::BadStatus {
+                        status_code,
+                        message: format!("[FAILED TO PARSE JSON: {it} {e}]"),
+                        extra_error_code: None,
+                    }
+                })?;
+                Err(parse(&api_error, status_code))
+            }
+        }
+    }
+}
+
 /// 这个模块提供了便捷的xxxxxx api调用包装
 pub mod auto {
     use std::time::Duration;
@@ -433,6 +647,13 @@ pub mod auto {
     /// # Errors
     /// 当本函数因重试次数过多而失败时，返回[`api::Error::TooManyRetries`]\
     /// 否则，返回的错误由指定函数所可能引发的错误决定
+    ///
+    /// # Panics
+    /// 本函数不会因为除不合理传入`max_retries`或`exponential_backoff_multiplier`以外的情况下panic，
+    /// 本函数的panic来自最后返回的`expect`，当`latest_error`为`None`时panic，
+    /// 但由于`retries < max_retries.max(1)`，故循环体至少会被执行一次，
+    /// 故在最后一行可达的情况下，`latest_error`不可能为`None`，
+    /// 故一般使用情况下，本函数不会panic ~（除非调用者故意找茬）~
     #[allow(clippy::cast_possible_truncation)]
     pub async fn xxxxxx_safe_call_ex<'a, F, R, T, Fut>(
         max_retries: u64,
@@ -457,43 +678,43 @@ pub mod auto {
         ) -> Sleep {
             sleep(Duration::from_millis(
                 (exponential_backoff_base_millis
-                    * exponential_backoff_multiplier.pow(retries as u32))
+                    * exponential_backoff_multiplier.saturating_pow(retries as u32))
                 .min(exponential_backoff_max_delay_millis),
             ))
         }
         let mut retries = 0;
         let mut latest_error = None;
-        while retries <= max_retries {
+        while retries < max_retries.max(1) {
             let result = f().await;
-            if let Err(err) = &result {
-                latest_error = Some(format!("{err:?}"));
-            }
             match result {
                 Ok(result) => return Ok(result),
-                Err(api::Error::Network(_)) => {
-                    wait(
-                        exponential_backoff_base_millis,
-                        exponential_backoff_multiplier,
-                        exponential_backoff_max_delay_millis,
-                        retries,
-                    )
-                    .await;
+                Err(e) => {
+                    match &e {
+                        api::Error::Network(_) => {
+                            wait(
+                                exponential_backoff_base_millis,
+                                exponential_backoff_multiplier,
+                                exponential_backoff_max_delay_millis,
+                                retries,
+                            )
+                            .await;
+                        }
+                        api::Error::BadStatus { status_code, .. } if !fail_cond(*status_code) => {
+                            wait(
+                                exponential_backoff_base_millis,
+                                exponential_backoff_multiplier,
+                                exponential_backoff_max_delay_millis,
+                                retries,
+                            )
+                            .await;
+                        }
+                        _ => return Err(e),
+                    }
+                    latest_error = Some(e);
                 }
-                Err(api::Error::BadStatus(code, _)) if !fail_cond(code) => {
-                    wait(
-                        exponential_backoff_base_millis,
-                        exponential_backoff_multiplier,
-                        exponential_backoff_max_delay_millis,
-                        retries,
-                    )
-                    .await;
-                }
-                Err(e) => return Err(e),
             }
             retries += 1;
         }
-        Err(api::Error::TooManyRetries(latest_error.unwrap_or_else(
-            || "too many retries without message, this should not happen".to_owned(),
-        )))
+        Err(latest_error.expect("this should not happen"))
     }
 }

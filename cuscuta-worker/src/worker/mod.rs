@@ -7,8 +7,10 @@ use std::time::Duration;
 
 use cuscuta_common::{
     api::{self, xxxxxx::FriendInfo},
+    data::{BundleData, Song},
     db::{
         self,
+        account::AccountRow,
         job::{
             Job, JobFailure, JobFailureResuming, JobFailureType,
             enqueue::write_job,
@@ -50,20 +52,26 @@ pub struct WorkerResult {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("some data is not ready: {0}")]
-    NotReady(String),
+    #[error("some data is not ready: {message}")]
+    NotReady { message: String },
+
     #[error("redis error: {0}")]
     Redis(redis::RedisError),
+
     #[error("redis extended error: {0}")]
     RedisExtend(cuscuta_common::db::redis::Error),
+
     #[error("job parse error: {0}")]
     JobParse(db::redis::Error),
+
     #[error("json parsing error: {0}")]
     JsonParse(serde_json::Error),
+
     #[error("api error: {0}")]
     Api(api::Error),
-    #[error("bad state error: {0}")]
-    BadState(String),
+
+    #[error("bad state error: {message}")]
+    BadState { message: String },
 }
 
 pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult {
@@ -109,33 +117,77 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
     worker_result
 }
 
+struct Args<'a> {
+    worker_id: &'a String,
+    redis_client: &'a Client,
+    account_row: AccountRow,
+    user_id: String,
+    token: String,
+    config: Config,
+    bundle_data: BundleData,
+    song_list: Vec<Song>,
+}
+
+fn get_args<'a>() -> Result<Args<'a>, Error> {
+    let worker_id = WORKER_ID.get().ok_or(Error::NotReady {
+        message: "worker_id... what?".to_string(),
+    })?;
+    let redis_client = REDIS_CLIENT.get().ok_or(Error::NotReady {
+        message: "redis client".to_string(),
+    })?;
+    let account_row = ACCOUNT_ROW
+        .try_read(std::clone::Clone::clone)
+        .map_err(|e| Error::NotReady {
+            message: format!("account row ({e})"),
+        })?;
+    let (user_id, token) = account_row
+        .check_log_info()
+        .map(|(id, token)| (id.to_string(), token))
+        .ok_or(Error::NotReady {
+            message: "user is not login".to_string(),
+        })?;
+    let config = CONFIG
+        .try_read(std::clone::Clone::clone)
+        .map_err(|e| Error::NotReady {
+            message: format!("config ({e})"),
+        })?;
+    let bundle_data = BUNDLE_DATA
+        .try_read(std::clone::Clone::clone)
+        .map_err(|e| Error::NotReady {
+            message: format!("bundle data ({e})"),
+        })?;
+    let song_list = SONG_LIST
+        .try_read(std::clone::Clone::clone)
+        .map_err(|e| Error::NotReady {
+            message: format!("song list ({e})"),
+        })?;
+    Ok(Args {
+        worker_id,
+        redis_client,
+        account_row,
+        user_id,
+        token,
+        config,
+        bundle_data,
+        song_list,
+    })
+}
+
 async fn internal_loop(
     current_jobs: &mut Vec<Job>,
     cursor: &mut usize,
     friends: &mut Vec<FriendInfo>,
 ) -> anyhow::Result<(), Error> {
-    let worker_id = WORKER_ID
-        .get()
-        .ok_or(Error::NotReady("worker_id... what?".to_string()))?;
-    let redis_client = REDIS_CLIENT
-        .get()
-        .ok_or(Error::NotReady("redis client".to_string()))?;
-    let account_row = ACCOUNT_ROW
-        .try_read(std::clone::Clone::clone)
-        .map_err(|e| Error::NotReady(format!("account row ({e})")))?;
-    let (user_id, token) = account_row
-        .check_log_info()
-        .map(|(id, token)| (id.to_string(), token))
-        .ok_or(Error::NotReady("user is not login".to_string()))?;
-    let config = CONFIG
-        .try_read(std::clone::Clone::clone)
-        .map_err(|e| Error::NotReady(format!("config ({e})")))?;
-    let bundle_data = BUNDLE_DATA
-        .try_read(std::clone::Clone::clone)
-        .map_err(|e| Error::NotReady(format!("bundle data ({e})")))?;
-    let song_list = SONG_LIST
-        .try_read(std::clone::Clone::clone)
-        .map_err(|e| Error::NotReady(format!("song list ({e})")))?;
+    let Args {
+        worker_id,
+        redis_client,
+        account_row,
+        user_id,
+        token,
+        config,
+        bundle_data,
+        song_list,
+    } = get_args()?;
     let Some(current_segments) = scan_sub_queue_and_pull_job(
         redis_client,
         current_jobs,
@@ -256,9 +308,9 @@ where
 pub fn resume_state(worker_result: WorkerResult) {
     // TODO: complete error handling here
     fn resume_jobs(worker_result: WorkerResult) -> Result<(), Error> {
-        let redis_client = REDIS_CLIENT
-            .get()
-            .ok_or(Error::NotReady("redis client".to_string()))?;
+        let redis_client = REDIS_CLIENT.get().ok_or(Error::NotReady {
+            message: "redis client".to_string(),
+        })?;
         let redis_stream_refresh_ttl = CONFIG
             .try_read(|it| it.redis_stream_refresh_ttl)
             .unwrap_or(300);

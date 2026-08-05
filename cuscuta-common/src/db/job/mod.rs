@@ -5,7 +5,7 @@ use redis::{Client, FromRedisValue, ScanOptions, TypedCommands, streams::StreamI
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 
-use crate::{api::xxxxxx::FriendInfo, db::redis::Error};
+use crate::{api::xxxxxx::FriendInfo, castable_enum_with_arg, db::redis::Error};
 
 /// 剩余时间相关功能
 pub mod eta;
@@ -23,7 +23,7 @@ pub mod track;
 ///
 /// 一个任务队列的Key格式如下：\
 /// `cuscuta:jobs:chunk_hash_timestamp_from_to`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubQueue {
     /// 这个任务队列的全名，例如`cuscuta:jobs:chunk_00000000_123456789_114_514`
     pub name: String,
@@ -39,7 +39,7 @@ pub struct SubQueue {
 }
 
 /// 一个Worker负责的`Job`实例，包含`Job`的关键信息和临时状态信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq)]
 pub struct Job {
     // From Redis
     /// 任务在Redis队列（Stream）中的id
@@ -57,7 +57,7 @@ pub struct Job {
 }
 
 /// 记录任务的状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum JobState {
     /// 任务刚刚被拉取，还没有加好友
     Pulled {
@@ -103,7 +103,7 @@ pub enum JobState {
 }
 
 /// 任务的失败情况
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct JobFailure {
     /// Job 失败的原因
     pub fail_type: JobFailureType,
@@ -116,7 +116,7 @@ pub struct JobFailure {
 }
 
 /// 失败时的恢复策略
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum JobFailureResuming {
     /// 任务直接失败
     Drop,
@@ -125,39 +125,10 @@ pub enum JobFailureResuming {
     NoOp,
 }
 
-macro_rules! castable_enum {
-    (
-        $(#[$meta:meta])*
-        #repr($repr:ty)
-        $vis:vis enum $name:ident {
-            $(
-                $(#[$vmeta:meta])*
-                $Variant:ident$(($($v:tt)*))? = $code:expr,
-            )*
-        }
-    ) => {
-        $(#[$meta])*
-        $vis enum $name {
-            $(
-                $(#[$vmeta])*
-                $Variant $(($($v)*))?,
-            )*
-        }
-        impl $name {
-            #[allow(missing_docs)]
-            $vis const fn get_repr(&self) -> $repr {
-                match self {
-                    $(Self::$Variant {..} => $code,)*
-                }
-            }
-        }
-    };
-}
-
-castable_enum! {
+castable_enum_with_arg! {
     /// 任务的失败信息
-    #[derive(Debug, Serialize, Deserialize, thiserror::Error, Clone)]
-    #repr(i32)
+    #[derive(Debug, Serialize, Deserialize, thiserror::Error, Clone, PartialEq, Eq)]
+    #repr(i64)
     pub enum JobFailureType {
         /// 好友找不到，一般是好友码无效
         #[error("friend not found")]
@@ -170,6 +141,14 @@ castable_enum! {
         /// Job 重新入队
         #[error("job Reenqueued")]
         Reenqueued = -3,
+
+        /// 远程Api错误
+        #[error("remote xxxxxx api error, HTTP {0}: {1:?}")]
+        XxxxxxApiError(u16, Option<i64>) = -4,
+
+        /// 其它Api错误
+        #[error("other api error: {0:?}")]
+        ApiError(String) = -5,
     }
 }
 
@@ -261,22 +240,32 @@ impl JobEssential {
         cursor_length: i32,
         retry_count: i32,
     ) -> Self {
-        let traits: Vec<_> = friend_code
-            .as_bytes()
-            .iter()
-            .chain(timestamp.as_bytes().iter())
-            .chain(cursor_start.to_le_bytes().iter())
-            .chain(cursor_length.to_le_bytes().iter())
-            .copied()
-            .collect();
-        let digest = hex::encode(sha2::Sha256::digest(traits));
         Self {
             friend_code,
             timestamp,
             cursor_start,
             cursor_length,
             retry_count,
-            job_uid: digest,
+            job_uid: "temp".to_owned(),
+        }
+        .generate_uid()
+    }
+
+    /// 从其它字段推断`job_uid`
+    #[must_use]
+    pub fn generate_uid(self) -> Self {
+        let traits: Vec<_> = self
+            .friend_code
+            .as_bytes()
+            .iter()
+            .chain(self.timestamp.as_bytes().iter())
+            .chain(self.cursor_start.to_le_bytes().iter())
+            .chain(self.cursor_length.to_le_bytes().iter())
+            .copied()
+            .collect();
+        Self {
+            job_uid: hex::encode(sha2::Sha256::digest(traits)),
+            ..self
         }
     }
 
@@ -358,6 +347,7 @@ pub fn scan_sub_queue(redis_client: &Client) -> Result<Vec<SubQueue>, Error> {
         sub_queues.push(SubQueue::try_from(name.as_str())?);
     }
     sub_queues.sort_by_key(|it| it.timestamp);
+    sub_queues.sort_by_key(|it| it.segment.start);
     Ok(sub_queues)
 }
 

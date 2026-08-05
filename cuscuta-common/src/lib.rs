@@ -20,3 +20,71 @@ pub mod quick_fetch;
 
 /// 定时操作相关
 pub mod scheduled_job;
+
+/// 为有参数的枚举类型添加数字转换
+#[macro_export]
+macro_rules! castable_enum_with_arg {
+    (
+        $(#[$meta:meta])*
+        #repr($repr:ty)
+        $vis:vis enum $name:ident {
+            $(
+                $(#[$vmeta:meta])*
+                $Variant:ident$(($($v:tt)*))? = $code:expr,
+            )*
+        }
+    ) => {
+        $(#[$meta])*
+        $vis enum $name {
+            $(
+                $(#[$vmeta])*
+                $Variant $(($($v)*))?,
+            )*
+        }
+        impl From<$name> for $repr {
+            fn from(v: $name) -> Self {
+                match v {
+                    $($name::$Variant {..} => $code,)*
+                }
+            }
+        }
+    };
+}
+
+/// 为无参数的枚举类型添加数字转换
+#[macro_export]
+macro_rules! castable_enum {
+    (
+        $(#[$meta:meta])*
+        #repr($repr:ty)
+        $vis:vis enum $name:ident {
+            $(
+                $(#[$vmeta:meta])*
+                $Variant:ident = $code:expr,
+            )*
+        }
+    ) => {
+        $(#[$meta])*
+        $vis enum $name {
+            $(
+                $(#[$vmeta])*
+                $Variant,
+            )*
+        }
+        impl From<$name> for $repr {
+            fn from(v: $name) -> Self {
+                match v {
+                    $($name::$Variant => $code,)*
+                }
+            }
+        }
+        impl From<$repr> for $name {
+            fn from(v: $repr) -> Self {
+                match v {
+                    $($code => $name::$Variant,)*
+                    _ => Self::Unknown
+                }
+            }
+        }
+    };
+}

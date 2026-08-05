@@ -174,6 +174,7 @@ All cuscuta components receive configuration through environment variables.
 | `WORKER_ACCOUNT_LEASE_TIME_SECS` | 120 | Account lease duration (s) |
 | `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 30 | Lease refresh interval (s) |
 | `WORKER_JOB_MAX_WORK_TIME_SECS` | 1200 | Maximum working time for a job (s) |
+| `WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS` | 10 | Rate limiting delay time (s) |
 | `ETA_ENABLE` | true | Enable ETA estimation |
 | `API_CHILO` | — | chilo service URL |
 | `API_LOGIN` | — | Login API endpoint |

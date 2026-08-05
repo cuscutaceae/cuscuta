@@ -1,4 +1,6 @@
-use std::collections::HashMap;
+//! 这个文件写的好脏……
+
+use std::{collections::HashMap, time::Duration};
 
 use cuscuta_common::{
     api::{
@@ -15,8 +17,15 @@ use cuscuta_common::{
 };
 use redis::{Client, Connection, TypedCommands};
 use reqwest::StatusCode;
+use tokio::time::sleep;
 
 use crate::{data::Config, worker::Error, worker_write_event};
+
+#[derive(Debug)]
+enum AddFriendError {
+    Api(api::Error),
+    Wait,
+}
 
 #[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 pub async fn try_add_friends(
@@ -57,32 +66,25 @@ pub async fn try_add_friends(
             job.essential.cursor_start = cursor.cast_signed() as i32;
             continue;
         }
-        let friends_new =
-            match try_modify_remote_friend(config, bundle_data, account_row, user_id, token, job)
-                .await
-            {
-                Ok(x) => x,
-                Err(e) => {
-                    job.state = JobState::Failed {
-                        start_timestamp,
-                        failure_info: JobFailure::new(
-                            JobFailureType::FriendNotFound,
-                            JobFailureResuming::Drop,
-                        ),
-                        friend_info: None,
-                    };
-                    worker_write_event!(
-                        WorkerEventType::Warn,
-                        format!("failed to add friend: {e:?}",)
-                    );
-                    continue;
-                }
-            };
-        let friend_delta = calc_friend_delta(friends, &friends_new)
-            .map_err(|e| Error::BadState(format!("failed to resolve friend delta: {e}")))?;
+        let friends_new = try_modify_remote_friend(
+            config,
+            bundle_data,
+            user_id,
+            token,
+            account_row,
+            start_timestamp,
+            job,
+        )
+        .await
+        .map_err(Error::Api)?;
+        let friend_delta =
+            calc_friend_delta(friends, &friends_new).map_err(|e| Error::BadState {
+                message: format!("failed to resolve friend delta: {e}"),
+            })?;
         let friend_add = match friend_delta {
             FriendDelta::Add(it) => it,
             FriendDelta::Remove(e) => {
+                tracing::warn!("pending_friends: friend conflict detected(remove): {e:?}");
                 worker_write_event!(
                     WorkerEventType::Info,
                     format!("friend conflict detected: {e:?}")
@@ -90,9 +92,8 @@ pub async fn try_add_friends(
                 continue;
             }
             FriendDelta::Same => {
-                return Err(Error::BadState(
-                    "bad friend delta (nothing changed)".to_string(),
-                ));
+                tracing::warn!("pending_friends: friends keep same, may triggered something");
+                continue;
             }
         };
         ids.insert(job.essential.friend_code.clone(), friend_add.clone());
@@ -111,11 +112,104 @@ pub async fn try_add_friends(
 async fn try_modify_remote_friend(
     config: &Config,
     bundle_data: &BundleData,
+    user_id: &str,
+    token: &str,
+    account_row: &AccountRow,
+    start_timestamp: i64,
+    job: &mut Job,
+) -> Result<Vec<FriendInfo>, api::Error> {
+    match try_add_friend(config, bundle_data, account_row, user_id, token, job).await {
+        Ok(x) => Ok(x),
+        Err(AddFriendError::Api(e)) => {
+            let failure_info = if let api::Error::BadStatus {
+                status_code,
+                extra_error_code,
+                ..
+            } = &e
+            {
+                if *status_code == 404 {
+                    JobFailure::new(JobFailureType::FriendNotFound, JobFailureResuming::Drop)
+                } else {
+                    JobFailure::new(
+                        JobFailureType::XxxxxxApiError(status_code.as_u16(), *extra_error_code),
+                        JobFailureResuming::Drop,
+                    )
+                }
+            } else {
+                JobFailure::new(
+                    JobFailureType::ApiError(format!("{e:?}")),
+                    JobFailureResuming::Drop,
+                )
+            };
+            job.state = JobState::Failed {
+                start_timestamp,
+                failure_info,
+                friend_info: None,
+            };
+            worker_write_event!(
+                WorkerEventType::Warn,
+                format!("failed to add friend: {e:?}",)
+            );
+            Err(e)
+        }
+        Err(AddFriendError::Wait) => {
+            worker_write_event!(WorkerEventType::Warn, "triggered friend modify waiting");
+            // To reviewers: Due to the target's rate limiting strategy,
+            //               blocking work queue is expected behavior here
+            sleep(Duration::from_secs(
+                config.worker_empty_friends_delay_time_secs,
+            ))
+            .await;
+            try_re_get_friend(config, bundle_data, user_id, token, account_row).await
+        }
+    }
+}
+
+async fn try_re_get_friend(
+    config: &Config,
+    bundle_data: &BundleData,
+    user_id: &str,
+    token: &str,
+    account_row: &AccountRow,
+) -> Result<Vec<FriendInfo>, api::Error> {
+    loop {
+        let result = xxxxxx_safe_call_ex(
+            config.worker_max_retry_count,
+            config.worker_exponential_backoff_base_millis,
+            config.worker_exponential_backoff_multiplier,
+            config.worker_exponential_backoff_max_delay_millis,
+            |it| it != StatusCode::TOO_MANY_REQUESTS,
+            || {
+                api::xxxxxx::api_list_friend(
+                    bundle_data,
+                    &account_row.account_email,
+                    user_id,
+                    token,
+                )
+            },
+        )
+        .await
+        .map(|it| it.friends)?;
+        if !result.is_empty() {
+            return Ok(result);
+        }
+        // To reviewers: Due to the target's rate limiting strategy,
+        //               blocking work queue is expected behavior here
+        sleep(Duration::from_secs(
+            config.worker_empty_friends_delay_time_secs,
+        ))
+        .await;
+    }
+}
+
+async fn try_add_friend(
+    config: &Config,
+    bundle_data: &BundleData,
     account_row: &AccountRow,
     user_id: &str,
     token: &str,
     job: &Job,
-) -> Result<Vec<FriendInfo>, api::Error> {
+) -> Result<Vec<FriendInfo>, AddFriendError> {
     let result = xxxxxx_safe_call_ex(
         config.worker_max_retry_count,
         config.worker_exponential_backoff_base_millis,
@@ -135,40 +229,33 @@ async fn try_modify_remote_friend(
     .await;
     match result {
         Err(e) => {
-            if let api::Error::BadStatus(code, message) = &e {
-                tracing::warn!("pending_friends: failed to call friend_add: {message}");
-                if *code == 400 {
-                    tracing::warn!(
-                        "pending_friends: friend is already exist but cache is out-of-date! trying readd"
-                    );
-                    xxxxxx_safe_call_ex(
-                        config.worker_max_retry_count,
-                        config.worker_exponential_backoff_base_millis,
-                        config.worker_exponential_backoff_multiplier,
-                        config.worker_exponential_backoff_max_delay_millis,
-                        |it| it != StatusCode::TOO_MANY_REQUESTS,
-                        || {
-                            api::xxxxxx::api_delete_friend(
-                                bundle_data,
-                                &account_row.account_email,
-                                user_id,
-                                token,
-                                &job.essential.friend_code,
-                            )
-                        },
+            if let api::Error::BadStatus {
+                status_code,
+                extra_error_code,
+                message,
+            } = &e
+            {
+                tracing::warn!(
+                    "pending_friends: failed to call friend_add: HTTP {status_code} {message}"
+                );
+                worker_write_event!(
+                    WorkerEventType::Warn,
+                    format!(
+                        "failed to add friend: HTTP {status_code}: {extra_error_code:?}: {message}"
                     )
-                    .await
-                    .map(|it| it.friends)
-                } else {
-                    tracing::warn!("pending_friends: failed to add friend: {e}: code: {code}");
-                    Err(e)
-                }
+                );
             } else {
                 tracing::warn!("pending_friends: unexpected error: {e}");
-                Err(e)
             }
+            Err(AddFriendError::Api(e))
         }
-        Ok(it) => Ok(it.friends),
+        Ok(it) => {
+            if !it.friends.is_empty() {
+                return Ok(it.friends);
+            }
+            tracing::warn!("pending_friends: returning friends is empty, waiting");
+            Err(AddFriendError::Wait)
+        }
     }
 }
 

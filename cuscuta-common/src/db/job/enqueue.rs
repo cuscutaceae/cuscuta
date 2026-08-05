@@ -2,7 +2,7 @@ use redis::{Client, TypedCommands};
 
 use crate::db::{job::JobEssential, redis::job_sub_queue_redis_key};
 
-/// 向任务队列写入新任务
+/// 向任务队列写入新任务，如果成功，返回新任务的redis stream id
 ///
 /// # Errors
 /// 本函数的错误全部来自[`redis::RedisError`]

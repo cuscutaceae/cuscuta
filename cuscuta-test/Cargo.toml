@@ -1,0 +1,15 @@
+[package]
+name = "cuscuta-test"
+edition = "2024"
+version.workspace = true
+
+[lib]
+
+[dependencies]
+testcontainers = "0.27.3"
+cuscuta-common = { path = "../cuscuta-common" }
+tokio = { workspace = true, features = ["macros"] }
+redis = { workspace = true }
+
+[lints]
+workspace = true

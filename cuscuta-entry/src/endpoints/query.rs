@@ -184,10 +184,10 @@ fn check_evidence(
             .failures
             .first()
         {
-            let failure_type = first_failed.fail_type.get_repr();
+            let failure_type = i64::from(first_failed.fail_type.clone());
             (
                 EvidenceCheckResult::JobFailed {
-                    code: failure_type.into(),
+                    code: failure_type,
                     message: format!("{:?}", first_failed.fail_type),
                 },
                 Some(job_tracks),

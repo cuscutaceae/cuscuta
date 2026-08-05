@@ -84,6 +84,9 @@ pub async fn sync_config(_: &CancellationToken) {
                 "WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS",
             )?,
             worker_job_max_work_time_secs: read_as_number("WORKER_JOB_MAX_WORK_TIME_SECS")?,
+            worker_empty_friends_delay_time_secs: read_as_number(
+                "WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS",
+            )?,
         };
         CONFIG
             .try_write(move |_| config.into())

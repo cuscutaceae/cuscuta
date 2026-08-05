@@ -39,10 +39,16 @@ where
         .map_err(Error::Network)?
         .error_for_status_with_response()
         .await
-        .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
+        .map_err(|(s, e)| Error::BadStatus {
+            status_code: e.status().unwrap_or_else(StatusCode::default),
+            message: s,
+            extra_error_code: None,
+        })?
         .json::<GitHubFileInternal>()
         .await
-        .map_err(|e| Error::Decode(format!("phase1: {e}")))?;
+        .map_err(|e| Error::Decode {
+            message: format!("phase1: {e}"),
+        })?;
     if file_object.content.is_empty() {
         reqwest::Client::builder()
             .user_agent("curl/7.88.1")
@@ -54,17 +60,31 @@ where
             .map_err(Error::Network)?
             .error_for_status_with_response()
             .await
-            .map_err(|(s, e)| Error::BadStatus(e.status().unwrap_or_else(StatusCode::default), s))?
+            .map_err(|(s, e)| Error::BadStatus {
+                status_code: e.status().unwrap_or_else(StatusCode::default),
+                message: s,
+                extra_error_code: None,
+            })?
             .json::<T>()
             .await
-            .map_err(|e| Error::Decode(format!("phase b_1: {e}")))
+            .map_err(|e| Error::Decode {
+                message: format!("phase b_1: {e}"),
+            })
     } else {
         base64::prelude::BASE64_STANDARD
             .decode(file_object.content.replace('\n', ""))
-            .map_err(|e| Error::Decode(format!("phase a_2: {e}")))
-            .map(|it| String::from_utf8(it).map_err(|e| Error::Decode(format!("phase a_3: {e}"))))?
+            .map_err(|e| Error::Decode {
+                message: format!("phase a_2: {e}"),
+            })
             .map(|it| {
-                serde_json::from_str::<T>(&it).map_err(|e| Error::Decode(format!("phase a_4: {e}")))
+                String::from_utf8(it).map_err(|e| Error::Decode {
+                    message: format!("phase a_3: {e}"),
+                })
+            })?
+            .map(|it| {
+                serde_json::from_str::<T>(&it).map_err(|e| Error::Decode {
+                    message: format!("phase a_4: {e}"),
+                })
             })?
     }
 }

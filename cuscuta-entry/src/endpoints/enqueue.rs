@@ -13,11 +13,14 @@ use crate::{
 };
 
 use cuscuta_common::{
-    db::job::{
-        JobEssential, SubQueue,
-        enqueue::write_job,
-        scan_sub_queue,
-        track::{JobTrackQueueStatus, JobTrackTag, batch_write_job_tracking_tag},
+    db::{
+        job::{
+            JobEssential, SubQueue,
+            enqueue::write_job,
+            scan_sub_queue,
+            track::{JobTrackQueueStatus, JobTrackTag, batch_write_job_tracking_tag},
+        },
+        redis::sub_queue_postfix,
     },
     quick_fetch::QuickFetch,
 };
@@ -111,10 +114,7 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
         let (queue_name, exist) = target_queue.map_or_else(
             || {
                 (
-                    format!(
-                        "chunk_{}_{}_{}_{}",
-                        "00000000", timestamp, range.start, range.end
-                    ),
+                    sub_queue_postfix("00000000", &timestamp, range.start, range.end),
                     false,
                 )
             },

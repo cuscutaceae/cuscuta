@@ -52,8 +52,9 @@ pub fn write_result_to_redis(
 ) -> Result<(), Error> {
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     for (key, score) in score_pairs {
-        let json = serde_json::to_string(score)
-            .map_err(|e| Error::BadState(format!("failed to serialize data to json: {e}")))?;
+        let json = serde_json::to_string(score).map_err(|e| Error::BadState {
+            message: format!("failed to serialize data to json: {e}"),
+        })?;
         connection.lpush(key, &json).map_err(Error::Redis)?;
     }
     Ok(())
