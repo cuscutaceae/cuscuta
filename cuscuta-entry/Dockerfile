@@ -15,7 +15,7 @@ RUN mkdir -p cuscuta-entry/src && echo "//! Dummy \nfn main() {}" > cuscuta-entr
 RUN mkdir -p cuscuta-worker/src && echo "//! Dummy \nfn main() {}" > cuscuta-worker/src/main.rs
 RUN mkdir -p cuscuta-chilo/src && echo "//! Dummy \nfn main() {}" > cuscuta-chilo/src/main.rs
 RUN mkdir -p cuscuta-mock/src && echo "//! Dummy \nfn main() {}" > cuscuta-mock/src/main.rs
-RUN mkdir -p cuscuta-test/src && echo "//! Dummy \nfn main() {}" > cuscuta-test/src/main.rs
+RUN mkdir -p cuscuta-test/src && echo "//! Dummy \nfn main() {}" > cuscuta-test/src/lib.rs
 RUN mkdir -p cuscutactl/src && echo "//! Dummy \nfn main() {}" > cuscutactl/src/main.rs
 # Pre-build to cache dependencies
 RUN cargo build --release -p cuscuta-entry
