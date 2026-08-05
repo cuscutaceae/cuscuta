@@ -571,9 +571,9 @@ impl ErrorForStatusWithResponseXxxxxx for Response {
         fn parse(api_error: &ApiError, status_code: StatusCode) -> Error {
             let error_code = api_error.error_code;
             let error_map = ApiErrorMap::from(error_code);
-            Error::ApiError {
-                http_status_code: status_code,
-                error_code,
+            Error::BadStatus {
+                status_code,
+                extra_error_code: Some(error_code),
                 message: if error_map == ApiErrorMap::Unknown {
                     format!("failed to map error description: code {error_code}")
                 } else {
@@ -588,11 +588,13 @@ impl ErrorForStatusWithResponseXxxxxx for Response {
                 let text = self.text().await.map_err(|it| Error::BadStatus {
                     status_code,
                     message: format!("[FAILED TO GET BODY: {it} {e}]"),
+                    extra_error_code: None,
                 })?;
                 let api_error = serde_json::from_str::<ApiError>(text.as_str()).map_err(|it| {
                     Error::BadStatus {
                         status_code,
                         message: format!("[FAILED TO PARSE JSON: {it} {e}]"),
+                        extra_error_code: None,
                     }
                 })?;
                 Err(parse(&api_error, status_code))

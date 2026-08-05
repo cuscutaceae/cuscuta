@@ -121,12 +121,29 @@ async fn try_modify_remote_friend(
     match try_add_friend(config, bundle_data, account_row, user_id, token, job).await {
         Ok(x) => Ok(x),
         Err(AddFriendError::Api(e)) => {
+            let failure_info = if let api::Error::BadStatus {
+                status_code,
+                extra_error_code,
+                ..
+            } = &e
+            {
+                if *status_code == 404 {
+                    JobFailure::new(JobFailureType::FriendNotFound, JobFailureResuming::Drop)
+                } else {
+                    JobFailure::new(
+                        JobFailureType::XxxxxxApiError(status_code.as_u16(), *extra_error_code),
+                        JobFailureResuming::Drop,
+                    )
+                }
+            } else {
+                JobFailure::new(
+                    JobFailureType::ApiError(format!("{e:?}")),
+                    JobFailureResuming::Drop,
+                )
+            };
             job.state = JobState::Failed {
                 start_timestamp,
-                failure_info: JobFailure::new(
-                    JobFailureType::FriendNotFound,
-                    JobFailureResuming::Drop,
-                ),
+                failure_info,
                 friend_info: None,
             };
             worker_write_event!(
@@ -212,19 +229,19 @@ async fn try_add_friend(
     .await;
     match result {
         Err(e) => {
-            if let api::Error::ApiError {
-                http_status_code,
-                error_code,
+            if let api::Error::BadStatus {
+                status_code,
+                extra_error_code,
                 message,
             } = &e
             {
                 tracing::warn!(
-                    "pending_friends: failed to call friend_add: HTTP {http_status_code} {message}"
+                    "pending_friends: failed to call friend_add: HTTP {status_code} {message}"
                 );
                 worker_write_event!(
                     WorkerEventType::Warn,
                     format!(
-                        "failed to add friend: HTTP {http_status_code}: {error_code}: {message}"
+                        "failed to add friend: HTTP {status_code}: {extra_error_code:?}: {message}"
                     )
                 );
             } else {

@@ -141,6 +141,14 @@ castable_enum_with_arg! {
         /// Job 重新入队
         #[error("job Reenqueued")]
         Reenqueued = -3,
+
+        /// 远程Api错误
+        #[error("remote xxxxxx api error, HTTP {0}: {1:?}")]
+        XxxxxxApiError(u16, Option<i64>) = -4,
+
+        /// 其它Api错误
+        #[error("other api error: {0:?}")]
+        ApiError(String) = -5,
     }
 }
 

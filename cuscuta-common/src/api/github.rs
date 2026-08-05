@@ -42,6 +42,7 @@ where
         .map_err(|(s, e)| Error::BadStatus {
             status_code: e.status().unwrap_or_else(StatusCode::default),
             message: s,
+            extra_error_code: None,
         })?
         .json::<GitHubFileInternal>()
         .await
@@ -62,6 +63,7 @@ where
             .map_err(|(s, e)| Error::BadStatus {
                 status_code: e.status().unwrap_or_else(StatusCode::default),
                 message: s,
+                extra_error_code: None,
             })?
             .json::<T>()
             .await

@@ -26,13 +26,16 @@ pub enum Error {
     Network(reqwest::Error),
 
     /// Api的`HTTP`返回码不为2xx或1xx
-    #[error("bad return status: {status_code}: {message}")]
+    #[error("bad return status: HTTP {status_code} {extra_error_code:?}: {message}")]
     BadStatus {
         /// 错误码
         status_code: StatusCode,
 
         /// 错误描述
         message: String,
+
+        /// Api错误码（如果有）
+        extra_error_code: Option<i64>,
     },
 
     /// Json反序列化失败
@@ -47,19 +50,6 @@ pub enum Error {
     Env {
         /// 环境变量错误
         error: env::VarError,
-
-        /// 错误描述
-        message: String,
-    },
-
-    /// Api错误，且具有更多信息
-    #[error("bad api return: {error_code}: {message}")]
-    ApiError {
-        /// HTTP 返回码
-        http_status_code: StatusCode,
-
-        /// 错误代码
-        error_code: i64,
 
         /// 错误描述
         message: String,
