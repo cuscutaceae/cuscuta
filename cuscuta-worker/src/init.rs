@@ -1,5 +1,8 @@
 use cuscuta_common::{
-    api::{self, xxxxxx::api_delete_friend},
+    api::{
+        self,
+        xxxxxx::{api_delete_friend, auto::xxxxxx_safe_call},
+    },
     data::BundleData,
     db::account::{AccountRow, try_lock_account, try_release_account, update_account_rate},
     quick_fetch::QuickFetch,
@@ -57,10 +60,10 @@ async fn try_init() -> Result<(), Error> {
     tracing::info!("init: cuscuta-worker initializing...");
     let bundle_data = BUNDLE_DATA
         .try_read(std::clone::Clone::clone)
-        .map_err(|e| (Level::Retry, format!("failed to read BUNDLE_DATA: {e}")))?;
-    let worker_account_lease_time_secs = CONFIG
-        .try_read(|it| it.worker_account_lease_time_secs)
-        .map_err(|e| (Level::Retry, format!("failed to read BUNDLE_DATA: {e}")))?;
+        .map_err(|e| (Level::Retry, format!("BUNDLE_DATA is not ready: {e}")))?;
+    let config = CONFIG
+        .try_read(std::clone::Clone::clone)
+        .map_err(|e| (Level::Retry, format!("CONFIG is not ready: {e}")))?;
     REDIS_CLIENT
         .get()
         .ok_or_else(|| (Level::Retry, "redis is not ready".to_string()))?
@@ -75,7 +78,7 @@ async fn try_init() -> Result<(), Error> {
         try_open_transaction()
             .await
             .map_err(|e| (Level::Retry, format!("failed to open transaction: {e}")))?,
-        worker_account_lease_time_secs,
+        config.worker_account_lease_time_secs,
     )
     .await
     .map_err(|e| {
@@ -95,18 +98,29 @@ async fn try_init() -> Result<(), Error> {
     } = get_friend_result(&bundle_data, &account_row).await?;
     tracing::info!("init: found {} existing friends", friends.friends.len());
     for friend in friends.friends {
-        api_delete_friend(
-            &bundle_data,
-            &account_row.account_email,
-            &account_row
-                .user_id
-                .ok_or_else(|| (Level::Halt, "unexpected data #1".to_string()))?
-                .to_string(),
-            &account_row
-                .temp_token
-                .clone()
-                .ok_or_else(|| (Level::Halt, "unexpected data #2".to_string()))?,
-            &friend.user_id.to_string(),
+        let user_id = account_row
+            .user_id
+            .ok_or_else(|| (Level::Halt, "unexpected data #1".to_string()))?
+            .to_string();
+        let token = account_row
+            .temp_token
+            .clone()
+            .ok_or_else(|| (Level::Halt, "unexpected data #2".to_string()))?;
+        let friend_id = friend.user_id.to_string();
+        xxxxxx_safe_call(
+            config.worker_max_retry_count,
+            config.worker_exponential_backoff_base_millis,
+            config.worker_exponential_backoff_multiplier,
+            config.worker_exponential_backoff_max_delay_millis,
+            || {
+                api_delete_friend(
+                    &bundle_data,
+                    &account_row.account_email,
+                    &user_id,
+                    &token,
+                    &friend_id,
+                )
+            },
         )
         .await
         .map_err(|e| (Level::Halt, format!("failed to clean friends: {e}")))?;
