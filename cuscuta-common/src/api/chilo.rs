@@ -28,13 +28,23 @@ type Result<T> = core::result::Result<T, Error>;
 /// - 当`reqwest`客户端初始化失败时，返回[`Error::ClientSetup`]
 /// - 当请求发送失败时，返回[`Error::Network`]
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
-pub async fn chilo_generate(timestamp: &str, path: &str, kind: &str) -> Result<ChiloResult> {
+pub async fn chilo_generate(
+    timestamp: &str,
+    path: &str,
+    body: &str,
+    kind: &str,
+) -> Result<ChiloResult> {
     reqwest::Client::builder()
         .user_agent("curl/7.88.1")
         .build()
         .map_err(Error::ClientSetup)?
         .get(try_get_env_var("API_CHILO")?)
-        .query(&[("timestamp", &timestamp), ("path", &path), ("kind", &kind)])
+        .query(&[
+            ("timestamp", &timestamp),
+            ("path", &path),
+            ("body", &body),
+            ("kind", &kind),
+        ])
         .send()
         .await
         .map_err(Error::Network)?

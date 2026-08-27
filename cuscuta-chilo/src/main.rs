@@ -514,6 +514,7 @@ fn read_hex(var: &str) -> Vec<u8> {
 #[derive(Debug, Deserialize)]
 struct GenerateQuery {
     timestamp: String,
+    body: String,
     path: String,
     kind: String,
 }
@@ -564,6 +565,7 @@ async fn generate(Query(query): Query<GenerateQuery>) -> impl IntoResponse {
         c31,
         c32,
         timestamp,
+        query.body.as_bytes(),
         query.path.as_bytes(),
     ) {
         Ok(result) => result,
