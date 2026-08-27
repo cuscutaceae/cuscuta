@@ -323,7 +323,7 @@ pub fn resume_state(worker_result: WorkerResult) {
             let job_id = write_job(
                 redis_client,
                 &job.essential,
-                &job.sub_queue.name,
+                &job.sub_queue.get_postfix(),
                 false,
                 redis_stream_refresh_ttl,
             )

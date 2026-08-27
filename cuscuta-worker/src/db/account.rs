@@ -23,7 +23,8 @@ pub async fn perform_login(
     let timestamp = Local::now().timestamp_millis().to_string();
     let random_challenge = match chilo_generate(
         &timestamp,
-        &format!("{}{}", "grant_type=client_credentials", url.path()),
+        url.path(),
+        "grant_type=client_credentials",
         "login",
     )
     .await?
