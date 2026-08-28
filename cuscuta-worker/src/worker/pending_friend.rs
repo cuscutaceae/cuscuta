@@ -66,17 +66,20 @@ pub async fn try_add_friends(
             job.essential.cursor_start = cursor.cast_signed() as i32;
             continue;
         }
-        let friends_new = try_modify_remote_friend(
-            config,
-            bundle_data,
-            user_id,
-            token,
-            account_row,
-            start_timestamp,
-            job,
-        )
-        .await
-        .map_err(Error::Api)?;
+        let friends_new =
+            match try_modify_remote_friend(config, bundle_data, user_id, token, account_row, job)
+                .await
+            {
+                Ok(o) => o,
+                Err(failure_info) => {
+                    job.state = JobState::Failed {
+                        start_timestamp,
+                        failure_info,
+                        friend_info: None,
+                    };
+                    continue;
+                }
+            };
         let friend_delta =
             calc_friend_delta(friends, &friends_new).map_err(|e| Error::BadState {
                 message: format!("failed to resolve friend delta: {e}"),
@@ -115,9 +118,8 @@ async fn try_modify_remote_friend(
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
-    start_timestamp: i64,
-    job: &mut Job,
-) -> Result<Vec<FriendInfo>, api::Error> {
+    job: &Job,
+) -> Result<Vec<FriendInfo>, JobFailure> {
     match try_add_friend(config, bundle_data, account_row, user_id, token, job).await {
         Ok(x) => Ok(x),
         Err(AddFriendError::Api(e)) => {
@@ -141,26 +143,22 @@ async fn try_modify_remote_friend(
                     JobFailureResuming::Drop,
                 )
             };
-            job.state = JobState::Failed {
-                start_timestamp,
-                failure_info,
-                friend_info: None,
-            };
             worker_write_event!(
                 WorkerEventType::Warn,
                 format!("failed to add friend: {e:?}",)
             );
-            Err(e)
+            Err(failure_info)
         }
         Err(AddFriendError::Wait) => {
             worker_write_event!(WorkerEventType::Warn, "triggered friend modify waiting");
-            // To reviewers: Due to the target's rate limiting strategy,
-            //               blocking work queue is expected behavior here
-            sleep(Duration::from_secs(
-                config.worker_empty_friends_delay_time_secs,
-            ))
-            .await;
-            try_re_get_friend(config, bundle_data, user_id, token, account_row).await
+            try_re_get_friend(config, bundle_data, user_id, token, account_row)
+                .await
+                .map_err(|e| {
+                    JobFailure::new(
+                        JobFailureType::ApiError(e.to_string()),
+                        JobFailureResuming::Drop,
+                    )
+                })
         }
     }
 }
@@ -173,6 +171,12 @@ async fn try_re_get_friend(
     account_row: &AccountRow,
 ) -> Result<Vec<FriendInfo>, api::Error> {
     loop {
+        // To reviewers: Due to the target's rate limiting strategy,
+        //               blocking work queue is expected behavior here
+        sleep(Duration::from_secs(
+            config.worker_empty_friends_delay_time_secs,
+        ))
+        .await;
         let result = xxxxxx_safe_call_ex(
             config.worker_max_retry_count,
             config.worker_exponential_backoff_base_millis,
@@ -193,12 +197,6 @@ async fn try_re_get_friend(
         if !result.is_empty() {
             return Ok(result);
         }
-        // To reviewers: Due to the target's rate limiting strategy,
-        //               blocking work queue is expected behavior here
-        sleep(Duration::from_secs(
-            config.worker_empty_friends_delay_time_secs,
-        ))
-        .await;
     }
 }
 
