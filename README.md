@@ -32,6 +32,7 @@ cuscuta包括一些组件
 | cuscuta-common | entry和worker的通用组件                                                                 |
 | cuscuta-chilo  | [chilo](https://github.com/cuscutaceae/chilo)的一个WebAPI包装，被worker依赖，理论可扩展 |
 | cuscuta-mock   | worker的mock用镜像                                                                      |
+| cuscuta-test   | 测试使用的相关组件                                                                      |
 | cuscutactl     | cuscuta集群的一个简易命令行管理工具（半数以上使用AI生成）                               |
 
 ### 设计与原理

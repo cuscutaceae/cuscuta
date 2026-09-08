@@ -10,7 +10,7 @@ use cuscuta_common::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG},
+    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, Config},
     db::{
         self,
         account::auto::{TokenUpdateResult, check_and_update_token},
@@ -39,16 +39,17 @@ impl From<(Level, String)> for Error {
 }
 
 async fn get_friend_result(
+    config: &Config,
     bundle_data: &BundleData,
     account_row: &AccountRow,
 ) -> Result<TokenUpdateResult, Error> {
-    let first_result = try_update_token(bundle_data, account_row, false).await;
+    let first_result = try_update_token(config, bundle_data, account_row, false).await;
     match first_result {
         Ok(result) => return Ok(result),
         Err((Level::DirtyAccount, _)) => {}
         Err(e) => return Err(e.into()),
     }
-    let second_result = try_update_token(bundle_data, account_row, true).await;
+    let second_result = try_update_token(config, bundle_data, account_row, true).await;
     match second_result {
         Ok(result) => Ok(result),
         Err((Level::DirtyAccount, m)) => Err((Level::Halt, m).into()),
@@ -95,7 +96,7 @@ async fn try_init() -> Result<(), Error> {
     let TokenUpdateResult {
         account_row,
         friends,
-    } = get_friend_result(&bundle_data, &account_row).await?;
+    } = get_friend_result(&config, &bundle_data, &account_row).await?;
     tracing::info!("init: found {} existing friends", friends.friends.len());
     for friend in friends.friends {
         let user_id = account_row
@@ -151,11 +152,13 @@ async fn try_failed_resume() -> Result<(), Error> {
 }
 
 async fn try_update_token(
+    config: &Config,
     bundle_data: &BundleData,
     account_row: &AccountRow,
     account_dirty: bool,
 ) -> Result<TokenUpdateResult, (Level, String)> {
-    let friends_result = check_and_update_token(bundle_data, account_row, account_dirty).await;
+    let friends_result =
+        check_and_update_token(config, bundle_data, account_row, account_dirty).await;
     if let Err(db::account::auto::Error::Api(api::Error::BadStatus {
         status_code,
         extra_error_code,

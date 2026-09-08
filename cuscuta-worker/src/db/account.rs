@@ -77,15 +77,18 @@ pub mod auto {
     use cuscuta_common::{
         api::{
             self,
-            xxxxxx::{FriendListResult1, api_list_friend},
+            xxxxxx::{FriendListResult1, api_list_friend, auto::xxxxxx_safe_call},
         },
         data::BundleData,
         db::{self, account::AccountRow},
     };
 
-    use crate::db::{
-        account::{perform_login, update_account_info},
-        postgresql::try_open_transaction,
+    use crate::{
+        data::Config,
+        db::{
+            account::{perform_login, update_account_info},
+            postgresql::try_open_transaction,
+        },
     };
 
     #[derive(Debug, thiserror::Error)]
@@ -112,6 +115,7 @@ pub mod auto {
 
     /// Warn: God function
     pub async fn check_and_update_token(
+        config: &Config,
         bundle_data: &BundleData,
         account_row: &AccountRow,
         force_login: bool,
@@ -144,13 +148,15 @@ pub mod auto {
             "check_token: fetch friends: {token}, {user_id}, {}, {bundle_data:?}",
             current_row.account_email
         );
+        let user_id = user_id.to_string();
         Ok((
             current_row.clone(),
-            api_list_friend(
-                bundle_data,
-                &current_row.account_email,
-                &user_id.to_string(),
-                &token,
+            xxxxxx_safe_call(
+                config.worker_max_retry_count,
+                config.worker_exponential_backoff_base_millis,
+                config.worker_exponential_backoff_multiplier,
+                config.worker_exponential_backoff_max_delay_millis,
+                || api_list_friend(bundle_data, &current_row.account_email, &user_id, &token),
             )
             .await
             .map_err(Error::Api)?,
