@@ -1,8 +1,5 @@
 use cuscuta_common::{
-    api::{
-        self,
-        xxxxxx::{SongScore, auto::xxxxxx_safe_call},
-    },
+    api::{self, xxxxxx::SongScore},
     data::{BundleData, Song},
     db::{
         account::AccountRow,
@@ -12,7 +9,7 @@ use cuscuta_common::{
 };
 use redis::{Client, TypedCommands};
 
-use crate::{data::Config, worker::Error};
+use crate::{api_compat::xxxxxx_safe_call_worker, data::Config, worker::Error};
 
 pub fn process_job_with_result(jobs: &mut [Job], scores: &[SongScore]) -> Vec<(String, SongScore)> {
     let mut job_links = Vec::new();
@@ -75,24 +72,18 @@ pub async fn gather_rank_list<'a>(
     let mut result = Vec::new();
     for difficulty in &song.difficulties {
         let rating_class = difficulty.rating_class.to_string();
-        let rank_list = xxxxxx_safe_call(
-            config.worker_max_retry_count,
-            config.worker_exponential_backoff_base_millis,
-            config.worker_exponential_backoff_multiplier,
-            config.worker_exponential_backoff_max_delay_millis,
-            || {
-                api::xxxxxx::api_get_rank_list(
-                    bundle_data,
-                    &account_row.account_email,
-                    user_id,
-                    token,
-                    &song.id,
-                    &rating_class,
-                    "0",
-                    "11",
-                )
-            },
-        )
+        let rank_list = xxxxxx_safe_call_worker(config, || {
+            api::xxxxxx::api_get_rank_list(
+                bundle_data,
+                &account_row.account_email,
+                user_id,
+                token,
+                &song.id,
+                &rating_class,
+                "0",
+                "11",
+            )
+        })
         .await
         .map_err(Error::Api)?;
         for it in rank_list {

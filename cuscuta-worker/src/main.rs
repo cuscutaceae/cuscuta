@@ -27,6 +27,7 @@
 //! - `API_GET_RANK`
 //!
 
+mod api_compat;
 mod data;
 mod db;
 mod init;
