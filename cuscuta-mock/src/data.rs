@@ -1,25 +1,11 @@
-use std::env;
-
 use cuscuta_common::api::xxxxxx::FriendInfo;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum FriendModifyResult {
-    Success(FriendModifyResultSuccess),
-    Failed(FriendModifyResultFailed),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FriendModifyResultSuccess {
-    pub success: bool,
-    pub value: FriendsResult,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FriendModifyResultFailed {
-    pub success: bool,
-    pub error_code: i32,
+    Success { success: bool, value: FriendsResult },
+    Failed { success: bool, error_code: i32 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,22 +26,16 @@ pub struct FriendRemoveForm {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum LoginResult {
-    Success(LoginResultSuccess),
-    Failed(LoginResultFailed),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoginResultSuccess {
-    pub success: bool,
-    pub user_id: i64,
-    pub access_token: String,
-    pub token_type: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoginResultFailed {
-    pub success: bool,
-    pub error_code: i32,
+    Success {
+        success: bool,
+        user_id: i64,
+        access_token: String,
+        token_type: String,
+    },
+    Failed {
+        success: bool,
+        error_code: i32,
+    },
 }
 
 #[derive(Deserialize)]
@@ -64,26 +44,21 @@ pub struct RankListQuery {
     pub difficulty: String,
     #[allow(unused)]
     pub start: String,
+    #[allow(unused)]
     pub limit: String,
 }
 
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum RankListFetchResult {
-    Success(RankListFetchResultSuccess),
-    Failed(RankListFetchResultFailed),
-}
-
-#[derive(Serialize)]
-pub struct RankListFetchResultSuccess {
-    pub success: bool,
-    pub value: Vec<RankListResult>,
-}
-
-#[derive(Serialize)]
-pub struct RankListFetchResultFailed {
-    pub success: bool,
-    pub error_code: i32,
+    Success {
+        success: bool,
+        value: Vec<RankListResult>,
+    },
+    Failed {
+        success: bool,
+        error_code: i32,
+    },
 }
 
 #[derive(Serialize, Default)]
@@ -108,10 +83,4 @@ pub struct RankListResult {
     pub is_char_uncapped: bool,
     pub icon: String,
     pub rank: i64,
-}
-
-pub fn check_env_bool(env_str: &str) -> bool {
-    env::var(env_str)
-        .map(|it| it.contains("1") || it.contains("true"))
-        .unwrap_or(false)
 }
