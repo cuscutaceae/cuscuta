@@ -103,7 +103,7 @@ pub async fn try_add_friends(
             FriendDelta::Same => {
                 worker_write_event!(
                     WorkerEventType::Warn,
-                    format!("friend conflict detected: Same")
+                    "friend conflict detected: Same".to_string()
                 );
                 tracing::warn!("pending_friends: friends keep same, may triggered something");
                 continue;
