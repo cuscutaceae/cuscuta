@@ -517,8 +517,7 @@ pub enum FriendDelta {
 /// 当好友仅变化1个或不变化时，返回`Ok`
 ///
 /// # Errors
-/// 当好友变化量不为0或1时，返回`String`的`Err`\
-/// （TODO：计划重构来改善错误处理）
+/// 当好友变化量不为0或1时，返回`String`的`Err`
 ///
 /// # Panics
 /// 所有可能的panic的代码来自于`set.iter().next().expect(...)`，而根据条件，这些set的长度在执行它之前均为1，故本函数理论上永远不会panic

@@ -115,7 +115,6 @@ pub async fn clean_jobs(
             )
             .await
             {
-                //TODO: verify the state
                 Ok(result) => {
                     deleted_friends_code.push(finished_job.essential.friend_code.clone());
                     *friends = result;
