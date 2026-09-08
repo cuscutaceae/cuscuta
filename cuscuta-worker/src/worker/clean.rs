@@ -1,6 +1,6 @@
 use chrono::Utc;
 use cuscuta_common::{
-    api::xxxxxx::{FriendInfo, api_delete_friend, auto::xxxxxx_safe_call},
+    api::xxxxxx::FriendInfo,
     data::BundleData,
     db::{
         account::AccountRow,
@@ -16,7 +16,11 @@ use redis::{Client, TypedCommands};
 
 use crate::{
     data::Config,
-    worker::{Error, update_job_track_info},
+    worker::{
+        Error,
+        friend_modify::{ExpectedModify, try_modify_remote_friend},
+        update_job_track_info,
+    },
     worker_write_event,
 };
 
@@ -32,6 +36,7 @@ pub async fn clean_jobs(
     config: &Config,
 ) -> Result<(), Error> {
     let pending_friends_code = get_pending_friends_code(jobs);
+    let mut deleted_friends_code = Vec::<String>::new();
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     for finished_job in jobs.iter_mut() {
         let (friend_info, start_timestamp, failure_info) = match &finished_job.state {
@@ -86,35 +91,6 @@ pub async fn clean_jobs(
             tracing::warn!("job_clean: failed to write track tag: {e}");
             continue;
         }
-        if let Some(friend_info) = friend_info
-            && !pending_friends_code.contains(&finished_job.essential.friend_code)
-        {
-            let friend_user_id = friend_info.user_id.to_string();
-            if let Err(e) = xxxxxx_safe_call(
-                config.worker_max_retry_count,
-                config.worker_exponential_backoff_base_millis,
-                config.worker_exponential_backoff_multiplier,
-                config.worker_exponential_backoff_max_delay_millis,
-                || {
-                    api_delete_friend(
-                        bundle_data,
-                        &account_row.account_email,
-                        user_id,
-                        token,
-                        &friend_user_id,
-                    )
-                },
-            )
-            .await
-            {
-                worker_write_event!(
-                    WorkerEventType::Warn,
-                    format!("failed to delete friend: {e}")
-                );
-            } else {
-                friends.retain(|it| it.user_id != friend_info.user_id);
-            }
-        }
         let cursor_length = i64::from(finished_job.essential.cursor_length);
         if cursor_length != 0 {
             let _ = record_eta(
@@ -122,7 +98,48 @@ pub async fn clean_jobs(
                 (Utc::now().timestamp_millis() - *start_timestamp) / cursor_length,
             );
         }
-        if let Some(failure_info) = failure_info {
+        if let Some(friend_info) = friend_info
+            && !pending_friends_code.contains(&finished_job.essential.friend_code)
+            && !deleted_friends_code.contains(&finished_job.essential.friend_code)
+        {
+            match try_modify_remote_friend(
+                config,
+                bundle_data,
+                user_id,
+                token,
+                account_row,
+                ExpectedModify::Remove {
+                    friend_id: friend_info.user_id,
+                },
+                friends,
+            )
+            .await
+            {
+                //TODO: verify the state
+                Ok(result) => {
+                    deleted_friends_code.push(finished_job.essential.friend_code.clone());
+                    *friends = result;
+                }
+                Err(failure_info) => {
+                    let friend_info = Some(friend_info.clone());
+                    let start_timestamp = *start_timestamp;
+                    finished_job.state = JobState::Failed {
+                        start_timestamp,
+                        failure_info,
+                        friend_info,
+                    };
+                }
+            }
+        }
+    }
+
+    for finished_job in jobs.iter_mut() {
+        if !(matches!(&finished_job.state, JobState::Finished { .. })
+            || matches!(&finished_job.state, JobState::Failed { .. }))
+        {
+            continue;
+        }
+        if let JobState::Failed { failure_info, .. } = &finished_job.state {
             worker_write_event!(
                 WorkerEventType::Warn,
                 format!("job finished with error: {failure_info:?}")
@@ -137,9 +154,11 @@ pub async fn clean_jobs(
             );
             tracing::info!("job: {finished_job:?} finished");
         }
+
         finished_job.state = JobState::Cleaned;
     }
     jobs.retain(|it| !matches!(it.state, JobState::Cleaned));
+
     Ok(())
 }
 

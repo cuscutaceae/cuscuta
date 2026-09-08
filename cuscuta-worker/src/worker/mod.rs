@@ -1,4 +1,5 @@
 mod clean;
+mod friend_modify;
 mod pending_friend;
 mod pending_gather;
 mod pull;
