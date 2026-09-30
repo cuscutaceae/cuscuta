@@ -54,8 +54,6 @@ services:
       # Config
       BIN_C1: "0000000000000000000000000000000000000000000000000000000000000000"
       BIN_C2: "0000000000000000000000000000000000000000000000000000000000000000"
-      BIN_LOGIN_C31: "00000000000000000000"
-      BIN_LOGIN_C32: "00000000000000000000"
     restart: no
 
   test-mock:
@@ -97,6 +95,8 @@ services:
       API_ADD_FRIENDS: "http://test-mock:8080/friend/me/add"
       API_DELETE_FRIENDS: "http://test-mock:8080/friend/me/delete"
       API_GET_RANK: "http://test-mock:8080/score/song/friend"
+      API_NOTIFICATION: "http://test-mock:8080/unimplemented"
+      API_COMPOSE_AGGREGATE: "http://test-mock:8080/unimplemented"
       # Config
       WORKER_MAX_JOBS: 8
       WORKER_MAX_RETRIES: 30

@@ -163,6 +163,21 @@ async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoR
             }),
         );
     }
+    if fail_check() {
+        tracing::info!(
+            "add_friend[fail_empty_before_add]: i: {i_header}, target: {}",
+            form.friend_code
+        );
+        return (
+            StatusCode::OK,
+            Json(FriendModifyResult::Success {
+                success: true,
+                value: FriendsResult {
+                    friends: Vec::new(),
+                },
+            }),
+        );
+    }
     create_empty_default_account(i_header);
     if form.friend_code == RESERVED_NOTFOUND_FRIEND_CODE {
         return (

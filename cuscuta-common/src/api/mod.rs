@@ -11,9 +11,11 @@ pub mod xxxxxx;
 /// chilo Api
 pub mod chilo;
 
+/// xxxxxx Api with auto chilo
+pub mod auto_chilo_xxxxxx;
+
 /// Api调用可能引发的错误
 ///
-/// 注：这里的错误处理可能很脏，因为这个错误类型包含了过于特化的[`Self::TooManyRetries`]
 /// 以及并非所有Api系函数均支持的[`Self::ApiError`]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

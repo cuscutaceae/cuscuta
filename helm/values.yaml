@@ -64,6 +64,8 @@ api:
   addFriends: ""
   deleteFriends: ""
   getRank: ""
+  notification: ""
+  compose: ""
 
 # -- Migration job
 migration:
@@ -82,8 +84,6 @@ chilo:
   constants:
     binC1: ""
     binC2: ""
-    binLoginC31: ""
-    binLoginC32: ""
   service:
     # -- Service type
     type: ClusterIP
