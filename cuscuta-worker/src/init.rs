@@ -1,8 +1,5 @@
 use cuscuta_common::{
-    api::{
-        self,
-        xxxxxx::{api_delete_friend, auto::xxxxxx_safe_call},
-    },
+    api::{self, auto_chilo_xxxxxx::api_delete_friend, xxxxxx::auto::xxxxxx_safe_call},
     data::BundleData,
     db::account::{AccountRow, try_lock_account, try_release_account, update_account_rate},
     quick_fetch::QuickFetch,

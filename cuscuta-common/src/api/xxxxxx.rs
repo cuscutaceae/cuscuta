@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::Write;
 
-use reqwest::{Response, StatusCode};
+use reqwest::{RequestBuilder, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -293,14 +293,12 @@ pub async fn api_login(
     random_challenge: &str,
 ) -> Result<LoginResult> {
     reqwest::Client::builder()
-        .user_agent("curl/7.88.1")
         .build()
         .map_err(Error::ClientSetup)?
         .post(try_get_env_var("API_LOGIN")?)
-        .header("X-Random-Challenge", random_challenge)
-        .header("AppVersion", bundle_data.application_version_number.clone())
-        .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(email))
+        .attach_random_challenge(random_challenge)
+        .attach_version(bundle_data)
+        .attach_device_id(email)
         .basic_auth(email, Some(password))
         .form(&[("grant_type", "client_credentials")])
         .send()
@@ -328,18 +326,17 @@ pub async fn api_list_friend(
     email: &str,
     user_id: &str,
     token: &str,
+    random_challenge: &str,
 ) -> Result<FriendListResult1> {
     reqwest::Client::builder()
-        .user_agent("curl/7.88.1")
         .build()
         .map_err(Error::ClientSetup)?
         .get(try_get_env_var("API_LIST_FRIENDS")?)
-        .header("X-Random-Challenge", generate_random_challenge())
-        .header("Platform", "android")
-        .header("AppVersion", bundle_data.application_version_number.clone())
-        .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(email))
-        .header("i", user_id)
+        .attach_random_challenge(random_challenge)
+        .attach_platform()
+        .attach_version(bundle_data)
+        .attach_device_id(email)
+        .attach_user_id(user_id)
         .bearer_auth(token)
         .send()
         .await
@@ -368,18 +365,17 @@ pub async fn api_add_friend(
     user_id: &str,
     token: &str,
     friend_code: &str,
+    random_challenge: &str,
 ) -> Result<FriendListResult1> {
     reqwest::Client::builder()
-        .user_agent("curl/7.88.1")
         .build()
         .map_err(Error::ClientSetup)?
         .post(try_get_env_var("API_ADD_FRIENDS")?)
-        .header("X-Random-Challenge", generate_random_challenge())
-        .header("Platform", "android")
-        .header("AppVersion", bundle_data.application_version_number.clone())
-        .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(email))
-        .header("i", user_id)
+        .attach_random_challenge(random_challenge)
+        .attach_platform()
+        .attach_version(bundle_data)
+        .attach_device_id(email)
+        .attach_user_id(user_id)
         .bearer_auth(token)
         .form(&[("friend_code", friend_code)])
         .send()
@@ -409,18 +405,17 @@ pub async fn api_delete_friend(
     user_id: &str,
     token: &str,
     friend_id: &str,
+    random_challenge: &str,
 ) -> Result<FriendListResult1> {
     reqwest::Client::builder()
-        .user_agent("curl/7.88.1")
         .build()
         .map_err(Error::ClientSetup)?
         .post(try_get_env_var("API_DELETE_FRIENDS")?)
-        .header("X-Random-Challenge", generate_random_challenge())
-        .header("Platform", "android")
-        .header("AppVersion", bundle_data.application_version_number.clone())
-        .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(email))
-        .header("i", user_id)
+        .attach_random_challenge(random_challenge)
+        .attach_platform()
+        .attach_version(bundle_data)
+        .attach_device_id(email)
+        .attach_user_id(user_id)
         .bearer_auth(token)
         .form(&[("friend_id", friend_id)])
         .send()
@@ -454,9 +449,9 @@ pub async fn api_get_rank_list(
     difficulty: &str,
     start: &str,
     limit: &str,
+    random_challenge: &str,
 ) -> Result<Vec<SongScore>> {
     reqwest::Client::builder()
-        .user_agent("curl/7.88.1")
         .build()
         .map_err(Error::ClientSetup)?
         .get(try_get_env_var("API_GET_RANK")?)
@@ -466,12 +461,11 @@ pub async fn api_get_rank_list(
             ("start", start),
             ("limit", limit),
         ])
-        .header("X-Random-Challenge", generate_random_challenge())
-        .header("Platform", "android")
-        .header("AppVersion", bundle_data.application_version_number.clone())
-        .header("ContentBundle", bundle_data.version_number.clone())
-        .header("DeviceId", generate_device_id(email))
-        .header("i", user_id)
+        .attach_random_challenge(random_challenge)
+        .attach_platform()
+        .attach_version(bundle_data)
+        .attach_device_id(email)
+        .attach_user_id(user_id)
         .bearer_auth(token)
         .send()
         .await
@@ -486,6 +480,74 @@ pub async fn api_get_rank_list(
         .map(|it| it.value)
 }
 
+/// 通过xxxxxx api查询通知
+///
+/// 本操作的返回将被丢弃
+///
+/// # Errors
+/// - 当环境变量配置无效时，返回[`Error::Env`]
+/// - 当`reqwest`客户端初始化失败时，返回[`Error::ClientSetup`]
+/// - 当请求发送失败时，返回[`Error::Network`]
+/// - 当返回值不为2xx时，返回[`Error::BadStatus`]
+pub async fn api_get_notification(
+    bundle_data: &BundleData,
+    email: &str,
+    user_id: &str,
+    token: &str,
+    random_challenge: &str,
+) -> Result<()> {
+    reqwest::Client::builder()
+        .build()
+        .map_err(Error::ClientSetup)?
+        .get(try_get_env_var("API_NOTIFICATION")?)
+        .attach_random_challenge(random_challenge)
+        .attach_platform()
+        .attach_version(bundle_data)
+        .attach_device_id(email)
+        .attach_user_id(user_id)
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(Error::Network)?
+        .error_for_status_with_response()
+        .await
+        .map(|_| ())
+}
+
+/// 通过xxxxxx api进行聚合查询
+///
+/// 本操作的返回将被丢弃
+///
+/// # Errors
+/// - 当环境变量配置无效时，返回[`Error::Env`]
+/// - 当`reqwest`客户端初始化失败时，返回[`Error::ClientSetup`]
+/// - 当请求发送失败时，返回[`Error::Network`]
+/// - 当返回值不为2xx时，返回[`Error::BadStatus`]
+pub async fn api_compose_aggregate(
+    bundle_data: &BundleData,
+    email: &str,
+    user_id: &str,
+    token: &str,
+    random_challenge: &str,
+) -> Result<()> {
+    reqwest::Client::builder()
+        .build()
+        .map_err(Error::ClientSetup)?
+        .get(try_get_env_var("API_COMPOSE_AGGREGATE")?)
+        .attach_random_challenge(random_challenge)
+        .attach_platform()
+        .attach_version(bundle_data)
+        .attach_device_id(email)
+        .attach_user_id(user_id)
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(Error::Network)?
+        .error_for_status_with_response()
+        .await
+        .map(|_| ())
+}
+
 fn generate_device_id(email: &str) -> String {
     // Warn: 这只是为了保证唯一性
     let mut result = String::with_capacity(16);
@@ -493,13 +555,6 @@ fn generate_device_id(email: &str) -> String {
         let _ = write!(&mut result, "{it:02x}");
     }
     result
-}
-
-/// 生成Random Challenge的占位符
-///
-/// 在不没有硬性检查的端点，就全部使用占位符替代
-fn generate_random_challenge() -> String {
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into()
 }
 
 /// [`calc_friend_delta`]所使用的好友Delta量
@@ -599,6 +654,46 @@ impl ErrorForStatusWithResponseXxxxxx for Response {
                 Err(parse(&api_error, status_code))
             }
         }
+    }
+}
+
+trait RequestBuilderHelper {
+    fn attach_platform(self) -> Self;
+
+    fn attach_version(self, bundle_data: &BundleData) -> Self;
+
+    fn attach_device_id(self, email: &str) -> Self;
+
+    fn attach_user_id(self, user_id: &str) -> Self;
+
+    fn attach_random_challenge(self, random_challenge: &str) -> Self;
+}
+
+impl RequestBuilderHelper for RequestBuilder {
+    fn attach_platform(self) -> Self {
+        self.header("Platform", "android")
+    }
+
+    fn attach_version(self, bundle_data: &BundleData) -> Self {
+        let version = &bundle_data.version_number;
+        let version = if version.ends_with('c') {
+            version.clone()
+        } else {
+            format!("{version}c")
+        };
+        self.header("AppVersion", version)
+    }
+
+    fn attach_device_id(self, email: &str) -> Self {
+        self.header("DeviceId", generate_device_id(email))
+    }
+
+    fn attach_user_id(self, user_id: &str) -> Self {
+        self.header("i", user_id)
+    }
+
+    fn attach_random_challenge(self, random_challenge: &str) -> Self {
+        self.header("X-Random-Challenge", random_challenge)
     }
 }
 

@@ -1,5 +1,5 @@
 use cuscuta_common::{
-    api::{self, xxxxxx::SongScore},
+    api::{auto_chilo_xxxxxx::api_get_rank_list, xxxxxx::SongScore},
     data::{BundleData, Song},
     db::{
         account::AccountRow,
@@ -73,7 +73,7 @@ pub async fn gather_rank_list<'a>(
     for difficulty in &song.difficulties {
         let rating_class = difficulty.rating_class.to_string();
         let rank_list = xxxxxx_safe_call_worker(config, || {
-            api::xxxxxx::api_get_rank_list(
+            api_get_rank_list(
                 bundle_data,
                 &account_row.account_email,
                 user_id,

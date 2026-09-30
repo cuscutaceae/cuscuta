@@ -20,6 +20,7 @@ tokio = { workspace = true, features = ["signal"] }
 tokio-util = { workspace = true }
 gethostname = "1.1.0"
 either = "1.18.0"
+futures = "0.3.34"
 
 [dev-dependencies]
 testcontainers = "0.27.3"

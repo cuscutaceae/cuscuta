@@ -1,7 +1,11 @@
 use std::{collections::HashSet, time::Duration};
 
 use cuscuta_common::{
-    api::{self, xxxxxx::FriendInfo},
+    api::{
+        self,
+        auto_chilo_xxxxxx::{api_add_friend, api_delete_friend, api_list_friend},
+        xxxxxx::FriendInfo,
+    },
     data::BundleData,
     db::{
         account::AccountRow,
@@ -137,6 +141,7 @@ async fn wait_for_result(
         .iter()
         .map(|it| it.user_id)
         .collect::<HashSet<_>>();
+    let mut empty_endure = 0;
     loop {
         // To reviewers: Due to the target's rate limiting strategy,
         //               blocking work queue is expected behavior here
@@ -147,21 +152,16 @@ async fn wait_for_result(
         let result = xxxxxx_safe_call_ex_worker(
             config,
             |it| it != StatusCode::TOO_MANY_REQUESTS,
-            || {
-                api::xxxxxx::api_list_friend(
-                    bundle_data,
-                    &account_row.account_email,
-                    user_id,
-                    token,
-                )
-            },
+            || api_list_friend(bundle_data, &account_row.account_email, user_id, token),
         )
         .await
         .map(|it| it.friends)
         .map_err(WaitForResultError::Api)?;
         match expects {
             sqlx::Either::Left(origin_length) => {
-                if result.is_empty() {
+                if result.is_empty() && empty_endure < 5 {
+                    // TODO: replace hardcoded endure_argument
+                    empty_endure += 1;
                     continue;
                 } else if result.len() != origin_length + 1 {
                     return Err(WaitForResultError::LoopAgain);
@@ -195,7 +195,7 @@ async fn try_modify_friend(
                 config,
                 |it| it != StatusCode::TOO_MANY_REQUESTS,
                 || {
-                    api::xxxxxx::api_add_friend(
+                    api_add_friend(
                         bundle_data,
                         &account_row.account_email,
                         user_id,
@@ -212,7 +212,7 @@ async fn try_modify_friend(
                 config,
                 |it| it != StatusCode::TOO_MANY_REQUESTS,
                 || {
-                    api::xxxxxx::api_delete_friend(
+                    api_delete_friend(
                         bundle_data,
                         &account_row.account_email,
                         user_id,

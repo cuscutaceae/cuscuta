@@ -1,7 +1,11 @@
 use std::{env, str::FromStr};
 
 use chrono::Local;
-use cuscuta_common::{data::BundleData, db::account::AccountRow};
+use cuscuta_common::{
+    api::auto_chilo_xxxxxx::{api_compose_aggregate, api_get_notification},
+    data::BundleData,
+    db::account::AccountRow,
+};
 use reqwest::{StatusCode, Url};
 use sqlx::{Postgres, Transaction};
 
@@ -42,13 +46,22 @@ pub async fn perform_login(
     tracing::info!("login_interface: challenge: {random_challenge}");
     tracing::info!("login_interface: email: {}", account_row.account_email);
     tracing::info!("login_interface: pw: {}", account_row.account_password);
-    api_login(
+    let email = &account_row.account_email;
+    let result = api_login(
         bundle_data,
-        &account_row.account_email,
+        email,
         &account_row.account_password,
         &random_challenge,
     )
-    .await
+    .await?;
+    //TODO refactor to auto_chilo
+    let user_id = &result.user_id.to_string();
+    let token = &result.access_token;
+    tracing::info!("login_interface: performing aggregate api call");
+    api_compose_aggregate(bundle_data, email, user_id, token).await?;
+    tracing::info!("login_interface: performing notification api call");
+    api_get_notification(bundle_data, email, user_id, token).await?;
+    Ok(result)
 }
 
 pub async fn update_account_info(
@@ -75,15 +88,14 @@ pub async fn update_account_info(
 
 pub mod auto {
     use cuscuta_common::{
-        api::{
-            self,
-            xxxxxx::{FriendListResult1, api_list_friend, auto::xxxxxx_safe_call},
-        },
+        api::{self, auto_chilo_xxxxxx::api_list_friend, xxxxxx::FriendListResult1},
         data::BundleData,
         db::{self, account::AccountRow},
     };
+    use reqwest::StatusCode;
 
     use crate::{
+        api_compat::xxxxxx_safe_call_ex_worker,
         data::Config,
         db::{
             account::{perform_login, update_account_info},
@@ -151,11 +163,9 @@ pub mod auto {
         let user_id = user_id.to_string();
         Ok((
             current_row.clone(),
-            xxxxxx_safe_call(
-                config.worker_max_retry_count,
-                config.worker_exponential_backoff_base_millis,
-                config.worker_exponential_backoff_multiplier,
-                config.worker_exponential_backoff_max_delay_millis,
+            xxxxxx_safe_call_ex_worker(
+                config,
+                |status| status != StatusCode::TOO_MANY_REQUESTS,
                 || api_list_friend(bundle_data, &current_row.account_email, &user_id, &token),
             )
             .await

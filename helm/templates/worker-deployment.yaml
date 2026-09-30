@@ -63,6 +63,10 @@ spec:
               value: {{ .Values.api.deleteFriends | quote }}
             - name: API_GET_RANK
               value: {{ .Values.api.getRank | quote }}
+            - name: API_NOTIFICATION
+              value: {{ .Values.api.notification | quote }}
+            - name: API_COMPOSE_AGGREGATE
+              value: {{ .Values.api.compose | quote }}
             - name: WORKER_MAX_JOBS
               value: {{ .Values.worker.maxJobs | quote }}
             - name: WORKER_MAX_RETRIES
