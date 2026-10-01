@@ -82,7 +82,6 @@ chilo:
   port: 8080
   # -- Binary constants for the challenge algorithm
   constants:
-    binC1: ""
     binC2: ""
   service:
     # -- Service type

@@ -23,7 +23,6 @@ redis:
 # -- Required: challenge constants (contact admin for values)
 chilo:
   constants:
-    binC1: ""
     binC2: ""
 
 # -- Required: GitHub tokens and repo info

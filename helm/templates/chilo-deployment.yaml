@@ -25,11 +25,6 @@ spec:
           env:
             - name: RUST_LOG
               value: {{ .Values.rustLog | quote }}
-            - name: BIN_C1
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "cuscuta.fullname" . }}-secret
-                  key: BIN_C1
             - name: BIN_C2
               valueFrom:
                 secretKeyRef:

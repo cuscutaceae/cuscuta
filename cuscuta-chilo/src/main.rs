@@ -1,9 +1,5 @@
 //! cuscuta-chilo是对[chilo](https://github.com/cuscutaceae/chilo)的Web API包装
 //!
-//! # 注意
-//! 这个版本的cuscuta-chilo使用了环境变量中硬编码的常量，为原型版本\
-//! 为了解决这个问题，scirpophaga与这个模块的整合已经加入开发计划……未来可能可以解决这个问题
-//!
 //! # 依赖环境变量
 //! cuscuta-chilo使用环境变量注入参数，这个crate依赖的环境变量有：
 //! - `BIN_C1`
