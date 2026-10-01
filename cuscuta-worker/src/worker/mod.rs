@@ -19,7 +19,7 @@ use cuscuta_common::{
                 JobTrackQueueStatus, JobTrackTag, batch_write_job_tracking_tag, fetch_job_track_tag,
             },
         },
-        log::{WorkerEventType, status::update_worker_status},
+        log::status::update_worker_status,
         redis::{
             job_result_friend_info_redis_key, job_result_tracking_redis_key,
             job_result_value_redis_key,
@@ -40,7 +40,6 @@ use crate::{
         pending_gather::{gather_rank_list, process_job_with_result, write_result_to_redis},
         pull::scan_sub_queue_and_pull_job,
     },
-    worker_write_event,
 };
 
 #[derive(Debug)]
@@ -88,7 +87,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
     WORKER_ID.get_or_init(|| worker_id.clone());
     while !cancellation_token.is_cancelled() {
         if let Err(e) = internal_loop(&mut current_jobs, &mut cursor, &mut friends).await {
-            worker_write_event!(WorkerEventType::Warn, format!("worker loop failed: {e}"));
+            tracing::error!("worker loop failed: {e}");
             if let Error::Api(api_error) = &e {
                 match api_error {
                     api::Error::Network(_) => {}
@@ -111,10 +110,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
         cursor,
         error: None,
     };
-    worker_write_event!(
-        WorkerEventType::Fatal,
-        format!("worker down: {worker_result:?}")
-    );
+    tracing::error!("worker down: {worker_result:?}");
     worker_result
 }
 

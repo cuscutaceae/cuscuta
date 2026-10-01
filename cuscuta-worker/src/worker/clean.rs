@@ -9,7 +9,6 @@ use cuscuta_common::{
             eta::record_eta,
             track::{JobTrackQueueStatus, JobTrackTag},
         },
-        log::WorkerEventType,
     },
 };
 use redis::{Client, TypedCommands};
@@ -21,7 +20,6 @@ use crate::{
         friend_modify::{ExpectedModify, try_modify_remote_friend},
         update_job_track_info,
     },
-    worker_write_event,
 };
 
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
@@ -139,18 +137,10 @@ pub async fn clean_jobs(
             continue;
         }
         if let JobState::Failed { failure_info, .. } = &finished_job.state {
-            worker_write_event!(
-                WorkerEventType::Warn,
-                format!("job finished with error: {failure_info:?}")
-            );
             tracing::warn!(
                 "job: {finished_job:?} finished with error: {finished_job:?} : {failure_info:?}"
             );
         } else {
-            worker_write_event!(
-                WorkerEventType::Trace,
-                format!("job finished: {finished_job:?}")
-            );
             tracing::info!("job: {finished_job:?} finished");
         }
 

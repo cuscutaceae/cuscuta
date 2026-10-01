@@ -241,9 +241,6 @@ async fn run_command(
             };
             match command {
                 command::SubCommandStats::Worker {} => stats::worker(&redis_url)?,
-                command::SubCommandStats::Event { show_level, limit } => {
-                    stats::event(&redis_url, *show_level, *limit)?;
-                }
             }
         }
     }

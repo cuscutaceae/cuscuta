@@ -11,7 +11,6 @@ use cuscuta_common::{
             scan_sub_queue,
             track::{JobTrackQueueStatus, JobTrackTag},
         },
-        log::WorkerEventType,
     },
 };
 use redis::{
@@ -22,7 +21,6 @@ use redis::{
 use crate::{
     data::Config,
     worker::{Error, update_job_track_info},
-    worker_write_event,
 };
 
 // 好吧我承认这里写的有点脏了
@@ -72,7 +70,6 @@ pub async fn scan_sub_queue_and_pull_job(
     if let Some(new_jobs) = new_jobs {
         for it in new_jobs {
             tracing::info!("worker_loop: pulled job: {it:?}");
-            worker_write_event!(WorkerEventType::Trace, format!("pulled: {it:?}"));
             update_job_track_info(
                 redis_client,
                 &it,

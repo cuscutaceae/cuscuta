@@ -8,7 +8,6 @@ use cuscuta_common::{
     db::{
         account::AccountRow,
         job::{Job, JobState},
-        log::WorkerEventType,
         redis::job_result_friend_info_redis_key,
     },
 };
@@ -20,7 +19,6 @@ use crate::{
         Error,
         friend_modify::{ExpectedModify, try_modify_remote_friend},
     },
-    worker_write_event,
 };
 
 #[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
@@ -94,17 +92,9 @@ pub async fn try_add_friends(
             FriendDelta::Add(it) => it,
             FriendDelta::Remove(info) => {
                 tracing::warn!("pending_friends: friend conflict detected(remove): {info:?}");
-                worker_write_event!(
-                    WorkerEventType::Warn,
-                    format!("friend conflict detected: lesser : {info:?}")
-                );
                 continue;
             }
             FriendDelta::Same => {
-                worker_write_event!(
-                    WorkerEventType::Warn,
-                    "friend conflict detected: Same".to_string()
-                );
                 tracing::warn!("pending_friends: friends keep same, may triggered something");
                 continue;
             }

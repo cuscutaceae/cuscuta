@@ -10,13 +10,12 @@ use cuscuta_common::{
     db::{
         account::AccountRow,
         job::{JobFailure, JobFailureResuming, JobFailureType},
-        log::WorkerEventType,
     },
 };
 use reqwest::StatusCode;
 use tokio::time::sleep;
 
-use crate::{api_compat::xxxxxx_safe_call_ex_worker, data::Config, worker_write_event};
+use crate::{api_compat::xxxxxx_safe_call_ex_worker, data::Config};
 
 #[derive(Debug)]
 enum FriendModifyError {
@@ -93,14 +92,10 @@ pub async fn try_modify_remote_friend(
                         JobFailureResuming::Drop,
                     )
                 };
-                worker_write_event!(
-                    WorkerEventType::Warn,
-                    format!("failed to modify friend: {e:?}",)
-                );
                 return Err(failure_info);
             }
             Err(FriendModifyError::Wait) => {
-                worker_write_event!(WorkerEventType::Warn, "triggered friend modify waiting");
+                tracing::warn!("triggered friend modify waiting");
                 match wait_for_result(
                     config,
                     bundle_data,
@@ -233,13 +228,7 @@ async fn try_modify_friend(
             } = &e
             {
                 tracing::warn!(
-                    "try_modify_friends: failed to call api: HTTP {status_code} {message}"
-                );
-                worker_write_event!(
-                    WorkerEventType::Warn,
-                    format!(
-                        "failed to modify friend: HTTP {status_code}: {extra_error_code:?}: {message}"
-                    )
+                    "try_modify_friends: failed to call api: HTTP {status_code} {extra_error_code:?} {message}"
                 );
             } else {
                 tracing::warn!("try_modify_friends: unexpected error: {e}");
