@@ -189,8 +189,6 @@ All cuscuta components receive configuration through environment variables.
 |----------|-------------|
 | `BIN_C1` | Constant C1 (hex, 32 bytes) |
 | `BIN_C2` | Constant C2 (hex, 32 bytes) |
-| `BIN_LOGIN_C31` | Constant login-C31 (hex, 10 bytes) |
-| `BIN_LOGIN_C32` | Constant login-C32 (hex, 10 bytes) |
 
 ---
 

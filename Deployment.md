@@ -177,6 +177,8 @@ cuscuta 所有组件均通过环境变量注入配置。
 | `API_ADD_FRIENDS` | — | 添加好友 API 地址 |
 | `API_DELETE_FRIENDS` | — | 删除好友 API 地址 |
 | `API_GET_RANK` | — | 排行榜 API 地址 |
+| `API_NOTIFICATION` | — | 通知 API 地址 |
+| `API_COMPOSE_AGGREGATE` | — | 聚合调用 API 地址 |
 
 ### Chilo 专用变量
 
@@ -184,8 +186,6 @@ cuscuta 所有组件均通过环境变量注入配置。
 |------|------|
 | `BIN_C1` | 常量 C1（十六进制，32字节长） |
 | `BIN_C2` | 常量 C2（十六进制，32字节长） |
-| `BIN_LOGIN_C31` | 常量 login-C31（十六进制，10字节长） |
-| `BIN_LOGIN_C32` | 常量 login-C32（十六进制，10字节长） |
 
 ---
 
