@@ -32,6 +32,8 @@ spec:
               value: {{ .Values.eta.recordTrim | quote }}
             - name: ETA_SEARCH_LIMIT
               value: {{ .Values.eta.searchLimit | quote }}
+            - name: STAT_ENABLE
+              value: {{ .Values.entry.status.enabled | quote }}
             - name: ACCOUNTS_SQL_ADDR
               valueFrom:
                 secretKeyRef:

@@ -104,6 +104,8 @@ entry:
         paths:
           - path: /
             pathType: Prefix
+  status:
+    enabled: true
 
 # -- cuscuta-worker (job processor)
 worker:

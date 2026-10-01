@@ -21,7 +21,7 @@ mod loop_tasks;
 use crate::{
     data::{BUNDLE_DATA, CONFIG, SONG_LIST},
     db::{postgresql::POSTGRESQL_POOL, redis::REDIS_CLIENT},
-    endpoints::query::query,
+    endpoints::{query::query, status::stat},
     enqueue::enqueue,
     loop_tasks::sync_config,
 };
@@ -64,7 +64,8 @@ async fn main() {
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/v1/enqueue", post(enqueue).layer(trace_layer.clone()))
-        .route("/v1/query", get(query).layer(trace_layer));
+        .route("/v1/query", get(query).layer(trace_layer.clone()))
+        .route("/v1/status", get(stat));
     let addr = TcpListener::bind("0.0.0.0:8081")
         .await
         .expect("failed to bind 0.0.0.0:8081");

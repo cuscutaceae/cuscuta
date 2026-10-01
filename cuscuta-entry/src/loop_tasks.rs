@@ -27,6 +27,7 @@ pub async fn sync_config(_: &CancellationToken) {
     fn try_sync() -> Result<(), String> {
         let config = Config {
             redis_stream_refresh_ttl: read_as_number("REDIS_STREAM_REFRESH_TTL")?,
+            enable_stat: read_as_number::<bool>("STAT_ENABLE")?,
         };
         CONFIG
             .try_write(move |_| config.into())

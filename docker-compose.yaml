@@ -141,6 +141,7 @@ services:
       ETA_ENABLE: "true"
       ETA_SEARCH_LIMIT: "10"
       ETA_RECORD_TRIM: "15"
+      STAT_ENABLE: "true"
     ports:
       - "8081:8081"
     depends_on:
