@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 
 use reqwest::{RequestBuilder, Response, StatusCode};
@@ -611,14 +611,18 @@ pub fn calc_friend_delta(
     before: &[FriendInfo],
     after: &[FriendInfo],
 ) -> core::result::Result<FriendDelta, String> {
-    let before: HashSet<_> = before.iter().collect();
-    let after: HashSet<_> = after.iter().collect();
-    let delta_add: HashSet<_> = after.difference(&before).collect();
+    let before_id: HashMap<_, _> = before.iter().map(|it| (it.user_id, it)).collect();
+    let after_id: HashMap<_, _> = after.iter().map(|it| (it.user_id, it)).collect();
+    let delta_add: Vec<_> = after_id
+        .keys()
+        .collect::<HashSet<_>>()
+        .difference(&before_id.keys().collect::<HashSet<_>>())
+        .map(|it| after_id.get(*it).expect("should exist"))
+        .collect();
     if delta_add.len() == 1 {
         return Ok(FriendDelta::Add(
             (**delta_add
-                .iter()
-                .next()
+                .first()
                 .expect("first element of delta_add is None when len==1, this should not happen"))
             .clone(),
         ));
@@ -626,12 +630,16 @@ pub fn calc_friend_delta(
     if !delta_add.is_empty() {
         return Err("bad add delta".into());
     }
-    let delta_rem: HashSet<_> = before.difference(&after).collect();
+    let delta_rem: Vec<_> = before_id
+        .keys()
+        .collect::<HashSet<_>>()
+        .difference(&after_id.keys().collect::<HashSet<_>>())
+        .map(|it| after_id.get(*it).expect("should exist"))
+        .collect();
     if delta_rem.len() == 1 {
         return Ok(FriendDelta::Remove(
             (**delta_rem
-                .iter()
-                .next()
+                .first()
                 .expect("first element of delta_rem is None when len==1, this should not happen"))
             .clone(),
         ));
