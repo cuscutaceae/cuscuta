@@ -1,13 +1,17 @@
 use cuscuta_common::{
-    api::{self, auto_chilo_xxxxxx::api_delete_friend, xxxxxx::auto::xxxxxx_safe_call},
-    data::BundleData,
+    api::{
+        self,
+        auto_chilo_xxxxxx::api_delete_friend,
+        xxxxxx::{XxxxxxUrl, auto::xxxxxx_safe_call},
+    },
+    data::AppVersionData,
     db::account::{AccountRow, try_lock_account, try_release_account, update_account_rate},
     quick_fetch::QuickFetch,
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, Config},
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, Config, XXXXXX_URL},
     db::{
         self,
         account::auto::{TokenUpdateResult, check_and_update_token},
@@ -36,17 +40,18 @@ impl From<(Level, String)> for Error {
 }
 
 async fn get_friend_result(
+    xxxxxx_url: &XxxxxxUrl,
     config: &Config,
-    bundle_data: &BundleData,
+    bundle_data: &AppVersionData,
     account_row: &AccountRow,
 ) -> Result<TokenUpdateResult, Error> {
-    let first_result = try_update_token(config, bundle_data, account_row, false).await;
+    let first_result = try_update_token(xxxxxx_url, config, bundle_data, account_row, false).await;
     match first_result {
         Ok(result) => return Ok(result),
         Err((Level::DirtyAccount, _)) => {}
         Err(e) => return Err(e.into()),
     }
-    let second_result = try_update_token(config, bundle_data, account_row, true).await;
+    let second_result = try_update_token(xxxxxx_url, config, bundle_data, account_row, true).await;
     match second_result {
         Ok(result) => Ok(result),
         Err((Level::DirtyAccount, m)) => Err((Level::Halt, m).into()),
@@ -56,12 +61,15 @@ async fn get_friend_result(
 
 async fn try_init() -> Result<(), Error> {
     tracing::info!("init: cuscuta-worker initializing...");
-    let bundle_data = BUNDLE_DATA
+    let bundle_data = APP_VERSION_DATA
         .try_read(std::clone::Clone::clone)
-        .map_err(|e| (Level::Retry, format!("BUNDLE_DATA is not ready: {e}")))?;
+        .map_err(|e| (Level::Retry, format!("APP_VERSION_DATA is not ready: {e}")))?;
     let config = CONFIG
         .try_read(std::clone::Clone::clone)
         .map_err(|e| (Level::Retry, format!("CONFIG is not ready: {e}")))?;
+    let xxxxxx_url = XXXXXX_URL
+        .try_read(std::clone::Clone::clone)
+        .map_err(|e| (Level::Retry, format!("XXXXXX_URL is not ready: {e}")))?;
     REDIS_CLIENT
         .get()
         .ok_or_else(|| (Level::Retry, "redis is not ready".to_string()))?
@@ -93,7 +101,7 @@ async fn try_init() -> Result<(), Error> {
     let TokenUpdateResult {
         account_row,
         friends,
-    } = get_friend_result(&config, &bundle_data, &account_row).await?;
+    } = get_friend_result(&xxxxxx_url, &config, &bundle_data, &account_row).await?;
     tracing::info!("init: found {} existing friends", friends.friends.len());
     for friend in friends.friends {
         let user_id = account_row
@@ -112,6 +120,7 @@ async fn try_init() -> Result<(), Error> {
             config.worker_exponential_backoff_max_delay_millis,
             || {
                 api_delete_friend(
+                    &xxxxxx_url,
                     &bundle_data,
                     &account_row.account_email,
                     &user_id,
@@ -149,13 +158,14 @@ async fn try_failed_resume() -> Result<(), Error> {
 }
 
 async fn try_update_token(
+    xxxxxx_url: &XxxxxxUrl,
     config: &Config,
-    bundle_data: &BundleData,
+    bundle_data: &AppVersionData,
     account_row: &AccountRow,
     account_dirty: bool,
 ) -> Result<TokenUpdateResult, (Level, String)> {
     let friends_result =
-        check_and_update_token(config, bundle_data, account_row, account_dirty).await;
+        check_and_update_token(xxxxxx_url, config, bundle_data, account_row, account_dirty).await;
     if let Err(db::account::auto::Error::Api(api::Error::BadStatus {
         status_code,
         extra_error_code,

@@ -1,15 +1,45 @@
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 /// xxxxxx的数据版本信息
-#[derive(Debug, Deserialize, Clone)]
-pub struct BundleData {
-    /// bundle的版本
-    #[serde(rename = "versionNumber")]
-    pub version_number: String,
+#[derive(Debug, Clone)]
+pub struct AppVersionData {
+    /// App的版本
+    pub version: String,
+}
 
-    /// 应用的版本
-    #[serde(rename = "applicationVersionNumber")]
-    pub application_version_number: String,
+impl<'de> Deserialize<'de> for AppVersionData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // 先反序列化成中间结构，再取出 a
+        #[derive(Deserialize)]
+        struct Wrapper {
+            value: InnerRaw,
+        }
+        #[derive(Deserialize)]
+        struct InnerRaw {
+            version: String,
+        }
+
+        let w = Wrapper::deserialize(deserializer)?;
+        Ok(Self {
+            version: w.value.version,
+        })
+    }
+}
+
+/// scirpophaga 的输出JSON数据格式
+#[derive(Debug, Deserialize, Clone)]
+pub struct ScirpophagaData {
+    /// c2 常量
+    pub c2: String,
+
+    /// 一般API路径前缀
+    pub common_path: String,
+
+    /// 认证API路径前缀
+    pub auth_path: String,
 }
 
 /// 曲目的难度信息

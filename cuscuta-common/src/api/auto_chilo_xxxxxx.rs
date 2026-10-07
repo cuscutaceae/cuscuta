@@ -1,43 +1,28 @@
-use std::{collections::HashMap, str::FromStr, sync::LazyLock};
+use std::str::FromStr;
 
 use axum::http::Uri;
 
 use crate::{
     api::{
-        Error, try_get_env_var,
-        xxxxxx::{FriendListResult1, SongScore},
+        Error,
+        xxxxxx::{FriendListResult1, LoginResult, SongScore, XxxxxxUrl},
     },
-    data::BundleData,
+    data::AppVersionData,
 };
-
-/// kind、path、body和函数名之间的映射
-pub static MAP: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| {
-    HashMap::from([
-        ("api_login", "login"),
-        ("api_list_friend", "friend_list"),
-        ("api_add_friend", "friend_add"),
-        ("api_delete_friend", "friend_delete"),
-        ("api_get_rank_list", "friend_rank"),
-        ("api_get_notification", "notification"),
-        ("api_compose_aggregate", "compose"),
-    ])
-});
 
 /// a marco that call xxxxxx api with chilo call
 #[macro_export]
 macro_rules! auto_chilo {
     ($fun:ident, $path: expr, $body: expr, $($tt:tt)*) => { async {
         #[allow(unused_imports)]
-        use $crate::api::{auto_chilo_xxxxxx::MAP, Error, xxxxxx, chilo::{self, ChiloResult}};
+        use $crate::api::{Error, xxxxxx, chilo::{self, ChiloResult}};
         use chrono::Utc;
         use axum::http::StatusCode;
-        let kind = MAP[stringify!($fun)];
         let timestamp = Utc::now().timestamp_millis().to_string();
         let chilo_result = chilo::chilo_generate(
             &timestamp,
             $path,
             $body,
-            kind
         ).await;
         tracing::debug!("xxxxxx_api_calling: {}: {} | {}", stringify!($fun), $path, $body);
         match chilo_result {
@@ -60,13 +45,34 @@ macro_rules! auto_chilo {
 
 type Result<T> = core::result::Result<T, Error>;
 
-fn get_path(env_var: &str) -> Result<String> {
-    let env = try_get_env_var(env_var)?;
-    let uri = Uri::from_str(&env).expect("failed to parse uri");
+fn get_path(url: &str) -> String {
+    let uri = Uri::from_str(url).expect("failed to parse uri");
     let path = uri
         .path_and_query()
         .map_or_else(|| uri.path(), |it| it.as_str());
-    Ok(path.to_string())
+    path.to_string()
+}
+
+/// 通过xxxxxx api登录
+///
+/// # Errors
+/// 参见[`super::xxxxxx`]下同名函数
+pub async fn api_login(
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
+    email: &str,
+    password: &str,
+) -> Result<LoginResult> {
+    auto_chilo!(
+        api_login,
+        &get_path(&url.login),
+        "grant_type=client_credentials",
+        url,
+        bundle_data,
+        email,
+        password,
+    )
+    .await
 }
 
 /// 通过xxxxxx api查询好友
@@ -74,15 +80,17 @@ fn get_path(env_var: &str) -> Result<String> {
 /// # Errors
 /// 参见[`super::xxxxxx`]下同名函数
 pub async fn api_list_friend(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
 ) -> Result<FriendListResult1> {
     auto_chilo!(
         api_list_friend,
-        &get_path("API_LIST_FRIENDS")?,
+        &get_path(&url.list_friend),
         "",
+        url,
         bundle_data,
         email,
         user_id,
@@ -96,7 +104,8 @@ pub async fn api_list_friend(
 /// # Errors
 /// 参见[`super::xxxxxx`]下同名函数
 pub async fn api_add_friend(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
@@ -104,8 +113,9 @@ pub async fn api_add_friend(
 ) -> Result<FriendListResult1> {
     auto_chilo!(
         api_add_friend,
-        &get_path("API_ADD_FRIENDS")?,
+        &get_path(&url.add_friend),
         &format!("friend_code={friend_code}"),
+        url,
         bundle_data,
         email,
         user_id,
@@ -120,7 +130,8 @@ pub async fn api_add_friend(
 /// # Errors
 /// 参见[`super::xxxxxx`]下同名函数
 pub async fn api_delete_friend(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
@@ -128,8 +139,9 @@ pub async fn api_delete_friend(
 ) -> Result<FriendListResult1> {
     auto_chilo!(
         api_delete_friend,
-        &get_path("API_DELETE_FRIENDS")?,
+        &get_path(&url.delete_friend),
         &format!("friend_id={friend_id}"),
+        url,
         bundle_data,
         email,
         user_id,
@@ -145,7 +157,8 @@ pub async fn api_delete_friend(
 /// 参见[`super::xxxxxx`]下同名函数
 #[allow(clippy::too_many_arguments)]
 pub async fn api_get_rank_list(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
@@ -163,8 +176,9 @@ pub async fn api_get_rank_list(
     );
     auto_chilo!(
         api_get_rank_list,
-        &format!("{}?{query}", get_path("API_GET_RANK")?),
+        &format!("{}?{query}", get_path(&url.get_rank)),
         "",
+        url,
         bundle_data,
         email,
         user_id,
@@ -184,15 +198,17 @@ pub async fn api_get_rank_list(
 /// # Errors
 /// 参见[`super::xxxxxx`]下同名函数
 pub async fn api_get_notification(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
 ) -> Result<()> {
     auto_chilo!(
         api_get_notification,
-        &get_path("API_NOTIFICATION")?,
+        &get_path(&url.get_notification),
         "",
+        url,
         bundle_data,
         email,
         user_id,
@@ -208,15 +224,17 @@ pub async fn api_get_notification(
 /// # Errors
 /// 参见[`super::xxxxxx`]下同名函数
 pub async fn api_compose_aggregate(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
 ) -> Result<()> {
     auto_chilo!(
         api_compose_aggregate,
-        &get_path("API_COMPOSE_AGGREGATE")?,
+        &get_path(&url.compose),
         "",
+        url,
         bundle_data,
         email,
         user_id,

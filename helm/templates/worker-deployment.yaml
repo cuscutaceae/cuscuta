@@ -33,40 +33,38 @@ spec:
                 secretKeyRef:
                   name: {{ include "cuscuta.secretName" (dict "root" . "cfg" .Values.redis.secret) }}
                   key: {{ include "cuscuta.secretKey" (dict "cfg" .Values.redis.secret "defaultKey" "REDIS_ADDR") }}
-            - name: GITHUB_BUNDLE_REPOSITORY
-              value: {{ .Values.github.bundleRepository | quote }}
-            - name: GITHUB_BUNDLE_PATH
-              value: {{ .Values.github.bundlePath | quote }}
-            - name: GITHUB_BUNDLE_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "cuscuta.fullname" . }}-secret
-                  key: GITHUB_BUNDLE_TOKEN
-            - name: GITHUB_SONG_REPOSITORY
-              value: {{ .Values.github.songRepository | quote }}
-            - name: GITHUB_SONG_PATH
-              value: {{ .Values.github.songPath | quote }}
-            - name: GITHUB_SONG_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "cuscuta.fullname" . }}-secret
-                  key: GITHUB_SONG_TOKEN
+            - name: RESOURCES_APP_VERSION_URL
+              value: {{ .Values.dataSource.base.appVersion.url | quote }}
+            - name: RESOURCES_APP_VERSION_USE_ONLINE
+              value: {{ .Values.dataSource.base.appVersion.useOnlineVersion | quote }}
+            - name: RESOURCES_APP_VERSION_DEFAULT
+              value: {{ .Values.dataSource.base.appVersion.versionDefault | quote }}
+            - name: RESOURCES_SONG_URL
+              value: {{ .Values.dataSource.base.songUrl | quote }}
+            - name: USE_ONLINE_PREFIX
+              value: {{ .Values.api.prefix.useOnlinePrefix | quote }}
+            - name: SCIRPOPHAGA_URL
+              value: {{ .Values.dataSource.scirpophaga.url | quote }}
+            - name: API_PREFIX_AUTH
+              value: {{ .Values.api.prefix.auth | quote }}
+            - name: API_PREFIX_COMMON
+              value: {{ .Values.api.prefix.common | quote }}
             - name: API_CHILO
               value: {{ include "cuscuta.chiloUrl" . | quote }}
-            - name: API_LOGIN
-              value: {{ .Values.api.login | quote }}
-            - name: API_LIST_FRIENDS
-              value: {{ .Values.api.listFriends | quote }}
-            - name: API_ADD_FRIENDS
-              value: {{ .Values.api.addFriends | quote }}
-            - name: API_DELETE_FRIENDS
-              value: {{ .Values.api.deleteFriends | quote }}
-            - name: API_GET_RANK
-              value: {{ .Values.api.getRank | quote }}
-            - name: API_NOTIFICATION
-              value: {{ .Values.api.notification | quote }}
-            - name: API_COMPOSE_AGGREGATE
-              value: {{ .Values.api.compose | quote }}
+            - name: API_ENDPOINT_LOGIN
+              value: {{ .Values.api.path.login | quote }}
+            - name: API_ENDPOINT_LIST_FRIENDS
+              value: {{ .Values.api.path.listFriends | quote }}
+            - name: API_ENDPOINT_ADD_FRIENDS
+              value: {{ .Values.api.path.addFriends | quote }}
+            - name: API_ENDPOINT_DELETE_FRIENDS
+              value: {{ .Values.api.path.deleteFriends | quote }}
+            - name: API_ENDPOINT_GET_RANK
+              value: {{ .Values.api.path.getRank | quote }}
+            - name: API_ENDPOINT_NOTIFICATION
+              value: {{ .Values.api.path.notification | quote }}
+            - name: API_ENDPOINT_COMPOSE_AGGREGATE
+              value: {{ .Values.api.path.compose | quote }}
             - name: WORKER_MAX_JOBS
               value: {{ .Values.worker.maxJobs | quote }}
             - name: WORKER_MAX_RETRIES

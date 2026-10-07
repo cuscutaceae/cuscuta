@@ -11,12 +11,6 @@
 //! - `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS`
 //! - `WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS`
 //! - `REDIS_STREAM_REFRESH_TTL`
-//! - `GITHUB_BUNDLE_REPOSITORY`
-//! - `GITHUB_BUNDLE_PATH`
-//! - `GITHUB_BUNDLE_TOKEN`
-//! - `GITHUB_SONG_REPOSITORY`
-//! - `GITHUB_SONG_PATH`
-//! - `GITHUB_SONG_TOKEN`
 //! - `REDIS_ADDR`
 //! - `ACCOUNTS_SQL_ADDR`
 //! - `API_CHILO`
@@ -48,15 +42,15 @@ use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, SONG_LIST},
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, SONG_LIST, XXXXXX_URL},
     db::{
         postgresql::{POSTGRESQL_POOL, try_open_transaction},
         redis::REDIS_CLIENT,
     },
     init::cuscuta_init,
     loop_tasks::{
-        open_postgresql_client, open_redis_client, sync_bundle_data, sync_config, sync_song_list,
-        update_lease_time,
+        open_postgresql_client, open_redis_client, sync_app_version_data, sync_config,
+        sync_scirpophaga_data, sync_song_list, update_lease_time,
     },
     worker::{resume_state, worker_loop},
 };
@@ -84,8 +78,9 @@ async fn main() {
     tokio::spawn(register_job(halt_token.clone(), 10, open_redis_client));
     tokio::spawn(register_job(halt_token.clone(), 10, open_postgresql_client));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_bundle_data));
+    tokio::spawn(register_job(halt_token.clone(), 10, sync_app_version_data));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_song_list));
+    tokio::spawn(register_job(halt_token.clone(), 10, sync_scirpophaga_data));
     tokio::spawn(register_job(
         halt_token.clone(),
         env::var("WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS")
@@ -169,7 +164,14 @@ fn check_ready() -> Option<&'static str> {
     if REDIS_CLIENT.get().is_none() {
         return Some("redis client is not initialized");
     }
-    batch_check_initialized!(CONFIG, BUNDLE_DATA, SONG_LIST, ACCOUNT_ROW, POSTGRESQL_POOL);
+    batch_check_initialized!(
+        CONFIG,
+        APP_VERSION_DATA,
+        XXXXXX_URL,
+        SONG_LIST,
+        ACCOUNT_ROW,
+        POSTGRESQL_POOL
+    );
     None
 }
 

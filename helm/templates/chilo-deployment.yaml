@@ -30,6 +30,10 @@ spec:
                 secretKeyRef:
                   name: {{ include "cuscuta.fullname" . }}-secret
                   key: BIN_C2
+            - name: USE_ONLINE_KEY
+              value: {{ .Values.chilo.constants.useOnlineKey | quote }}
+            - name: SCIRPOPHAGA_URL
+              value: {{ .Values.dataSource.scirpophaga.url | quote }}
           livenessProbe:
             httpGet:
               path: /healthz

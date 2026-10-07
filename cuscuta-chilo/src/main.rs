@@ -57,9 +57,9 @@ enum GenerateResult {
     Failed { success: bool, message: String },
 }
 
-async fn generate(Query(query): Query<GenerateQuery>) -> impl IntoResponse {
-    tracing::info!("Generated from: {query:?}");
-    let Ok(timestamp) = query.timestamp.parse::<u64>() else {
+async fn generate(Query(form): Query<GenerateQuery>) -> impl IntoResponse {
+    tracing::info!("Generated from: {form:?}");
+    let Ok(timestamp) = form.timestamp.parse::<u64>() else {
         return (
             StatusCode::BAD_REQUEST,
             Json(GenerateResult::Failed {
@@ -72,8 +72,8 @@ async fn generate(Query(query): Query<GenerateQuery>) -> impl IntoResponse {
         C2.get()
             .expect("C2 is not initialized, this should not happen"),
         timestamp,
-        query.body.as_bytes(),
-        query.path.as_bytes(),
+        form.body.as_bytes(),
+        form.path.as_bytes(),
     );
     let base64 = base64::prelude::BASE64_STANDARD.encode(result);
     (

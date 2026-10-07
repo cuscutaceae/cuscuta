@@ -1,3 +1,5 @@
+#![deprecated]
+
 use base64::Engine;
 use reqwest::StatusCode;
 use serde::{Deserialize, de::DeserializeOwned};

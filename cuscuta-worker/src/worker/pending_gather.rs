@@ -1,6 +1,9 @@
 use cuscuta_common::{
-    api::{auto_chilo_xxxxxx::api_get_rank_list, xxxxxx::SongScore},
-    data::{BundleData, Song},
+    api::{
+        auto_chilo_xxxxxx::api_get_rank_list,
+        xxxxxx::{SongScore, XxxxxxUrl},
+    },
+    data::{AppVersionData, Song},
     db::{
         account::AccountRow,
         job::{Job, JobState},
@@ -57,8 +60,10 @@ pub fn write_result_to_redis(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn gather_rank_list<'a>(
-    bundle_data: &'a BundleData,
+    xxxxxx_url: &XxxxxxUrl,
+    bundle_data: &'a AppVersionData,
     user_id: &'a str,
     token: &'a str,
     account_row: &'a AccountRow,
@@ -74,6 +79,7 @@ pub async fn gather_rank_list<'a>(
         let rating_class = difficulty.rating_class.to_string();
         let rank_list = xxxxxx_safe_call_worker(config, || {
             api_get_rank_list(
+                xxxxxx_url,
                 bundle_data,
                 &account_row.account_email,
                 user_id,

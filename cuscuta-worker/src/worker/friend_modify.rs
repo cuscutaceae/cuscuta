@@ -4,9 +4,9 @@ use cuscuta_common::{
     api::{
         self,
         auto_chilo_xxxxxx::{api_add_friend, api_delete_friend, api_list_friend},
-        xxxxxx::FriendInfo,
+        xxxxxx::{FriendInfo, XxxxxxUrl},
     },
-    data::BundleData,
+    data::AppVersionData,
     db::{
         account::AccountRow,
         job::{JobFailure, JobFailureResuming, JobFailureType},
@@ -33,9 +33,11 @@ pub enum WaitForResultError {
     Api(api::Error),
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn try_modify_remote_friend(
     config: &Config,
-    bundle_data: &BundleData,
+    xxxxxx_url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
@@ -58,6 +60,7 @@ pub async fn try_modify_remote_friend(
     );
     loop {
         let result = try_modify_friend(
+            xxxxxx_url,
             config,
             bundle_data,
             user_id,
@@ -97,6 +100,7 @@ pub async fn try_modify_remote_friend(
             Err(FriendModifyError::Wait) => {
                 tracing::warn!("triggered friend modify waiting");
                 match wait_for_result(
+                    xxxxxx_url,
                     config,
                     bundle_data,
                     user_id,
@@ -123,9 +127,11 @@ pub async fn try_modify_remote_friend(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn wait_for_result(
+    xxxxxx_url: &XxxxxxUrl,
     config: &Config,
-    bundle_data: &BundleData,
+    bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
@@ -147,7 +153,15 @@ async fn wait_for_result(
         let result = xxxxxx_safe_call_ex_worker(
             config,
             |it| it != StatusCode::TOO_MANY_REQUESTS,
-            || api_list_friend(bundle_data, &account_row.account_email, user_id, token),
+            || {
+                api_list_friend(
+                    xxxxxx_url,
+                    bundle_data,
+                    &account_row.account_email,
+                    user_id,
+                    token,
+                )
+            },
         )
         .await
         .map(|it| it.friends)
@@ -175,9 +189,11 @@ async fn wait_for_result(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn try_modify_friend(
+    xxxxxx_url: &XxxxxxUrl,
     config: &Config,
-    bundle_data: &BundleData,
+    bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
@@ -191,6 +207,7 @@ async fn try_modify_friend(
                 |it| it != StatusCode::TOO_MANY_REQUESTS,
                 || {
                     api_add_friend(
+                        xxxxxx_url,
                         bundle_data,
                         &account_row.account_email,
                         user_id,
@@ -208,6 +225,7 @@ async fn try_modify_friend(
                 |it| it != StatusCode::TOO_MANY_REQUESTS,
                 || {
                     api_delete_friend(
+                        xxxxxx_url,
                         bundle_data,
                         &account_row.account_email,
                         user_id,

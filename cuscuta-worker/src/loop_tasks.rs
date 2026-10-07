@@ -2,8 +2,8 @@ use std::{env, str::FromStr};
 
 use chrono::{DateTime, Utc};
 use cuscuta_common::{
-    api::github::fetch_github_resource,
-    data::{BundleData, Song, SongsResult},
+    api::{fetch_env_as_json, xxxxxx::XxxxxxUrl},
+    data::{AppVersionData, ScirpophagaData, Song, SongsResult},
     db::account::update_account_lease_time,
     quick_fetch::QuickFetch,
 };
@@ -12,45 +12,121 @@ use sqlx::postgres::PgPoolOptions;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, Config, SONG_LIST},
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, Config, SONG_LIST, XXXXXX_URL},
     db::{
         postgresql::{POSTGRESQL_POOL, try_open_transaction},
         redis::REDIS_CLIENT,
     },
 };
 
-pub async fn sync_bundle_data(_: &CancellationToken) {
-    async fn try_sync() -> Result<BundleData, String> {
-        let bundle_data = fetch_github_resource::<BundleData>(
-            &env::var("GITHUB_BUNDLE_REPOSITORY")
-                .map_err(|e| format!("failed to read GITHUB_BUNDLE_REPOSITORY: {e}"))?,
-            &env::var("GITHUB_BUNDLE_PATH")
-                .map_err(|e| format!("failed to read GITHUB_BUNDLE_PATH: {e}"))?,
-            &env::var("GITHUB_BUNDLE_TOKEN")
-                .map_err(|e| format!("failed to read GITHUB_BUNDLE_TOKEN: {e}"))?,
-        )
-        .await
-        .map_err(|e| format!("failed to fetch bundle data from GitHub: {e}"))?;
-        BUNDLE_DATA
-            .try_write(|_| bundle_data.clone().into())
-            .map_err(|e| format!("failed to write BUNDLE_DATA: {e}"))?;
-        Ok(bundle_data)
+pub async fn sync_scirpophaga_data(_: &CancellationToken) {
+    fn try_get_env_var(env: &str) -> Result<String, String> {
+        env::var(env)
+            .map_err(|e| format!("failed to fetch env var: {env}: {e}"))
+            .map(|it| format!("/{}", it.trim_start_matches('/')))
     }
-    if BUNDLE_DATA.is_initialized() {
-        tracing::trace!("bundle data sync");
+    async fn try_sync() -> Result<XxxxxxUrl, String> {
+        let use_online_prefix =
+            env::var("USE_ONLINE_PREFIX").map_or(true, |it| it.parse::<bool>().unwrap_or(true));
+        let scirpophaga_data = if use_online_prefix {
+            fetch_env_as_json("SCIRPOPHAGA_URL")
+                .await
+                .map_err(|e| format!("failed to fetch from SCIRPOPHAGA_URL: {e}"))?
+        } else {
+            ScirpophagaData {
+                c2: "useless".to_owned(),
+                common_path: env::var("API_PREFIX_COMMON")
+                    .map_err(|e| format!("failed to read API_PREFIX_COMMON: {e}"))?,
+                auth_path: env::var("API_PREFIX_AUTH")
+                    .map_err(|e| format!("failed to read API_PREFIX_AUTH: {e}"))?,
+            }
+        };
+        let common_prefix = scirpophaga_data.common_path.trim_end_matches('/');
+        let auth_prefix = scirpophaga_data.auth_path.trim_end_matches('/');
+        let xxxxxx_url = XxxxxxUrl {
+            login: format!("{auth_prefix}{}", try_get_env_var("API_ENDPOINT_LOGIN")?),
+            list_friend: format!(
+                "{common_prefix}{}",
+                try_get_env_var("API_ENDPOINT_LIST_FRIENDS")?
+            ),
+            add_friend: format!(
+                "{common_prefix}{}",
+                try_get_env_var("API_ENDPOINT_ADD_FRIENDS")?
+            ),
+            delete_friend: format!(
+                "{common_prefix}{}",
+                try_get_env_var("API_ENDPOINT_DELETE_FRIENDS")?
+            ),
+            get_rank: format!(
+                "{common_prefix}{}",
+                try_get_env_var("API_ENDPOINT_GET_RANK")?
+            ),
+            get_notification: format!(
+                "{common_prefix}{}",
+                try_get_env_var("API_ENDPOINT_NOTIFICATION")?
+            ),
+            compose: format!(
+                "{common_prefix}{}",
+                try_get_env_var("API_ENDPOINT_COMPOSE_AGGREGATE")?
+            ),
+        };
+        XXXXXX_URL
+            .try_write(|_| xxxxxx_url.clone().into())
+            .map_err(|e| format!("failed to write SCIRPOPHAGA_DATA: {e}"))?;
+        Ok(xxxxxx_url)
+    }
+    if XXXXXX_URL.is_initialized() {
+        tracing::trace!("scirpophaga data sync");
         return;
     }
-    tracing::info!("sync_bundle_data: trying sync bundle data");
+    tracing::info!("sync_scirpophaga_data: trying sync scirpophaga data");
     match try_sync().await {
-        Ok(bundle_data) => {
+        Ok(data) => {
+            tracing::info!("sync_scirpophaga_data: scirpophaga data initialized: {data:?}",);
+        }
+        Err(e) => {
+            tracing::error!("sync_scirpophaga_data: failed to sync scirpophaga data: {e}");
+        }
+    }
+}
+
+pub async fn sync_app_version_data(_: &CancellationToken) {
+    async fn try_sync() -> Result<AppVersionData, String> {
+        let use_online_version = env::var("RESOURCES_APP_VERSION_USE_ONLINE")
+            .map_or(true, |it| it.parse::<bool>().unwrap_or(true));
+        let app_version_data = if use_online_version {
+            fetch_env_as_json::<AppVersionData>("RESOURCES_APP_VERSION_URL")
+                .await
+                .map_err(|e| format!("failed to fetch bundle data from url: {e}"))?
+        } else {
+            let version_number = env::var("RESOURCES_APP_VERSION_DEFAULT")
+                .map_err(|e| format!("failed to read env: RESOURCES_APP_VERSION_DEFAULT: {e}"))?;
+            if version_number.is_empty() {
+                return Err("invalid version number: empty string".to_owned());
+            }
+            AppVersionData {
+                version: version_number,
+            }
+        };
+        APP_VERSION_DATA
+            .try_write(|_| app_version_data.clone().into())
+            .map_err(|e| format!("failed to write APP_VERSION_DATA: {e}"))?;
+        Ok(app_version_data)
+    }
+    if APP_VERSION_DATA.is_initialized() {
+        tracing::trace!("app version data sync");
+        return;
+    }
+    tracing::info!("sync_app_version_data: trying sync bundle data");
+    match try_sync().await {
+        Ok(app_version_data) => {
             tracing::info!(
-                "sync_bundle_data: bundle data initialized: appVer:{}, ver:{}",
-                bundle_data.application_version_number,
-                bundle_data.version_number
+                "sync_app_version_data: bundle data initialized: appVer:{}",
+                app_version_data.version,
             );
         }
         Err(e) => {
-            tracing::error!("sync_bundle_data: failed to sync bundle data: {e}");
+            tracing::error!("sync_app_version_data: failed to sync bundle data: {e}");
         }
     }
 }
@@ -107,23 +183,16 @@ pub async fn sync_config(_: &CancellationToken) {
 
 pub async fn sync_song_list(_: &CancellationToken) {
     async fn try_sync() -> Result<(usize, usize), String> {
-        let song_list: Vec<_> = fetch_github_resource::<SongsResult>(
-            &env::var("GITHUB_SONG_REPOSITORY")
-                .map_err(|e| format!("failed to read GITHUB_SONG_REPOSITORY: {e}"))?,
-            &env::var("GITHUB_SONG_PATH")
-                .map_err(|e| format!("failed to read GITHUB_SONG_PATH: {e}"))?,
-            &env::var("GITHUB_SONG_TOKEN")
-                .map_err(|e| format!("failed to read GITHUB_SONG_TOKEN: {e}"))?,
-        )
-        .await
-        .map_err(|e| format!("failed to fetch bundle data from GitHub: {e}"))
-        .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
-        .collect();
+        let song_list: Vec<_> = fetch_env_as_json::<SongsResult>("RESOURCES_SONG_URL")
+            .await
+            .map_err(|e| format!("failed to fetch song data from url: {e}"))
+            .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
+            .collect();
         let music_len = song_list.len();
         let chart_len = song_list.iter().fold(0, |v, it| v + it.difficulties.len());
         SONG_LIST
             .try_write(move |_| song_list.into())
-            .map_err(|e| format!("failed to write CONFIG: {e}"))?;
+            .map_err(|e| format!("failed to write SONG_LIST: {e}"))?;
         Ok((music_len, chart_len))
     }
     if SONG_LIST.is_initialized() {

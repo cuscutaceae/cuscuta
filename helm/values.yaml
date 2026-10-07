@@ -46,26 +46,32 @@ eta:
   # -- Max jobs to search for ETA estimation (env: ETA_SEARCH_LIMIT)
   searchLimit: 10
 
-# -- GitHub data sources
-github:
-  bundleRepository: cuscutaceae/scales
-  bundlePath: bundle.json
-  # -- GitHub personal access token for bundle repo
-  bundleToken: ""
-  songRepository: cuscutaceae/scales
-  songPath: songs/songlist
-  # -- GitHub personal access token for song repo
-  songToken: ""
+# -- Data sources
+dataSource:
+  base:
+    appVersion:
+      useOnlineVersion: true
+      url: ""
+      versionDefault: ""
+    songUrl: ""
+  scirpophaga:
+    url: ""
+
 
 # -- External target API endpoints (required for production; mock can be used for testing)
 api:
-  login: ""
-  listFriends: ""
-  addFriends: ""
-  deleteFriends: ""
-  getRank: ""
-  notification: ""
-  compose: ""
+  prefix:
+    useOnlinePrefix: true
+    auth: ""
+    common: ""
+  path:
+    login: ""
+    listFriends: ""
+    addFriends: ""
+    deleteFriends: ""
+    getRank: ""
+    notification: ""
+    compose: ""
 
 # -- Migration job
 migration:
@@ -82,6 +88,8 @@ chilo:
   port: 8080
   # -- Binary constants for the challenge algorithm
   constants:
+    # -- Whether to use online key fetching
+    useOnlineKey: true
     binC2: ""
   service:
     # -- Service type

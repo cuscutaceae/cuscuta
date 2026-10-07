@@ -1,8 +1,9 @@
 use std::env;
 
-use reqwest::{Response, StatusCode};
+use reqwest::{RequestBuilder, Response, StatusCode};
+use serde::de::DeserializeOwned;
 
-/// Github Api
+/// Github Api [DEPRECATED]
 pub mod github;
 
 /// xxxxxx Api
@@ -58,6 +59,36 @@ pub enum Error {
     },
 }
 
+/// 从环境变量中读取URL，并获取JSON数据
+///
+/// # Errors
+/// - 当环境变量配置无效时，返回[`Error::Env`]
+/// - 当请求发送失败时，返回[`Error::Network`]
+/// - 当返回值不为2xx时，返回[`Error::BadStatus`]
+/// - 当Json反序列化失败时，返回[`Error::Decode`]
+pub async fn fetch_env_as_json<T>(env: &str) -> Result<T, Error>
+where
+    T: DeserializeOwned,
+{
+    reqwest::Client::new()
+        .get(try_get_env_var(env)?)
+        .send()
+        .await
+        .map_err(Error::Network)?
+        .error_for_status_with_response()
+        .await
+        .map_err(|(s, e)| Error::BadStatus {
+            status_code: e.status().unwrap_or_else(StatusCode::default),
+            message: s,
+            extra_error_code: None,
+        })?
+        .json::<T>()
+        .await
+        .map_err(|e| Error::Decode {
+            message: format!("failed to decode json: {e}"),
+        })
+}
+
 fn try_get_env_var(var: &str) -> Result<String, Error> {
     env::var(var).map_err(|error| Error::Env {
         error,
@@ -85,5 +116,21 @@ impl ErrorForStatusWithResponse for Response {
                 e,
             )),
         }
+    }
+}
+
+trait LoggingRequestBeforeSend
+where
+    Self: Sized,
+{
+    fn send_after_log(self) -> impl Future<Output = Result<Response, reqwest::Error>>;
+}
+
+impl LoggingRequestBeforeSend for RequestBuilder {
+    async fn send_after_log(self) -> Result<Response, reqwest::Error> {
+        let (client, request) = self.build_split();
+        let request = request?;
+        tracing::debug!("request_logging: {request:?}");
+        client.execute(request).await
     }
 }

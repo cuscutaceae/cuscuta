@@ -3,12 +3,6 @@
 //! # 依赖环境变量
 //! cuscuta-entry使用环境变量注入参数，这个crate依赖的环境变量有：
 //! - `REDIS_STREAM_REFRESH_TTL`
-//! - `GITHUB_BUNDLE_REPOSITORY`
-//! - `GITHUB_BUNDLE_PATH`
-//! - `GITHUB_BUNDLE_TOKEN`
-//! - `GITHUB_SONG_REPOSITORY`
-//! - `GITHUB_SONG_PATH`
-//! - `GITHUB_SONG_TOKEN`
 //! - `REDIS_ADDR`
 //! - `ACCOUNTS_SQL_ADDR`
 
@@ -19,7 +13,7 @@ mod init;
 mod loop_tasks;
 
 use crate::{
-    data::{BUNDLE_DATA, CONFIG, SONG_LIST},
+    data::{CONFIG, SONG_LIST},
     db::{postgresql::POSTGRESQL_POOL, redis::REDIS_CLIENT},
     endpoints::{query::query, status::stat},
     enqueue::enqueue,
@@ -46,7 +40,7 @@ use tracing::Level;
 use crate::{
     endpoints::enqueue,
     init::cuscuta_init,
-    loop_tasks::{open_postgresql_client, open_redis_client, sync_bundle_data, sync_song_list},
+    loop_tasks::{open_postgresql_client, open_redis_client, sync_song_list},
 };
 
 #[tokio::main]
@@ -78,7 +72,6 @@ async fn main() {
     ));
     tokio::spawn(register_job(halt_token.clone(), 10, open_redis_client));
     tokio::spawn(register_job(halt_token.clone(), 10, open_postgresql_client));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_bundle_data));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_song_list));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
     axum::serve(addr, service)
@@ -91,7 +84,7 @@ fn check_ready() -> Option<&'static str> {
     if REDIS_CLIENT.get().is_none() {
         return Some("redis client is not initialized");
     }
-    batch_check_initialized!(CONFIG, BUNDLE_DATA, SONG_LIST, POSTGRESQL_POOL);
+    batch_check_initialized!(CONFIG, SONG_LIST, POSTGRESQL_POOL);
     None
 }
 

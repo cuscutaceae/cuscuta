@@ -7,8 +7,11 @@ mod pull;
 use std::time::Duration;
 
 use cuscuta_common::{
-    api::{self, xxxxxx::FriendInfo},
-    data::{BundleData, Song},
+    api::{
+        self,
+        xxxxxx::{FriendInfo, XxxxxxUrl},
+    },
+    data::{AppVersionData, Song},
     db::{
         self,
         account::AccountRow,
@@ -32,7 +35,7 @@ use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, Config, SONG_LIST, WORKER_ID},
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, Config, SONG_LIST, WORKER_ID, XXXXXX_URL},
     db::redis::REDIS_CLIENT,
     worker::{
         clean::clean_jobs,
@@ -121,7 +124,8 @@ struct Args<'a> {
     user_id: String,
     token: String,
     config: Config,
-    bundle_data: BundleData,
+    bundle_data: AppVersionData,
+    xxxxxx_url: XxxxxxUrl,
     song_list: Vec<Song>,
 }
 
@@ -148,7 +152,7 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
         .map_err(|e| Error::NotReady {
             message: format!("config ({e})"),
         })?;
-    let bundle_data = BUNDLE_DATA
+    let bundle_data = APP_VERSION_DATA
         .try_read(std::clone::Clone::clone)
         .map_err(|e| Error::NotReady {
             message: format!("bundle data ({e})"),
@@ -158,6 +162,12 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
         .map_err(|e| Error::NotReady {
             message: format!("song list ({e})"),
         })?;
+    let xxxxxx_url =
+        XXXXXX_URL
+            .try_read(std::clone::Clone::clone)
+            .map_err(|e| Error::NotReady {
+                message: format!("xxxxxx_url ({e})"),
+            })?;
     Ok(Args {
         worker_id,
         redis_client,
@@ -166,6 +176,7 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
         token,
         config,
         bundle_data,
+        xxxxxx_url,
         song_list,
     })
 }
@@ -183,6 +194,7 @@ async fn internal_loop(
         token,
         config,
         bundle_data,
+        xxxxxx_url,
         song_list,
     } = get_args()?;
     let Some(current_segments) = scan_sub_queue_and_pull_job(
@@ -217,6 +229,7 @@ async fn internal_loop(
     }
     try_add_friends(
         &config,
+        &xxxxxx_url,
         &bundle_data,
         redis_client,
         &user_id,
@@ -231,6 +244,7 @@ async fn internal_loop(
         vec![]
     } else {
         gather_rank_list(
+            &xxxxxx_url,
             &bundle_data,
             &user_id,
             &token,
@@ -253,6 +267,7 @@ async fn internal_loop(
         &token,
         &account_row,
         &config,
+        &xxxxxx_url,
     )
     .await?;
     *cursor += 1;

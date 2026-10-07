@@ -1,7 +1,7 @@
 use chrono::Utc;
 use cuscuta_common::{
-    api::xxxxxx::FriendInfo,
-    data::BundleData,
+    api::xxxxxx::{FriendInfo, XxxxxxUrl},
+    data::AppVersionData,
     db::{
         account::AccountRow,
         job::{
@@ -27,11 +27,12 @@ pub async fn clean_jobs(
     jobs: &mut Vec<Job>,
     friends: &mut Vec<FriendInfo>,
     redis_client: &Client,
-    bundle_data: &BundleData,
+    bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
     config: &Config,
+    xxxxxx_url: &XxxxxxUrl,
 ) -> Result<(), Error> {
     let pending_friends_code = get_pending_friends_code(jobs);
     let mut deleted_friends_code = Vec::<String>::new();
@@ -102,6 +103,7 @@ pub async fn clean_jobs(
         {
             match try_modify_remote_friend(
                 config,
+                xxxxxx_url,
                 bundle_data,
                 user_id,
                 token,

@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use cuscuta_common::{
-    api::xxxxxx::{FriendDelta, FriendInfo, calc_friend_delta},
-    data::BundleData,
+    api::xxxxxx::{FriendDelta, FriendInfo, XxxxxxUrl, calc_friend_delta},
+    data::AppVersionData,
     db::{
         account::AccountRow,
         job::{Job, JobState},
@@ -24,7 +24,8 @@ use crate::{
 #[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 pub async fn try_add_friends(
     config: &Config,
-    bundle_data: &BundleData,
+    xxxxxx_url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     redis_client: &Client,
     user_id: &str,
     token: &str,
@@ -63,6 +64,7 @@ pub async fn try_add_friends(
 
         let friends_new = match try_modify_remote_friend(
             config,
+            xxxxxx_url,
             bundle_data,
             user_id,
             token,

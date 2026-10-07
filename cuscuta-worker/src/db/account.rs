@@ -1,66 +1,39 @@
-use std::{env, str::FromStr};
-
-use chrono::Local;
 use cuscuta_common::{
-    api::auto_chilo_xxxxxx::{api_compose_aggregate, api_get_notification},
-    data::BundleData,
+    api::{
+        auto_chilo_xxxxxx::{api_compose_aggregate, api_get_notification, api_login},
+        xxxxxx::XxxxxxUrl,
+    },
+    data::AppVersionData,
     db::account::AccountRow,
 };
-use reqwest::{StatusCode, Url};
 use sqlx::{Postgres, Transaction};
 
-use cuscuta_common::api::{
-    self,
-    chilo::chilo_generate,
-    xxxxxx::{LoginResult, api_login},
-};
+use cuscuta_common::api::{self, xxxxxx::LoginResult};
 
 pub async fn perform_login(
-    bundle_data: &BundleData,
+    xxxxxx_url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     account_row: &AccountRow,
 ) -> Result<LoginResult, api::Error> {
-    let url = Url::from_str(&env::var("API_LOGIN").map_err(|error| api::Error::Env {
-        error,
-        message: "API_LOGIN".into(),
-    })?)
-    .unwrap_or_else(|_| Url::from_str("http://nofyso:11451/auth/login").unwrap());
-    let timestamp = Local::now().timestamp_millis().to_string();
-    let random_challenge = match chilo_generate(
-        &timestamp,
-        url.path(),
-        "grant_type=client_credentials",
-        "login",
-    )
-    .await?
-    {
-        api::chilo::ChiloResult::Success { value, .. } => value,
-        api::chilo::ChiloResult::Failed { message } => {
-            tracing::warn!("login_interface: failed to generate challenge: {message}");
-            return Err(api::Error::BadStatus {
-                status_code: StatusCode::INTERNAL_SERVER_ERROR,
-                message,
-                extra_error_code: None,
-            });
-        }
-    };
-    tracing::info!("login_interface: challenge: {random_challenge}");
     tracing::info!("login_interface: email: {}", account_row.account_email);
     tracing::info!("login_interface: pw: {}", account_row.account_password);
     let email = &account_row.account_email;
+    tracing::info!("login_interface: performing login api call");
     let result = api_login(
+        xxxxxx_url,
         bundle_data,
         email,
         &account_row.account_password,
-        &random_challenge,
     )
     .await?;
-    //TODO refactor to auto_chilo
+    tracing::info!("login_interface: account token: {}", result.access_token);
+    tracing::info!("login_interface: user id: {}", result.user_id);
     let user_id = &result.user_id.to_string();
     let token = &result.access_token;
     tracing::info!("login_interface: performing aggregate api call");
-    api_compose_aggregate(bundle_data, email, user_id, token).await?;
+    api_compose_aggregate(xxxxxx_url, bundle_data, email, user_id, token).await?;
     tracing::info!("login_interface: performing notification api call");
-    api_get_notification(bundle_data, email, user_id, token).await?;
+    api_get_notification(xxxxxx_url, bundle_data, email, user_id, token).await?;
     Ok(result)
 }
 
@@ -88,8 +61,12 @@ pub async fn update_account_info(
 
 pub mod auto {
     use cuscuta_common::{
-        api::{self, auto_chilo_xxxxxx::api_list_friend, xxxxxx::FriendListResult1},
-        data::BundleData,
+        api::{
+            self,
+            auto_chilo_xxxxxx::api_list_friend,
+            xxxxxx::{FriendListResult1, XxxxxxUrl},
+        },
+        data::AppVersionData,
         db::{self, account::AccountRow},
     };
     use reqwest::StatusCode;
@@ -127,15 +104,16 @@ pub mod auto {
 
     /// Warn: God function
     pub async fn check_and_update_token(
+        xxxxxx_url: &XxxxxxUrl,
         config: &Config,
-        bundle_data: &BundleData,
+        bundle_data: &AppVersionData,
         account_row: &AccountRow,
         force_login: bool,
     ) -> Result<TokenUpdateResult, Error> {
         //FIXME refactor this
         let current_row =
             if account_row.temp_token.is_none() || account_row.user_id.is_none() || force_login {
-                let login_result = perform_login(bundle_data, account_row)
+                let login_result = perform_login(xxxxxx_url, bundle_data, account_row)
                     .await
                     .map_err(Error::Api)?;
                 let transaction = try_open_transaction().await.map_err(Error::Db)?;
@@ -166,7 +144,15 @@ pub mod auto {
             xxxxxx_safe_call_ex_worker(
                 config,
                 |status| status != StatusCode::TOO_MANY_REQUESTS,
-                || api_list_friend(bundle_data, &current_row.account_email, &user_id, &token),
+                || {
+                    api_list_friend(
+                        xxxxxx_url,
+                        bundle_data,
+                        &current_row.account_email,
+                        &user_id,
+                        &token,
+                    )
+                },
             )
             .await
             .map_err(Error::Api)?,

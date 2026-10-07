@@ -1,8 +1,8 @@
 use std::{env, str::FromStr};
 
 use cuscuta_common::{
-    api::github::fetch_github_resource,
-    data::{BundleData, Song, SongsResult},
+    api::fetch_env_as_json,
+    data::{Song, SongsResult},
     quick_fetch::QuickFetch,
 };
 use redis::TypedCommands;
@@ -10,7 +10,7 @@ use sqlx::postgres::PgPoolOptions;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{BUNDLE_DATA, CONFIG, Config, SONG_LIST},
+    data::{CONFIG, Config, SONG_LIST},
     db::{postgresql::POSTGRESQL_POOL, redis::REDIS_CLIENT},
 };
 
@@ -46,61 +46,18 @@ pub async fn sync_config(_: &CancellationToken) {
     tracing::info!("sync_config: config initialized");
 }
 
-pub async fn sync_bundle_data(_: &CancellationToken) {
-    async fn try_sync() -> Result<BundleData, String> {
-        let bundle_data = fetch_github_resource::<BundleData>(
-            &env::var("GITHUB_BUNDLE_REPOSITORY")
-                .map_err(|e| format!("failed to read GITHUB_BUNDLE_REPOSITORY: {e}"))?,
-            &env::var("GITHUB_BUNDLE_PATH")
-                .map_err(|e| format!("failed to read GITHUB_BUNDLE_PATH: {e}"))?,
-            &env::var("GITHUB_BUNDLE_TOKEN")
-                .map_err(|e| format!("failed to read GITHUB_BUNDLE_TOKEN: {e}"))?,
-        )
-        .await
-        .map_err(|e| format!("failed to fetch bundle data from GitHub: {e}"))?;
-        BUNDLE_DATA
-            .try_write(|_| bundle_data.clone().into())
-            .map_err(|e| format!("failed to write BUNDLE_DATA: {e}"))?;
-        Ok(bundle_data)
-    }
-    if BUNDLE_DATA.is_initialized() {
-        tracing::trace!("bundle data sync");
-        return;
-    }
-    tracing::info!("sync_bundle_data: trying sync bundle data");
-    match try_sync().await {
-        Ok(bundle_data) => {
-            tracing::info!(
-                "sync_bundle_data: bundle data initialized: appVer:{}, ver:{}",
-                bundle_data.application_version_number,
-                bundle_data.version_number
-            );
-        }
-        Err(e) => {
-            tracing::error!("sync_bundle_data: failed to sync bundle data: {e}");
-        }
-    }
-}
-
 pub async fn sync_song_list(_: &CancellationToken) {
     async fn try_sync() -> Result<(usize, usize), String> {
-        let song_list: Vec<_> = fetch_github_resource::<SongsResult>(
-            &env::var("GITHUB_SONG_REPOSITORY")
-                .map_err(|e| format!("failed to read GITHUB_SONG_REPOSITORY: {e}"))?,
-            &env::var("GITHUB_SONG_PATH")
-                .map_err(|e| format!("failed to read GITHUB_SONG_PATH: {e}"))?,
-            &env::var("GITHUB_SONG_TOKEN")
-                .map_err(|e| format!("failed to read GITHUB_SONG_TOKEN: {e}"))?,
-        )
-        .await
-        .map_err(|e| format!("failed to fetch bundle data from GitHub: {e}"))
-        .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
-        .collect();
+        let song_list: Vec<_> = fetch_env_as_json::<SongsResult>("RESOURCES_SONG_URL")
+            .await
+            .map_err(|e| format!("failed to fetch song data from url: {e}"))
+            .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
+            .collect();
         let music_len = song_list.len();
         let chart_len = song_list.iter().fold(0, |v, it| v + it.difficulties.len());
         SONG_LIST
             .try_write(move |_| song_list.into())
-            .map_err(|e| format!("failed to write CONFIG: {e}"))?;
+            .map_err(|e| format!("failed to write SONG_LIST: {e}"))?;
         Ok((music_len, chart_len))
     }
     if SONG_LIST.is_initialized() {

@@ -5,11 +5,9 @@ use reqwest::{RequestBuilder, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::api::LoggingRequestBeforeSend;
 use crate::castable_enum;
-use crate::{
-    api::{Error, try_get_env_var},
-    data::BundleData,
-};
+use crate::{api::Error, data::AppVersionData};
 
 type Result<T> = core::result::Result<T, Error>;
 
@@ -278,6 +276,31 @@ pub struct SongScore {
     pub player_name: String,
 }
 
+/// Xxxxxx 的 API URL
+#[derive(Debug, Clone)]
+pub struct XxxxxxUrl {
+    /// 登录 Url
+    pub login: String,
+
+    /// 好友列表 Url
+    pub list_friend: String,
+
+    /// 添加好友 Url
+    pub add_friend: String,
+
+    /// 删除好友 Url
+    pub delete_friend: String,
+
+    /// 排行榜 Url
+    pub get_rank: String,
+
+    /// 通知 Url
+    pub get_notification: String,
+
+    /// 聚合调用 Url
+    pub compose: String,
+}
+
 /// 通过xxxxxx api登录
 ///
 /// # Errors
@@ -287,7 +310,8 @@ pub struct SongScore {
 /// - 当返回值不为2xx时，返回[`Error::BadStatus`]
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
 pub async fn api_login(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     password: &str,
     random_challenge: &str,
@@ -295,13 +319,13 @@ pub async fn api_login(
     reqwest::Client::builder()
         .build()
         .map_err(Error::ClientSetup)?
-        .post(try_get_env_var("API_LOGIN")?)
+        .post(&url.login)
         .attach_random_challenge(random_challenge)
         .attach_version(bundle_data)
         .attach_device_id(email)
         .basic_auth(email, Some(password))
         .form(&[("grant_type", "client_credentials")])
-        .send()
+        .send_after_log()
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
@@ -322,7 +346,8 @@ pub async fn api_login(
 /// - 当返回值不为2xx时，返回[`Error::BadStatus`]
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
 pub async fn api_list_friend(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
@@ -331,14 +356,14 @@ pub async fn api_list_friend(
     reqwest::Client::builder()
         .build()
         .map_err(Error::ClientSetup)?
-        .get(try_get_env_var("API_LIST_FRIENDS")?)
+        .get(&url.list_friend)
         .attach_random_challenge(random_challenge)
         .attach_platform()
         .attach_version(bundle_data)
         .attach_device_id(email)
         .attach_user_id(user_id)
         .bearer_auth(token)
-        .send()
+        .send_after_log()
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
@@ -360,7 +385,8 @@ pub async fn api_list_friend(
 /// - 当返回值不为2xx时，返回[`Error::BadStatus`]
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
 pub async fn api_add_friend(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
@@ -370,7 +396,7 @@ pub async fn api_add_friend(
     reqwest::Client::builder()
         .build()
         .map_err(Error::ClientSetup)?
-        .post(try_get_env_var("API_ADD_FRIENDS")?)
+        .post(&url.add_friend)
         .attach_random_challenge(random_challenge)
         .attach_platform()
         .attach_version(bundle_data)
@@ -378,7 +404,7 @@ pub async fn api_add_friend(
         .attach_user_id(user_id)
         .bearer_auth(token)
         .form(&[("friend_code", friend_code)])
-        .send()
+        .send_after_log()
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
@@ -400,7 +426,8 @@ pub async fn api_add_friend(
 /// - 当返回值不为2xx时，返回[`Error::BadStatus`]
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
 pub async fn api_delete_friend(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
@@ -410,7 +437,7 @@ pub async fn api_delete_friend(
     reqwest::Client::builder()
         .build()
         .map_err(Error::ClientSetup)?
-        .post(try_get_env_var("API_DELETE_FRIENDS")?)
+        .post(&url.delete_friend)
         .attach_random_challenge(random_challenge)
         .attach_platform()
         .attach_version(bundle_data)
@@ -418,7 +445,7 @@ pub async fn api_delete_friend(
         .attach_user_id(user_id)
         .bearer_auth(token)
         .form(&[("friend_id", friend_id)])
-        .send()
+        .send_after_log()
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
@@ -441,7 +468,8 @@ pub async fn api_delete_friend(
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
 #[allow(clippy::too_many_arguments)]
 pub async fn api_get_rank_list(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
@@ -454,7 +482,7 @@ pub async fn api_get_rank_list(
     reqwest::Client::builder()
         .build()
         .map_err(Error::ClientSetup)?
-        .get(try_get_env_var("API_GET_RANK")?)
+        .get(&url.get_rank)
         .query(&[
             ("song_id", song_id),
             ("difficulty", difficulty),
@@ -467,7 +495,7 @@ pub async fn api_get_rank_list(
         .attach_device_id(email)
         .attach_user_id(user_id)
         .bearer_auth(token)
-        .send()
+        .send_after_log()
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
@@ -490,7 +518,8 @@ pub async fn api_get_rank_list(
 /// - 当请求发送失败时，返回[`Error::Network`]
 /// - 当返回值不为2xx时，返回[`Error::BadStatus`]
 pub async fn api_get_notification(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
@@ -499,14 +528,14 @@ pub async fn api_get_notification(
     reqwest::Client::builder()
         .build()
         .map_err(Error::ClientSetup)?
-        .get(try_get_env_var("API_NOTIFICATION")?)
+        .get(&url.get_notification)
         .attach_random_challenge(random_challenge)
         .attach_platform()
         .attach_version(bundle_data)
         .attach_device_id(email)
         .attach_user_id(user_id)
         .bearer_auth(token)
-        .send()
+        .send_after_log()
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
@@ -524,23 +553,25 @@ pub async fn api_get_notification(
 /// - 当请求发送失败时，返回[`Error::Network`]
 /// - 当返回值不为2xx时，返回[`Error::BadStatus`]
 pub async fn api_compose_aggregate(
-    bundle_data: &BundleData,
+    url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     email: &str,
     user_id: &str,
     token: &str,
     random_challenge: &str,
 ) -> Result<()> {
+    tracing::debug!("XXXXXX: {token}");
     reqwest::Client::builder()
         .build()
         .map_err(Error::ClientSetup)?
-        .get(try_get_env_var("API_COMPOSE_AGGREGATE")?)
+        .get(&url.compose)
         .attach_random_challenge(random_challenge)
         .attach_platform()
         .attach_version(bundle_data)
         .attach_device_id(email)
         .attach_user_id(user_id)
         .bearer_auth(token)
-        .send()
+        .send_after_log()
         .await
         .map_err(Error::Network)?
         .error_for_status_with_response()
@@ -660,7 +691,7 @@ impl ErrorForStatusWithResponseXxxxxx for Response {
 trait RequestBuilderHelper {
     fn attach_platform(self) -> Self;
 
-    fn attach_version(self, bundle_data: &BundleData) -> Self;
+    fn attach_version(self, bundle_data: &AppVersionData) -> Self;
 
     fn attach_device_id(self, email: &str) -> Self;
 
@@ -674,8 +705,8 @@ impl RequestBuilderHelper for RequestBuilder {
         self.header("Platform", "android")
     }
 
-    fn attach_version(self, bundle_data: &BundleData) -> Self {
-        let version = &bundle_data.version_number;
+    fn attach_version(self, bundle_data: &AppVersionData) -> Self {
+        let version = &bundle_data.version;
         let version = if version.ends_with('c') {
             version.clone()
         } else {
