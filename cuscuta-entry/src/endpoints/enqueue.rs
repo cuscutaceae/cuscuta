@@ -156,7 +156,7 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
     }
     batch_write_job_tracking_tag(redis_client, &job_track_tags)
         .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?;
-    Ok(base64::prelude::BASE64_STANDARD.encode(format!("{}-{}", form.friend_code, timestamp)))
+    Ok(base64::prelude::BASE64_URL_SAFE.encode(format!("{}-{}", form.friend_code, timestamp)))
 }
 
 fn input_check(input: &str) -> bool {
