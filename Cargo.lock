@@ -710,7 +710,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-mock"
-version = "0.1.0"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "axum",
@@ -764,7 +764,7 @@ dependencies = [
 
 [[package]]
 name = "cuscutactl"
-version = "0.1.2"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "base64",
