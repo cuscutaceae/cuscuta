@@ -129,7 +129,7 @@ struct Args<'a> {
     songs_with_hash_pool: Vec<SongsWithHash>,
 }
 
-fn get_args<'a>() -> Result<Args<'a>, Error> {
+async fn get_args<'a>() -> Result<Args<'a>, Error> {
     let worker_id = WORKER_ID.get().ok_or(Error::NotReady {
         message: "worker_id... what?".to_string(),
     })?;
@@ -137,7 +137,8 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
         message: "redis client".to_string(),
     })?;
     let account_row = ACCOUNT_ROW
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| Error::NotReady {
             message: format!("account row ({e})"),
         })?;
@@ -148,27 +149,29 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
             message: "user is not login".to_string(),
         })?;
     let config = CONFIG
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| Error::NotReady {
             message: format!("config ({e})"),
         })?;
     let bundle_data = APP_VERSION_DATA
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| Error::NotReady {
             message: format!("bundle data ({e})"),
         })?;
-    let songs_with_hash_pool =
-        SONG_LIST
-            .try_read(std::clone::Clone::clone)
-            .map_err(|e| Error::NotReady {
-                message: format!("song list ({e})"),
-            })?;
-    let xxxxxx_url =
-        XXXXXX_URL
-            .try_read(std::clone::Clone::clone)
-            .map_err(|e| Error::NotReady {
-                message: format!("xxxxxx_url ({e})"),
-            })?;
+    let songs_with_hash_pool = SONG_LIST
+        .read_spinning(std::clone::Clone::clone)
+        .await
+        .map_err(|e| Error::NotReady {
+            message: format!("song list ({e})"),
+        })?;
+    let xxxxxx_url = XXXXXX_URL
+        .read_spinning(std::clone::Clone::clone)
+        .await
+        .map_err(|e| Error::NotReady {
+            message: format!("xxxxxx_url ({e})"),
+        })?;
     Ok(Args {
         worker_id,
         redis_client,
@@ -197,7 +200,7 @@ async fn internal_loop(
         bundle_data,
         xxxxxx_url,
         songs_with_hash_pool,
-    } = get_args()?;
+    } = get_args().await?;
     let Some((current_segments, songs_with_hash)) = scan_sub_queue_and_pull_job(
         redis_client,
         current_jobs,
@@ -318,14 +321,15 @@ where
     batch_write_job_tracking_tag(redis_client, &[info]).map_err(Error::RedisExtend)
 }
 
-pub fn resume_state(worker_result: WorkerResult) {
+pub async fn resume_state(worker_result: WorkerResult) {
     // TODO: complete error handling here
-    fn resume_jobs(worker_result: WorkerResult) -> Result<(), Error> {
+    async fn resume_jobs(worker_result: WorkerResult) -> Result<(), Error> {
         let redis_client = REDIS_CLIENT.get().ok_or(Error::NotReady {
             message: "redis client".to_string(),
         })?;
         let redis_stream_refresh_ttl = CONFIG
-            .try_read(|it| it.redis_stream_refresh_ttl)
+            .read_spinning(|it| it.redis_stream_refresh_ttl)
+            .await
             .unwrap_or(300);
         let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
         for job in worker_result.jobs {
@@ -362,7 +366,7 @@ pub fn resume_state(worker_result: WorkerResult) {
         }
         Ok(())
     }
-    if let Err(e) = resume_jobs(worker_result) {
+    if let Err(e) = resume_jobs(worker_result).await {
         tracing::error!("resuming: failed to resume jobs: {e}");
     }
 }

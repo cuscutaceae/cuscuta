@@ -77,7 +77,7 @@ async fn generate(Query(form): Query<GenerateQuery>) -> impl IntoResponse {
             }),
         );
     };
-    let Ok(c2) = C2.try_read(|it| it.clone()) else {
+    let Ok(c2) = C2.read_spinning(std::clone::Clone::clone).await else {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(GenerateResult::Failed {

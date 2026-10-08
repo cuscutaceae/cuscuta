@@ -82,11 +82,12 @@ pub fn sync_song_list(
             async fn try_sync(
                 global_song_list: &QuickFetchType<Vec<SongsWithHash>>,
             ) -> Result<(usize, usize, String), String> {
-                let song_list: Vec<_> = read_env_url_and_fetch_json::<SongsResult>("RESOURCES_SONG_URL")
-                    .await
-                    .map_err(|e| format!("failed to fetch song data from url: {e}"))
-                    .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
-                    .collect();
+                let song_list: Vec<_> =
+                    read_env_url_and_fetch_json::<SongsResult>("RESOURCES_SONG_URL")
+                        .await
+                        .map_err(|e| format!("failed to fetch song data from url: {e}"))
+                        .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
+                        .collect();
                 let music_len = song_list.len();
                 let chart_len = song_list.iter().fold(0, |v, it| v + it.difficulties.len());
                 tracing::info!("sync_song_list: hashing");

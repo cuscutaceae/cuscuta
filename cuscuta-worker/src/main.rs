@@ -135,7 +135,7 @@ async fn start_loop(cancellation_token: CancellationToken) {
         worker_loop_result.jobs.len(),
         worker_loop_result.cursor
     );
-    resume_state(worker_loop_result);
+    resume_state(worker_loop_result).await;
     cancellation_token.cancel();
 }
 
@@ -172,7 +172,8 @@ async fn shutdown_signal(cancellation_token: CancellationToken) {
 async fn halt_progress() {
     async fn reset_account_state() -> Result<(), String> {
         let account_row = ACCOUNT_ROW
-            .try_read(std::clone::Clone::clone)
+            .read_spinning(std::clone::Clone::clone)
+            .await
             .map_err(|e| format!("failed to fetch account: {e}"))?;
         let transaction = try_open_transaction()
             .await

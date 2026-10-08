@@ -74,7 +74,8 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
         return Err(Error::BadRequest(ErrorType::BadRequestFriendCode));
     }
     let config = CONFIG
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|_| Error::NotReady(ErrorType::ConfigNotReady))?;
     let redis_client = REDIS_CLIENT
         .get()
@@ -83,7 +84,7 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
         .await
         .map_err(|e| Error::DbExtend(ErrorType::FailedTransactionOpenDb, e))?;
     let (song_list_len, hash) = SONG_LIST
-        .try_read(|it| {
+        .read_spinning(|it| {
             let songs_with_hash = it.first().expect("should have one element as least!");
             (
                 songs_with_hash
@@ -94,6 +95,7 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
                 songs_with_hash.hash.clone(),
             )
         })
+        .await
         .map_err(|_| Error::NotReady(ErrorType::SongListNotReady))?;
     let active_account_count = count_active_account(transaction)
         .await

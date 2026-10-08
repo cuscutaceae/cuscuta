@@ -62,13 +62,16 @@ async fn get_friend_result(
 async fn try_init() -> Result<(), Error> {
     tracing::info!("init: cuscuta-worker initializing...");
     let bundle_data = APP_VERSION_DATA
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| (Level::Retry, format!("APP_VERSION_DATA is not ready: {e}")))?;
     let config = CONFIG
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| (Level::Retry, format!("CONFIG is not ready: {e}")))?;
     let xxxxxx_url = XXXXXX_URL
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| (Level::Retry, format!("XXXXXX_URL is not ready: {e}")))?;
     REDIS_CLIENT
         .get()
@@ -140,7 +143,10 @@ async fn try_init() -> Result<(), Error> {
 }
 
 async fn try_failed_resume() -> Result<(), Error> {
-    let account_row = ACCOUNT_ROW.try_read(std::clone::Clone::clone).ok();
+    let account_row = ACCOUNT_ROW
+        .read_spinning(std::clone::Clone::clone)
+        .await
+        .ok();
     if let Some(account_row) = account_row {
         let transaction = try_open_transaction()
             .await

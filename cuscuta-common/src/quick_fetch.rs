@@ -33,7 +33,9 @@ pub trait QuickFetch<T> {
     /// 不会返回[`Error::TryLock`]
     fn read_spinning<U, F>(&self, f: F) -> impl Future<Output = Result<U>>
     where
-        F: Fn(&T) -> U;
+        T: Send + Sync,
+        U: Send,
+        F: Send + Fn(&T) -> U;
 
     /// 尝试获取引用。并写入回调函数的返回值
     ///
@@ -64,7 +66,9 @@ impl<T> QuickFetch<T> for OnceLock<RwLock<Option<T>>> {
 
     async fn read_spinning<U, F>(&self, f: F) -> Result<U>
     where
-        F: Fn(&T) -> U,
+        T: Send + Sync,
+        U: Send,
+        F: Send + Fn(&T) -> U,
     {
         loop {
             if let Ok(guard) = self.get_or_init(|| RwLock::new(Option::None)).try_read() {

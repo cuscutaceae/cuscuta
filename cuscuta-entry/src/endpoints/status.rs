@@ -27,12 +27,13 @@ enum StatResult<'a> {
 }
 
 pub async fn stat() -> impl IntoResponse {
-    fn op<'a>() -> Result<StatResult<'a>, Error> {
+    async fn op<'a>() -> Result<StatResult<'a>, Error> {
         let redis_client = REDIS_CLIENT
             .get()
             .ok_or(Error::NotReady(ErrorType::RedisNotReady))?;
         let config = CONFIG
-            .try_read(std::clone::Clone::clone)
+            .read_spinning(std::clone::Clone::clone)
+            .await
             .map_err(|_| Error::NotReady(ErrorType::ConfigNotReady))?;
         let worker_status = search_worker_status(redis_client)
             .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
@@ -44,7 +45,7 @@ pub async fn stat() -> impl IntoResponse {
             worker_status: worker_status.into_iter().map(|it| it.1).collect(),
         })
     }
-    match op() {
+    match op().await {
         Ok(x) => (StatusCode::OK, Json(x)),
         Err(e) => (
             e.get_status_code(),

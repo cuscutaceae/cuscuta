@@ -174,10 +174,12 @@ pub async fn update_lease_time(_: &CancellationToken) {
             .await
             .map_err(|e| format!("failed to open transaction: {e}"))?;
         let account_row = ACCOUNT_ROW
-            .try_read(std::clone::Clone::clone)
+            .read_spinning(std::clone::Clone::clone)
+            .await
             .map_err(|e| format!("failed to fetch account_row, is account not logged yet? {e}"))?;
         let config = CONFIG
-            .try_read(std::clone::Clone::clone)
+            .read_spinning(std::clone::Clone::clone)
+            .await
             .map_err(|e| format!("failed to read config: {e}"))?;
         let lease_time = update_account_lease_time(
             transaction,
