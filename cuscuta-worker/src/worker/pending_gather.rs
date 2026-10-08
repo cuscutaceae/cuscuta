@@ -3,7 +3,7 @@ use cuscuta_common::{
         auto_chilo_xxxxxx::api_get_rank_list,
         xxxxxx::{SongScore, XxxxxxUrl},
     },
-    data::{AppVersionData, Song},
+    data::{AppVersionData, SongsWithHash},
     db::{
         account::AccountRow,
         job::{Job, JobState},
@@ -67,11 +67,11 @@ pub async fn gather_rank_list<'a>(
     user_id: &'a str,
     token: &'a str,
     account_row: &'a AccountRow,
-    song_list: &'a [Song],
+    songs_with_hash: &'a SongsWithHash,
     cursor: usize,
     config: &Config,
 ) -> Result<Vec<SongScore>, Error> {
-    let Some(song) = song_list.get(cursor) else {
+    let Some(song) = songs_with_hash.songs.get(cursor) else {
         return Ok(Vec::new());
     };
     let mut result = Vec::new();

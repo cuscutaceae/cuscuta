@@ -33,6 +33,7 @@ use std::env;
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use cuscuta_common::{
     batch_check_initialized,
+    data::read_parsed_env,
     db::account::try_release_account,
     quick_fetch::QuickFetch,
     scheduled_job::{
@@ -69,6 +70,12 @@ async fn main() {
         .await
         .expect("failed to bind 0.0.0.0:8080");
     tracing::info!("listening in 0.0.0.0:8080...");
+    let data_update_period = read_parsed_env::<u64>("RESOURCE_UPDATE_PERIOD").unwrap_or_else(|e| {
+        tracing::info!(
+            "pre_init: failed to read RESOURCE_UPDATE_PERIOD: {e}, set to default (30s)"
+        );
+        30
+    });
     tokio::spawn(register_individual_job(
         halt_token.clone(),
         CancellationToken::new(),
@@ -86,13 +93,21 @@ async fn main() {
         open_postgresql_client(&POSTGRESQL_POOL),
     ));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_app_version_data));
+    tokio::spawn(register_job(
+        halt_token.clone(),
+        data_update_period,
+        sync_app_version_data,
+    ));
     tokio::spawn(register_job_future(
         halt_token.clone(),
-        10,
+        data_update_period,
         sync_song_list(&SONG_LIST),
     ));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_scirpophaga_data));
+    tokio::spawn(register_job(
+        halt_token.clone(),
+        data_update_period,
+        sync_scirpophaga_data,
+    ));
     tokio::spawn(register_job(
         halt_token.clone(),
         env::var("WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS")

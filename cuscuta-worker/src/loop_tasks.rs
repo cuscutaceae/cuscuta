@@ -1,9 +1,9 @@
-use std::{env, str::FromStr};
+use std::env;
 
 use chrono::{DateTime, Utc};
 use cuscuta_common::{
     api::{fetch_env_as_json, xxxxxx::XxxxxxUrl},
-    data::{AppVersionData, ScirpophagaData},
+    data::{AppVersionData, ScirpophagaData, read_parsed_env},
     db::account::update_account_lease_time,
     quick_fetch::QuickFetch,
 };
@@ -127,35 +127,26 @@ pub async fn sync_app_version_data(_: &CancellationToken) {
 }
 
 pub async fn sync_config(_: &CancellationToken) {
-    fn read_as_number<T>(key: &str) -> Result<T, String>
-    where
-        T: FromStr,
-    {
-        env::var(key)
-            .map_err(|e| format!("failed to read {key}: {e}"))?
-            .parse::<T>()
-            .map_err(|_| format!("failed to read {key}: failed to parse"))
-    }
     fn try_sync() -> Result<(), String> {
         let config = Config {
-            worker_max_jobs: read_as_number("WORKER_MAX_JOBS")?,
-            worker_max_retry_count: read_as_number("WORKER_MAX_RETRIES")?,
-            worker_exponential_backoff_base_millis: read_as_number(
+            worker_max_jobs: read_parsed_env("WORKER_MAX_JOBS")?,
+            worker_max_retry_count: read_parsed_env("WORKER_MAX_RETRIES")?,
+            worker_exponential_backoff_base_millis: read_parsed_env(
                 "WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS",
             )?,
-            worker_exponential_backoff_multiplier: read_as_number(
+            worker_exponential_backoff_multiplier: read_parsed_env(
                 "WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER",
             )?,
-            worker_exponential_backoff_max_delay_millis: read_as_number(
+            worker_exponential_backoff_max_delay_millis: read_parsed_env(
                 "WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS",
             )?,
-            redis_stream_refresh_ttl: read_as_number("REDIS_STREAM_REFRESH_TTL")?,
-            worker_account_lease_time_secs: read_as_number("WORKER_ACCOUNT_LEASE_TIME_SECS")?,
-            _worker_account_lease_time_refresh_gap_secs: read_as_number(
+            redis_stream_refresh_ttl: read_parsed_env("REDIS_STREAM_REFRESH_TTL")?,
+            worker_account_lease_time_secs: read_parsed_env("WORKER_ACCOUNT_LEASE_TIME_SECS")?,
+            _worker_account_lease_time_refresh_gap_secs: read_parsed_env(
                 "WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS",
             )?,
-            worker_job_max_work_time_secs: read_as_number("WORKER_JOB_MAX_WORK_TIME_SECS")?,
-            worker_empty_friends_delay_time_secs: read_as_number(
+            worker_job_max_work_time_secs: read_parsed_env("WORKER_JOB_MAX_WORK_TIME_SECS")?,
+            worker_empty_friends_delay_time_secs: read_parsed_env(
                 "WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS",
             )?,
         };

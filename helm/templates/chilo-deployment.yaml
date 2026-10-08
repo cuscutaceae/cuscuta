@@ -34,6 +34,10 @@ spec:
               value: {{ .Values.chilo.constants.useOnlineKey | quote }}
             - name: SCIRPOPHAGA_URL
               value: {{ .Values.dataSource.scirpophaga.url | quote }}
+            - name: RESOURCE_UPDATE_PERIOD
+              value: {{ .Values.dataSource.update.dataUpdatePeriod | quote }}
+            - name: RESOURCE_UPDATE_RETRIES
+              value: {{ .Values.dataSource.update.dataUpdateRetries | quote }}
           livenessProbe:
             httpGet:
               path: /healthz

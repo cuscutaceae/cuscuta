@@ -41,6 +41,10 @@ spec:
               value: {{ .Values.dataSource.base.appVersion.versionDefault | quote }}
             - name: RESOURCES_SONG_URL
               value: {{ .Values.dataSource.base.songUrl | quote }}
+            - name: RESOURCE_UPDATE_PERIOD
+              value: {{ .Values.dataSource.update.dataUpdatePeriod | quote }}
+            - name: RESOURCE_UPDATE_RETRIES
+              value: {{ .Values.dataSource.update.dataUpdateRetries | quote }}
             - name: USE_ONLINE_PREFIX
               value: {{ .Values.api.prefix.useOnlinePrefix | quote }}
             - name: SCIRPOPHAGA_URL
@@ -88,7 +92,7 @@ spec:
             - name: ETA_ENABLE
               value: {{ .Values.eta.enabled | quote }}
             - name: ETA_SEARCH_LIMIT
-              value: {{ .Values.eta.searchLimit | quote }}
+              value: {{ .Values.eta.searchLimit | quote }}            
           livenessProbe:
             httpGet:
               path: /healthz

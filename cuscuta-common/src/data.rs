@@ -1,3 +1,5 @@
+use std::{env, str::FromStr};
+
 use serde::{Deserialize, Deserializer};
 
 /// xxxxxx的数据版本信息
@@ -71,7 +73,7 @@ pub struct SongRaw {
 }
 
 /// 曲目信息
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Song {
     /// 曲目的数字id
     pub idx: i32,
@@ -81,6 +83,16 @@ pub struct Song {
 
     /// 曲目的难度信息
     pub difficulties: Vec<Difficulty>,
+}
+
+/// 曲目列表信息
+#[derive(Debug, Clone)]
+pub struct SongsWithHash {
+    /// 曲目列表的Hash
+    pub hash: String,
+
+    /// 曲目列表
+    pub songs: Vec<Song>,
 }
 
 /// 曲目信息的适配数据模型（顶层）
@@ -99,4 +111,15 @@ impl From<SongRaw> for Option<Song> {
             difficulties: it,
         })
     }
+}
+
+/// 读取环境变量，并parse
+pub fn read_parsed_env<T>(key: &str) -> Result<T, String>
+where
+    T: FromStr,
+{
+    env::var(key)
+        .map_err(|e| format!("failed to read {key}: {e}"))?
+        .parse::<T>()
+        .map_err(|_| format!("failed to read {key}: failed to parse"))
 }

@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use cuscuta_common::data::Song;
+use cuscuta_common::data::SongsWithHash;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
@@ -11,4 +11,4 @@ pub struct Config {
 
 pub static CONFIG: OnceLock<RwLock<Option<Config>>> = OnceLock::new();
 
-pub static SONG_LIST: OnceLock<RwLock<Option<Vec<Song>>>> = OnceLock::new();
+pub static SONG_LIST: OnceLock<RwLock<Option<Vec<SongsWithHash>>>> = OnceLock::new();

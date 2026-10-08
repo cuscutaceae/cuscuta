@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use cuscuta_common::{
-    data::Song,
+    data::SongsWithHash,
     db::{
         job::{Job, JobEssential, SubQueue},
         redis::{job_sub_queue_redis_key, sub_queue_postfix},
@@ -47,12 +47,12 @@ async fn pull_job_test() {
     }
 
     // 空本地队列首次pull测试
-    let sub_queue = scan_sub_queue_and_pull_job(
+    let (sub_queue, _) = scan_sub_queue_and_pull_job(
         &client,
         &mut current_jobs,
         &mut cursor,
         &config,
-        &Vec::<Song>::mock(),
+        &Vec::<SongsWithHash>::mock(),
         worker_id,
     )
     .await
@@ -88,12 +88,12 @@ async fn pull_job_test() {
         queue_timestamp,
     )
     .expect("failed to enqueue fake jobs");
-    let sub_queue = scan_sub_queue_and_pull_job(
+    let (sub_queue, _) = scan_sub_queue_and_pull_job(
         &client,
         &mut current_jobs,
         &mut cursor,
         &config,
-        &Vec::<Song>::mock(),
+        &Vec::<SongsWithHash>::mock(),
         worker_id,
     )
     .await

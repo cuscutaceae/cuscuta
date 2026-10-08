@@ -46,6 +46,10 @@ spec:
                   key: {{ include "cuscuta.secretKey" (dict "cfg" .Values.redis.secret "defaultKey" "REDIS_ADDR") }}
             - name: RESOURCES_SONG_URL
               value: {{ .Values.dataSource.base.songUrl | quote }}
+            - name: RESOURCE_UPDATE_PERIOD
+              value: {{ .Values.dataSource.update.dataUpdatePeriod | quote }}
+            - name: RESOURCE_UPDATE_RETRIES
+              value: {{ .Values.dataSource.update.dataUpdateRetries | quote }}
           livenessProbe:
             httpGet:
               path: /healthz

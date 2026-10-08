@@ -20,6 +20,7 @@ use crate::{
     loop_tasks::sync_config,
 };
 use cuscuta_common::{
+    data::read_parsed_env,
     quick_fetch::QuickFetch,
     scheduled_job::{
         register_job_future,
@@ -66,6 +67,12 @@ async fn main() {
         .await
         .expect("failed to bind 0.0.0.0:8081");
     tracing::info!("listening in 0.0.0.0:8081...");
+    let data_update_period = read_parsed_env::<u64>("RESOURCE_UPDATE_PERIOD").unwrap_or_else(|e| {
+        tracing::info!(
+            "pre_init: failed to read RESOURCE_UPDATE_PERIOD: {e}, set to default (30s)"
+        );
+        30
+    });
     tokio::spawn(register_individual_job(
         halt_token.clone(),
         CancellationToken::new(),
@@ -84,7 +91,7 @@ async fn main() {
     ));
     tokio::spawn(register_job_future(
         halt_token.clone(),
-        10,
+        data_update_period,
         sync_song_list(&SONG_LIST),
     ));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));

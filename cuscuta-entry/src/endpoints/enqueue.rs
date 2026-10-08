@@ -82,11 +82,17 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
     let transaction = try_open_transaction()
         .await
         .map_err(|e| Error::DbExtend(ErrorType::FailedTransactionOpenDb, e))?;
-    let song_list_len = SONG_LIST
+    let (song_list_len, hash) = SONG_LIST
         .try_read(|it| {
-            it.iter()
-                .map(|song| song.difficulties.len())
-                .collect::<Vec<_>>()
+            let songs_with_hash = it.first().expect("should have one element as least!");
+            (
+                songs_with_hash
+                    .songs
+                    .iter()
+                    .map(|song| song.difficulties.len())
+                    .collect::<Vec<_>>(),
+                songs_with_hash.hash.clone(),
+            )
         })
         .map_err(|_| Error::NotReady(ErrorType::SongListNotReady))?;
     let active_account_count = count_active_account(transaction)
@@ -114,7 +120,7 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
         let (queue_name, exist) = target_queue.map_or_else(
             || {
                 (
-                    sub_queue_postfix("00000000", &timestamp, range.start, range.end),
+                    sub_queue_postfix(&hash, &timestamp, range.start, range.end),
                     false,
                 )
             },

@@ -25,21 +25,28 @@ chilo:
   constants:
     binC2: ""
 
-# -- Required: GitHub tokens and repo info
-github:
-  bundleRepository: cuscutaceae/scales
-  bundlePath: bundle.json
-  bundleToken: ""
-  songRepository: cuscutaceae/scales
-  songPath: songs/songlist
-  songToken: ""
+# -- Data sources
+dataSource:
+  base:
+    appVersion:
+      useOnlineVersion: true
+      url: ""
+      versionDefault: ""
+    songUrl: ""
+  scirpophaga:
+    url: ""
 
 # -- Required: target API endpoints
 api:
-  login: ""
-  listFriends: ""
-  addFriends: ""
-  deleteFriends: ""
-  getRank: ""
-  notification: ""
-  compose: ""
+  prefix:
+    useOnlinePrefix: true
+    auth: ""
+    common: ""
+  path:
+    login: ""
+    listFriends: ""
+    addFriends: ""
+    deleteFriends: ""
+    getRank: ""
+    notification: ""
+    compose: ""

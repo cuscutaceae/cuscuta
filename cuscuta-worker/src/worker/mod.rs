@@ -11,7 +11,7 @@ use cuscuta_common::{
         self,
         xxxxxx::{FriendInfo, XxxxxxUrl},
     },
-    data::{AppVersionData, Song},
+    data::{AppVersionData, SongsWithHash},
     db::{
         self,
         account::AccountRow,
@@ -126,7 +126,7 @@ struct Args<'a> {
     config: Config,
     bundle_data: AppVersionData,
     xxxxxx_url: XxxxxxUrl,
-    song_list: Vec<Song>,
+    songs_with_hash_pool: Vec<SongsWithHash>,
 }
 
 fn get_args<'a>() -> Result<Args<'a>, Error> {
@@ -157,11 +157,12 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
         .map_err(|e| Error::NotReady {
             message: format!("bundle data ({e})"),
         })?;
-    let song_list = SONG_LIST
-        .try_read(std::clone::Clone::clone)
-        .map_err(|e| Error::NotReady {
-            message: format!("song list ({e})"),
-        })?;
+    let songs_with_hash_pool =
+        SONG_LIST
+            .try_read(std::clone::Clone::clone)
+            .map_err(|e| Error::NotReady {
+                message: format!("song list ({e})"),
+            })?;
     let xxxxxx_url =
         XXXXXX_URL
             .try_read(std::clone::Clone::clone)
@@ -177,7 +178,7 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
         config,
         bundle_data,
         xxxxxx_url,
-        song_list,
+        songs_with_hash_pool,
     })
 }
 
@@ -195,14 +196,14 @@ async fn internal_loop(
         config,
         bundle_data,
         xxxxxx_url,
-        song_list,
+        songs_with_hash_pool,
     } = get_args()?;
-    let Some(current_segments) = scan_sub_queue_and_pull_job(
+    let Some((current_segments, songs_with_hash)) = scan_sub_queue_and_pull_job(
         redis_client,
         current_jobs,
         cursor,
         &config,
-        &song_list,
+        &songs_with_hash_pool,
         worker_id,
     )
     .await?
@@ -249,7 +250,7 @@ async fn internal_loop(
             &user_id,
             &token,
             &account_row,
-            &song_list,
+            &songs_with_hash,
             *cursor,
             &config,
         )

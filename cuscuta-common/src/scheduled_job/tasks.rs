@@ -1,27 +1,73 @@
 use std::{env, pin::Pin, sync::OnceLock};
 
 use redis::TypedCommands;
+use sha2::Digest;
 use sqlx::postgres::PgPoolOptions;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     api::fetch_env_as_json,
-    data::{Song, SongsResult},
+    data::{Song, SongsResult, SongsWithHash},
     quick_fetch::QuickFetch,
 };
 
 type QuickFetchType<T> = OnceLock<RwLock<Option<T>>>;
 
+fn calc_song_list_hash(song_list: &[Song]) -> String {
+    struct SongPart<'a> {
+        idx: i32,
+        id: &'a str,
+        difficulty: u8,
+    }
+    let mut parts = song_list
+        .iter()
+        .map(|it| {
+            let difficulty = it
+                .difficulties
+                .iter()
+                .fold(0u8, |b, d| b | (1 << d.rating_class));
+            SongPart {
+                idx: it.idx,
+                id: &it.id,
+                difficulty,
+            }
+        })
+        .collect::<Vec<_>>();
+    parts.sort_by_key(|it| it.idx);
+    let data = parts
+        .into_iter()
+        .flat_map(
+            |SongPart {
+                 idx,
+                 id,
+                 difficulty,
+             }| {
+                idx.to_le_bytes()
+                    .iter()
+                    .chain(id.as_bytes())
+                    .chain(&[difficulty])
+                    .copied()
+                    .collect::<Vec<_>>()
+            },
+        )
+        .collect::<Vec<_>>();
+    let arr = sha2::Sha256::digest(data)
+        .into_iter()
+        .take(8)
+        .collect::<Vec<_>>();
+    hex::encode(&arr)
+}
+
 /// 同步歌曲列表
 pub fn sync_song_list(
-    global_song_list: &'static QuickFetchType<Vec<Song>>,
+    global_song_list: &'static QuickFetchType<Vec<SongsWithHash>>,
 ) -> impl Fn(&CancellationToken) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
     |_| {
         Box::pin(async {
             async fn try_sync(
-                global_song_list: &QuickFetchType<Vec<Song>>,
-            ) -> Result<(usize, usize), String> {
+                global_song_list: &QuickFetchType<Vec<SongsWithHash>>,
+            ) -> Result<(usize, usize, String), String> {
                 let song_list: Vec<_> = fetch_env_as_json::<SongsResult>("RESOURCES_SONG_URL")
                     .await
                     .map_err(|e| format!("failed to fetch song data from url: {e}"))
@@ -29,10 +75,24 @@ pub fn sync_song_list(
                     .collect();
                 let music_len = song_list.len();
                 let chart_len = song_list.iter().fold(0, |v, it| v + it.difficulties.len());
+                tracing::info!("sync_song_list: hashing");
+                let hash = calc_song_list_hash(&song_list);
                 global_song_list
-                    .try_write(move |_| song_list.into())
+                    .try_write(|songs_with_hash| {
+                        let new = SongsWithHash {
+                            hash: hash.clone(),
+                            songs: song_list.clone(),
+                        };
+                        match songs_with_hash {
+                            Some(mut songs_with_hash) => {
+                                songs_with_hash.insert(0, new);
+                                Some(songs_with_hash)
+                            }
+                            None => Some(vec![new]),
+                        }
+                    })
                     .map_err(|e| format!("failed to write SONG_LIST: {e}"))?;
-                Ok((music_len, chart_len))
+                Ok((music_len, chart_len, hash))
             }
             if global_song_list.is_initialized() {
                 tracing::trace!("song list sync");
@@ -40,8 +100,8 @@ pub fn sync_song_list(
             }
             tracing::info!("sync_song_list: trying sync song list");
             match try_sync(global_song_list).await {
-                Ok((music_len, chart_len)) => tracing::info!(
-                    "sync_song_list: song list initialized (music:{music_len}, charts:{chart_len})"
+                Ok((music_len, chart_len, hash)) => tracing::info!(
+                    "sync_song_list: song list initialized (music:{music_len}, charts:{chart_len}, hash: {hash})"
                 ),
                 Err(e) => tracing::error!("sync_song_list: failed to sync song list: {e}"),
             }

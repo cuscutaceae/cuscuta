@@ -3,7 +3,7 @@ mod test;
 use std::collections::HashMap;
 
 use cuscuta_common::{
-    data::Song,
+    data::SongsWithHash,
     db::{
         self,
         job::{
@@ -24,17 +24,20 @@ use crate::{
 };
 
 // 好吧我承认这里写的有点脏了
-pub async fn scan_sub_queue_and_pull_job(
+pub async fn scan_sub_queue_and_pull_job<'a>(
     redis_client: &Client,
     current_jobs: &mut Vec<Job>,
     cursor: &mut usize,
     config: &Config,
-    song_list: &[Song],
+    songs_with_hash_pool: &'a [SongsWithHash],
     worker_id: &str,
-) -> Result<Option<SubQueue>, Error> {
+) -> Result<Option<(SubQueue, &'a SongsWithHash)>, Error> {
     let current_sub_queue = current_jobs.first().map(|it| it.sub_queue.clone());
-    let song_list_len = song_list.len();
-    let (new_jobs, current_segments) = if let Some(s) = current_sub_queue {
+    let (new_jobs, current_segments, songs_with_hash) = if let Some(s) = current_sub_queue {
+        let songs_with_hash = songs_with_hash_pool
+            .iter()
+            .find(|it| it.hash == s.hash)
+            .expect("should have matched songs");
         (
             pull_jobs(
                 current_jobs,
@@ -42,9 +45,10 @@ pub async fn scan_sub_queue_and_pull_job(
                 config,
                 redis_client,
                 worker_id,
-                song_list_len,
+                songs_with_hash,
             )?,
             s,
+            songs_with_hash,
         )
     } else {
         let sub_queues = scan_sub_queue(redis_client).map_err(|e| match e {
@@ -53,19 +57,19 @@ pub async fn scan_sub_queue_and_pull_job(
                 message: format!("bad data: {e}"),
             },
         })?;
-        let Some((jobs, sub_queue)) = discover_sub_queue_for_jobs(
+        let Some((jobs, sub_queue, songs_with_hash)) = discover_sub_queue_for_jobs(
             current_jobs,
             config,
             redis_client,
             worker_id,
             &sub_queues,
-            song_list_len,
+            songs_with_hash_pool,
         )?
         else {
             return Ok(None);
         };
         *cursor = sub_queue.segment.start;
-        (Some(jobs), sub_queue)
+        (Some(jobs), sub_queue, songs_with_hash)
     };
     if let Some(new_jobs) = new_jobs {
         for it in new_jobs {
@@ -90,7 +94,7 @@ pub async fn scan_sub_queue_and_pull_job(
             current_jobs.push(it);
         }
     }
-    Ok(Some(current_segments))
+    Ok(Some((current_segments, songs_with_hash)))
 }
 
 #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
@@ -147,7 +151,7 @@ fn pull_jobs(
     config: &Config,
     redis_client: &Client,
     pod_uid: &str,
-    total_length: usize,
+    songs_with_hash: &SongsWithHash,
 ) -> Result<Option<Vec<Job>>, Error> {
     // TODO: 添加无GROUP找不到的错误处理（跳过）
     let valid_jobs = valid_jobs(jobs);
@@ -159,6 +163,7 @@ fn pull_jobs(
     if valid_jobs >= max_jobs {
         return Ok(Option::None);
     }
+    let total_length = songs_with_hash.songs.len();
     let divisions = jobs
         .first()
         .map_or(1, |it| {
@@ -216,23 +221,30 @@ fn pull_jobs(
     ))
 }
 
-fn discover_sub_queue_for_jobs(
+fn discover_sub_queue_for_jobs<'a>(
     jobs: &[Job],
     config: &Config,
     redis_client: &Client,
     pod_uid: &str,
     sub_queues: &[SubQueue],
-    total_length: usize,
-) -> Result<Option<(Vec<Job>, SubQueue)>, Error> {
-    for queue in sub_queues {
-        let Some(jobs) = pull_jobs(jobs, queue, config, redis_client, pod_uid, total_length)?
-        else {
-            continue;
-        };
-        if jobs.is_empty() {
-            continue;
+    songs_with_hash_pool: &'a [SongsWithHash],
+) -> Result<Option<(Vec<Job>, SubQueue, &'a SongsWithHash)>, Error> {
+    for songs_with_hash in songs_with_hash_pool {
+        for queue in sub_queues
+            .iter()
+            .rev()
+            .filter(|it| it.hash == songs_with_hash.hash)
+        {
+            let Some(jobs) =
+                pull_jobs(jobs, queue, config, redis_client, pod_uid, songs_with_hash)?
+            else {
+                continue;
+            };
+            if jobs.is_empty() {
+                continue;
+            }
+            return Ok(Some((jobs, queue.clone(), songs_with_hash)));
         }
-        return Ok(Some((jobs, queue.clone())));
     }
     Ok(None)
 }

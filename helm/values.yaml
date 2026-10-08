@@ -41,7 +41,7 @@ redisStreamRefreshTtl: 300
 eta:
   # -- Enable ETA estimation (env: ETA_ENABLE)
   enabled: true
-# -- Max ETA data points to retain (env: ETA_RECORD_TRIM)
+  # -- Max ETA data points to retain (env: ETA_RECORD_TRIM)
   recordTrim: 15
   # -- Max jobs to search for ETA estimation (env: ETA_SEARCH_LIMIT)
   searchLimit: 10
@@ -56,7 +56,10 @@ dataSource:
     songUrl: ""
   scirpophaga:
     url: ""
-
+  update:
+    # -- Data update period for worker and entry (second)
+    dataUpdatePeriod: 60
+    dataUpdateRetries: 5
 
 # -- External target API endpoints (required for production; mock can be used for testing)
 api:
