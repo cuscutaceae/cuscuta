@@ -3,20 +3,15 @@ use std::{env, str::FromStr};
 use chrono::{DateTime, Utc};
 use cuscuta_common::{
     api::{fetch_env_as_json, xxxxxx::XxxxxxUrl},
-    data::{AppVersionData, ScirpophagaData, Song, SongsResult},
+    data::{AppVersionData, ScirpophagaData},
     db::account::update_account_lease_time,
     quick_fetch::QuickFetch,
 };
-use redis::TypedCommands;
-use sqlx::postgres::PgPoolOptions;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, Config, SONG_LIST, XXXXXX_URL},
-    db::{
-        postgresql::{POSTGRESQL_POOL, try_open_transaction},
-        redis::REDIS_CLIENT,
-    },
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, Config, XXXXXX_URL},
+    db::postgresql::try_open_transaction,
 };
 
 pub async fn sync_scirpophaga_data(_: &CancellationToken) {
@@ -179,86 +174,6 @@ pub async fn sync_config(_: &CancellationToken) {
         return;
     }
     tracing::info!("sync_config: config initialized");
-}
-
-pub async fn sync_song_list(_: &CancellationToken) {
-    async fn try_sync() -> Result<(usize, usize), String> {
-        let song_list: Vec<_> = fetch_env_as_json::<SongsResult>("RESOURCES_SONG_URL")
-            .await
-            .map_err(|e| format!("failed to fetch song data from url: {e}"))
-            .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
-            .collect();
-        let music_len = song_list.len();
-        let chart_len = song_list.iter().fold(0, |v, it| v + it.difficulties.len());
-        SONG_LIST
-            .try_write(move |_| song_list.into())
-            .map_err(|e| format!("failed to write SONG_LIST: {e}"))?;
-        Ok((music_len, chart_len))
-    }
-    if SONG_LIST.is_initialized() {
-        tracing::trace!("song list sync");
-        return;
-    }
-    tracing::info!("sync_song_list: trying sync song list");
-    match try_sync().await {
-        Ok((music_len, chart_len)) => tracing::info!(
-            "sync_song_list: song list initialized (music:{music_len}, charts:{chart_len})"
-        ),
-        Err(e) => tracing::error!("sync_song_list: failed to sync song list: {e}"),
-    }
-}
-
-pub async fn open_redis_client(_: &CancellationToken) {
-    fn try_connect() -> Result<(), String> {
-        let addr = env::var("REDIS_ADDR").map_err(|_| "failed to read env: REDIS_ADDR")?;
-        tracing::debug!("redis_open: redis: {addr}");
-        let redis = redis::Client::open(addr)
-            .map_err(|e| format!("failed to open redis client(phase 1): {e}"))?;
-        let mut con = redis
-            .get_connection()
-            .map_err(|e| format!("failed to open redis client(phase 2): {e}"))?;
-        con.ping()
-            .map_err(|e| format!("failed to open redis client(phase 3): {e}"))?;
-        REDIS_CLIENT
-            .set(redis)
-            .map_err(|_| "failed to set redis client".to_string())?;
-        Ok(())
-    }
-    if REDIS_CLIENT.get().is_some() {
-        return;
-    }
-    tracing::debug!("redis_open: trying to connect to redis server...");
-    if let Err(e) = try_connect() {
-        tracing::error!("redis_open: failed to connect to redis server: {e}");
-        return;
-    }
-    tracing::info!("redis_open: redis client created successfully");
-}
-
-pub async fn open_postgresql_client(_: &CancellationToken) {
-    async fn try_connect() -> Result<(), String> {
-        let addr = env::var("ACCOUNTS_SQL_ADDR")
-            .map_err(|e| format!("failed to read ACCOUNTS_SQL_ADDR: {e}"))?;
-        tracing::debug!("postgresql_open: {addr}");
-        let x = PgPoolOptions::new()
-            .max_connections(5)
-            .connect(addr.as_str())
-            .await
-            .map_err(|e| format!("failed to connect to postgresql server: {e}"))?;
-        POSTGRESQL_POOL
-            .try_write(move |_| x.into())
-            .map_err(|e| format!("failed to write postgresql pool: {e}"))?;
-        Ok(())
-    }
-    if POSTGRESQL_POOL.is_initialized() {
-        return;
-    }
-    tracing::debug!("postgresql_open: trying to connect to postgresql server...");
-    if let Err(e) = try_connect().await {
-        tracing::error!("postgresql_open: failed to connect to postgresql server: {e}");
-        return;
-    }
-    tracing::info!("postgresql_open: postgresql pool created successfully");
 }
 
 pub async fn update_lease_time(_: &CancellationToken) {

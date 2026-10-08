@@ -35,7 +35,10 @@ use cuscuta_common::{
     batch_check_initialized,
     db::account::try_release_account,
     quick_fetch::QuickFetch,
-    scheduled_job::{register_individual_job, register_job},
+    scheduled_job::{
+        register_individual_job, register_job, register_job_future,
+        tasks::{open_postgresql_client, open_redis_client, sync_song_list},
+    },
 };
 use serde_json::json;
 use tokio::net::TcpListener;
@@ -48,10 +51,7 @@ use crate::{
         redis::REDIS_CLIENT,
     },
     init::cuscuta_init,
-    loop_tasks::{
-        open_postgresql_client, open_redis_client, sync_app_version_data, sync_config,
-        sync_scirpophaga_data, sync_song_list, update_lease_time,
-    },
+    loop_tasks::{sync_app_version_data, sync_config, sync_scirpophaga_data, update_lease_time},
     worker::{resume_state, worker_loop},
 };
 
@@ -75,11 +75,23 @@ async fn main() {
         10,
         cuscuta_init,
     ));
-    tokio::spawn(register_job(halt_token.clone(), 10, open_redis_client));
-    tokio::spawn(register_job(halt_token.clone(), 10, open_postgresql_client));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        open_redis_client(&REDIS_CLIENT),
+    ));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        open_postgresql_client(&POSTGRESQL_POOL),
+    ));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_app_version_data));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_song_list));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        sync_song_list(&SONG_LIST),
+    ));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_scirpophaga_data));
     tokio::spawn(register_job(
         halt_token.clone(),

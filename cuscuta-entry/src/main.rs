@@ -19,7 +19,13 @@ use crate::{
     enqueue::enqueue,
     loop_tasks::sync_config,
 };
-use cuscuta_common::quick_fetch::QuickFetch;
+use cuscuta_common::{
+    quick_fetch::QuickFetch,
+    scheduled_job::{
+        register_job_future,
+        tasks::{open_postgresql_client, open_redis_client, sync_song_list},
+    },
+};
 
 use axum::{
     Json, Router,
@@ -37,11 +43,7 @@ use tokio_util::sync::CancellationToken;
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
 
-use crate::{
-    endpoints::enqueue,
-    init::cuscuta_init,
-    loop_tasks::{open_postgresql_client, open_redis_client, sync_song_list},
-};
+use crate::{endpoints::enqueue, init::cuscuta_init};
 
 #[tokio::main]
 async fn main() {
@@ -70,9 +72,21 @@ async fn main() {
         10,
         cuscuta_init,
     ));
-    tokio::spawn(register_job(halt_token.clone(), 10, open_redis_client));
-    tokio::spawn(register_job(halt_token.clone(), 10, open_postgresql_client));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_song_list));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        open_redis_client(&REDIS_CLIENT),
+    ));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        open_postgresql_client(&POSTGRESQL_POOL),
+    ));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        sync_song_list(&SONG_LIST),
+    ));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
     axum::serve(addr, service)
         .with_graceful_shutdown(shutdown_signal(halt_token))
