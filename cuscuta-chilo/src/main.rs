@@ -1,9 +1,12 @@
-//! cuscuta-chilo是对[chilo](https://github.com/cuscutaceae/chilo)的Web API包装
+//! cuscuta-chilo 是对 [chilo](https://github.com/cuscutaceae/chilo) 的 Web API 包装。
 //!
 //! # 依赖环境变量
-//! cuscuta-chilo使用环境变量注入参数，这个crate依赖的环境变量有：
-//! - `BIN_C1`
-//! - `BIN_C2`
+//! cuscuta-chilo 使用环境变量注入参数，这个 crate 依赖的环境变量有：
+//! - `RESOURCE_UPDATE_PERIOD`（数据刷新周期，单位秒，默认 30）
+//! - `RESOURCE_UPDATE_RETRIES`（数据拉取最大重试次数，默认 5）
+//! - `USE_ONLINE_KEY`（是否在线拉取密钥，默认 true）
+//! - `SCIRPOPHAGA_URL`（在线密钥来源，`USE_ONLINE_KEY=true` 时使用）
+//! - `BIN_C2`（离线密钥，十六进制，`USE_ONLINE_KEY=false` 时使用）
 
 mod loop_tasks;
 

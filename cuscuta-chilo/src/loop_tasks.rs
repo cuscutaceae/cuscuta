@@ -18,7 +18,7 @@ pub async fn sync_scirpophaga_data(_: &CancellationToken) {
                 .map_err(|e| format!("failed to fetch from SCIRPOPHAGA_URL: {e}"))?
                 .c2
         } else {
-            env::var("BIN_C2").map_err(|e| format!("failed to read API_PREFIX_COMMON: {e}"))?
+            env::var("BIN_C2").map_err(|e| format!("failed to read BIN_C2: {e}"))?
         };
         let vec = hex::decode(data.clone())
             .map_err(|e| format!("failed to decode string: {data} ({e})"))?;

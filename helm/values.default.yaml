@@ -1,31 +1,32 @@
-# Minimal production configuration.
-# Fill in the blanks, then:
+# 最小生产配置。
+# 填入空缺项后执行：
 #   helm install cuscuta . -f values.default.yaml
 
-# -- Required: PostgreSQL connection
+# -- 必填：PostgreSQL 连接
 postgresql:
   url: "postgresql://user:password@host:5432/db"
-  # To use an external Secret instead, uncomment below and remove url above:
+  # 如需使用外部 Secret，请取消下面的注释并删除上面的 url：
   # secret:
   #   enabled: true
   #   name: "my-postgres-secret"
   #   key: "ACCOUNTS_SQL_ADDR"
 
-# -- Required: Redis connection
+# -- 必填：Redis 连接
 redis:
   url: "redis://host:6379/0"
-  # To use an external Secret instead, uncomment below and remove url above:
+  # 如需使用外部 Secret，请取消下面的注释并删除上面的 url：
   # secret:
   #   enabled: true
   #   name: "my-redis-secret"
   #   key: "REDIS_ADDR"
 
-# -- Required: challenge constants (contact admin for values)
+# -- 必填：挑战密钥（具体取值请联系管理员）
 chilo:
   constants:
+    # -- 离线密钥 C2，十六进制
     binC2: ""
 
-# -- Data sources
+# -- 数据源
 dataSource:
   base:
     appVersion:
@@ -36,7 +37,7 @@ dataSource:
   scirpophaga:
     url: ""
 
-# -- Required: target API endpoints
+# -- 必填：目标 API 端点
 api:
   prefix:
     useOnlinePrefix: true

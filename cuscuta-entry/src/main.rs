@@ -1,10 +1,14 @@
-//! cuscuta的entry
+//! cuscuta 的 entry。
 //!
 //! # 依赖环境变量
-//! cuscuta-entry使用环境变量注入参数，这个crate依赖的环境变量有：
+//! cuscuta-entry 使用环境变量注入参数，这个 crate 依赖的环境变量有：
 //! - `REDIS_STREAM_REFRESH_TTL`
 //! - `REDIS_ADDR`
 //! - `ACCOUNTS_SQL_ADDR`
+//! - `STAT_ENABLE`
+//! - `RESOURCE_UPDATE_PERIOD`（数据刷新周期，单位秒，默认 30）
+//! - `RESOURCE_UPDATE_RETRIES`（数据拉取最大重试次数，默认 5）
+//! - `RESOURCES_SONG_URL`
 
 mod data;
 mod db;

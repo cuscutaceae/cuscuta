@@ -1,3 +1,10 @@
+# 本地测试用的 Docker Compose 配置（mock 模式）。
+#
+# 说明：
+# - worker 使用 USE_ONLINE_PREFIX=false，将目标 API 请求指向 test-mock；
+# - chilo 使用 USE_ONLINE_KEY=false，直接使用下方的 BIN_C2（全 0 仅用于测试）；
+# - RESOURCES_SONG_URL 与 RESOURCES_APP_VERSION_DEFAULT 为占位值，使用前请替换为实际数据。
+
 services:
   # Optional
   #
@@ -52,6 +59,7 @@ services:
       # Log
       RUST_LOG: debug
       # Config
+      USE_ONLINE_KEY: "false"
       BIN_C2: "0000000000000000000000000000000000000000000000000000000000000000"
     restart: no
 
@@ -65,6 +73,8 @@ services:
     environment:
       # Log
       RUST_LOG: info
+      # Mock
+      FAIL_CHANCE: "0.3"
     restart: no
 
   test-worker:
@@ -81,22 +91,24 @@ services:
       ACCOUNTS_SQL_ADDR: "postgresql://myuser:mypassword@postgres:5432/mydb"
       REDIS_ADDR: "redis://redis:6379/0"
       # Data
-      GITHUB_BUNDLE_REPOSITORY: cuscutaceae/scales
-      GITHUB_BUNDLE_PATH: bundle.json
-      GITHUB_BUNDLE_TOKEN: "DummyToken"
-      GITHUB_SONG_REPOSITORY: cuscutaceae/scales
-      GITHUB_SONG_PATH: songs/songlist
-      GITHUB_SONG_TOKEN: "DummyToken"
-      # API
+      RESOURCES_APP_VERSION_USE_ONLINE: "false"
+      RESOURCES_APP_VERSION_DEFAULT: "1.0.0c"  # TODO: 替换为实际目标 App 版本
+      RESOURCES_SONG_URL: "https://example.com/songlist"  # TODO: 替换为实际曲目列表地址
+      RESOURCE_UPDATE_PERIOD: 60
+      RESOURCE_UPDATE_RETRIES: 5
+      # API（离线前缀模式，指向 mock）
+      USE_ONLINE_PREFIX: "false"
+      API_PREFIX_AUTH: "http://test-mock:8080"
+      API_PREFIX_COMMON: "http://test-mock:8080"
       API_CHILO: "http://test-chilo:8080/generate"
-      API_LOGIN: "http://test-mock:8080/auth/login"
-      API_LIST_FRIENDS: "http://test-mock:8080/friend/me"
-      API_ADD_FRIENDS: "http://test-mock:8080/friend/me/add"
-      API_DELETE_FRIENDS: "http://test-mock:8080/friend/me/delete"
-      API_GET_RANK: "http://test-mock:8080/score/song/friend"
-      API_NOTIFICATION: "http://test-mock:8080/unimplemented"
-      API_COMPOSE_AGGREGATE: "http://test-mock:8080/unimplemented"
-      # Config
+      API_ENDPOINT_LOGIN: "/auth/login"
+      API_ENDPOINT_LIST_FRIENDS: "/friend/me"
+      API_ENDPOINT_ADD_FRIENDS: "/friend/me/add"
+      API_ENDPOINT_DELETE_FRIENDS: "/friend/me/delete"
+      API_ENDPOINT_GET_RANK: "/score/song/friend"
+      API_ENDPOINT_NOTIFICATION: "/"
+      API_ENDPOINT_COMPOSE_AGGREGATE: "/"
+      # Worker tuning
       WORKER_MAX_JOBS: 8
       WORKER_MAX_RETRIES: 30
       WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS: 10
@@ -105,9 +117,8 @@ services:
       WORKER_ACCOUNT_LEASE_TIME_SECS: 120
       WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS: 30
       WORKER_JOB_MAX_WORK_TIME_SECS: 1200
+      WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS: 10
       REDIS_STREAM_REFRESH_TTL: 300
-      ETA_ENABLE: "true"
-      ETA_SEARCH_LIMIT: "10"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -129,17 +140,11 @@ services:
       ACCOUNTS_SQL_ADDR: "postgresql://myuser:mypassword@postgres:5432/mydb"
       REDIS_ADDR: "redis://redis:6379/0"
       # Data
-      GITHUB_BUNDLE_REPOSITORY: cuscutaceae/scales
-      GITHUB_BUNDLE_PATH: bundle.json
-      GITHUB_BUNDLE_TOKEN: "DummyToken"
-      GITHUB_SONG_REPOSITORY: cuscutaceae/scales
-      GITHUB_SONG_PATH: songs/songlist
-      GITHUB_SONG_TOKEN: "DummyToken"
+      RESOURCES_SONG_URL: "https://example.com/songlist"  # TODO: 替换为实际曲目列表地址
+      RESOURCE_UPDATE_PERIOD: 60
+      RESOURCE_UPDATE_RETRIES: 5
       # Config
       REDIS_STREAM_REFRESH_TTL: 300
-      ETA_ENABLE: "true"
-      ETA_SEARCH_LIMIT: "10"
-      ETA_RECORD_TRIM: "15"
       STAT_ENABLE: "true"
     ports:
       - "8081:8081"

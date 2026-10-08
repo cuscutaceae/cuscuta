@@ -20,10 +20,10 @@
 ```shell
 # 1. 复制最小配置文件并填写必填项
 cp helm/values.default.yaml my-values.yaml
-# 编辑 my-values.yaml，填入 postgresql.url、redis.url、chilo.constants、github.*、api.*
+# 编辑 my-values.yaml，填入 postgresql.url、redis.url、chilo.constants.binC2、dataSource.* 和 api.*
 
 # 2. 安装
-helm install cuscuta oci://ghcr.io/cuscutaceae/charts/cuscuta --version 0.1.0 -f my-values.yaml
+helm install cuscuta oci://ghcr.io/cuscutaceae/charts/cuscuta --version 0.1.3 -f my-values.yaml
 
 # 3. 验证集群状态
 cuscutactl --mode kubernetes doctor
@@ -39,7 +39,7 @@ Helm chart 详情见 [helm/values.yaml](helm/values.yaml)，最小配置模板�
 
 ```shell
 cp docker-compose-local.yaml docker-compose.override.yaml
-# 编辑 docker-compose.override.yaml，填入 GITHUB_*_TOKEN 和 chilo 常量
+# 编辑 docker-compose.override.yaml，按需填入数据源 URL、API 端点和 chilo 密钥
 docker compose up -d
 ```
 
@@ -114,21 +114,37 @@ cargo build --release -p cuscuta-chilo
 | `redis.secret.enabled` | 是否从外部 Secret 读取 Redis URL |
 | `redis.secret.name` | 外部 Secret 的名称 |
 | `redis.secret.key` | 外部 Secret 中 Redis URL 的键名 |
-| `chilo.constants.binC1` | 常量 C1（十六进制） |
-| `chilo.constants.binC2` | 常量 C2（十六进制） |
-| `chilo.constants.binLoginC31` | 常量 login-C31（十六进制） |
-| `chilo.constants.binLoginC32` | 常量 login-C32（十六进制） |
-| `github.bundleRepository` | Bundle 数据所在的 GitHub 仓库 |
-| `github.bundlePath` | 仓库中 bundle JSON 的路径 |
-| `github.bundleToken` | 访问 bundle 仓库的 GitHub PAT |
-| `github.songRepository` | 曲目列表所在的 GitHub 仓库 |
-| `github.songPath` | 仓库中曲目列表的路径 |
-| `github.songToken` | 访问曲目仓库的 GitHub PAT |
-| `api.login` | 目标登录 API 地址 |
-| `api.listFriends` | 目标好友列表 API 地址 |
-| `api.addFriends` | 目标添加好友 API 地址 |
-| `api.deleteFriends` | 目标删除好友 API 地址 |
-| `api.getRank` | 目标排行榜 API 地址 |
+| `rustLog` | 所有组件的日志级别（对应 `RUST_LOG`） |
+| `redisStreamRefreshTtl` | entry 和 worker 共享的 Redis 流 TTL（秒，对应 `REDIS_STREAM_REFRESH_TTL`） |
+| `chilo.constants.useOnlineKey` | 是否在线拉取密钥（对应 `USE_ONLINE_KEY`） |
+| `chilo.constants.binC2` | 离线密钥 C2（十六进制，对应 `BIN_C2`） |
+| `dataSource.base.appVersion.useOnlineVersion` | 是否在线获取 App 版本（对应 `RESOURCES_APP_VERSION_USE_ONLINE`） |
+| `dataSource.base.appVersion.url` | App 版本 JSON 地址（对应 `RESOURCES_APP_VERSION_URL`） |
+| `dataSource.base.appVersion.versionDefault` | 离线时使用的 App 版本（对应 `RESOURCES_APP_VERSION_DEFAULT`） |
+| `dataSource.base.songUrl` | 曲目列表 JSON 地址（对应 `RESOURCES_SONG_URL`） |
+| `dataSource.scirpophaga.url` | scirpophaga 数据 JSON 地址（对应 `SCIRPOPHAGA_URL`） |
+| `dataSource.update.dataUpdatePeriod` | 数据刷新周期（秒，对应 `RESOURCE_UPDATE_PERIOD`） |
+| `dataSource.update.dataUpdateRetries` | 数据拉取最大重试次数（对应 `RESOURCE_UPDATE_RETRIES`） |
+| `api.prefix.useOnlinePrefix` | 是否在线获取 API 路径前缀（对应 `USE_ONLINE_PREFIX`） |
+| `api.prefix.auth` | 认证 API 路径前缀（对应 `API_PREFIX_AUTH`） |
+| `api.prefix.common` | 通用 API 路径前缀（对应 `API_PREFIX_COMMON`） |
+| `api.path.login` | 登录 API 路径（对应 `API_ENDPOINT_LOGIN`） |
+| `api.path.listFriends` | 好友列表 API 路径（对应 `API_ENDPOINT_LIST_FRIENDS`） |
+| `api.path.addFriends` | 添加好友 API 路径（对应 `API_ENDPOINT_ADD_FRIENDS`） |
+| `api.path.deleteFriends` | 删除好友 API 路径（对应 `API_ENDPOINT_DELETE_FRIENDS`） |
+| `api.path.getRank` | 排行榜 API 路径（对应 `API_ENDPOINT_GET_RANK`） |
+| `api.path.notification` | 通知 API 路径（对应 `API_ENDPOINT_NOTIFICATION`） |
+| `api.path.compose` | 聚合调用 API 路径（对应 `API_ENDPOINT_COMPOSE_AGGREGATE`） |
+| `entry.status.enabled` | 是否启用 `/v1/status` 接口（对应 `STAT_ENABLE`） |
+| `worker.maxJobs` | 每个 worker 最大并发任务数（对应 `WORKER_MAX_JOBS`） |
+| `worker.maxRetries` | API 调用最大重试次数（对应 `WORKER_MAX_RETRIES`） |
+| `worker.exponentialBackoffBaseMillis` | 指数退避初始等待时间（对应 `WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS`） |
+| `worker.exponentialBackoffMultiplier` | 指数退避乘数（对应 `WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER`） |
+| `worker.exponentialBackoffMaxDelayMillis` | 指数退避最大等待时间（对应 `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS`） |
+| `worker.accountLeaseTimeSecs` | 账号租约时长（对应 `WORKER_ACCOUNT_LEASE_TIME_SECS`） |
+| `worker.accountLeaseTimeRefreshGapSecs` | 租约续期间隔（对应 `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS`） |
+| `worker.jobMaxWorkTimeSecs` | 任务最长运行时间（对应 `WORKER_JOB_MAX_WORK_TIME_SECS`） |
+| `worker.emptyFriendsDelayTimeSecs` | 风控应对延迟（对应 `WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS`） |
 | `worker.keda.enabled` | 是否启用 KEDA 自动伸缩 |
 | `worker.keda.maxReplicaCount` | worker 最大副本数 |
 | `mock.enabled` | 是否启用 mock 服务（生产环境应关闭） |
@@ -139,53 +155,76 @@ cargo build --release -p cuscuta-chilo
 
 cuscuta 所有组件均通过环境变量注入配置。
 
-### 共用变量
+### 通用基础设施
 
-| 变量 | 使用者 |
-|------|--------|
-| `RUST_LOG` | 全部 |
-| `ACCOUNTS_SQL_ADDR` | entry, worker |
-| `REDIS_ADDR` | entry, worker |
-| `REDIS_STREAM_REFRESH_TTL` | entry, worker |
-| `ETA_ENABLE` | entry, worker |
-| `ETA_SEARCH_LIMIT` | entry, worker |
-| `ETA_RECORD_TRIM` | entry |
-| `GITHUB_BUNDLE_REPOSITORY` | entry, worker |
-| `GITHUB_BUNDLE_PATH` | entry, worker |
-| `GITHUB_BUNDLE_TOKEN` | entry, worker |
-| `GITHUB_SONG_REPOSITORY` | entry, worker |
-| `GITHUB_SONG_PATH` | entry, worker |
-| `GITHUB_SONG_TOKEN` | entry, worker |
-
-### Worker 专用变量
-
-| 变量 | 默认值 | 说明 |
+| 变量 | 使用者 | 说明 |
 |------|--------|------|
-| `WORKER_MAX_JOBS` | 8 | 每个 worker 最大并发任务数 |
-| `WORKER_MAX_RETRIES` | 30 | API 调用最大重试次数 |
-| `WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS` | 10 | 指数退避初始等待时间（毫秒） |
-| `WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER` | 2 | 指数退避乘数 |
-| `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS` | 500 | 指数退避最大等待时间（毫秒） |
-| `WORKER_ACCOUNT_LEASE_TIME_SECS` | 120 | 账号租约时长（秒） |
-| `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 30 | 租约续期间隔（秒） |
-| `WORKER_JOB_MAX_WORK_TIME_SECS` | 1200 | 任务的最长运行时间（秒） |
-| `WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS` | 10 | 风控应对延迟（秒） |
-| `ETA_ENABLE` | true | 是否启用 ETA 预估 |
-| `API_CHILO` | — | chilo 服务地址 |
-| `API_LOGIN` | — | 登录 API 地址 |
-| `API_LIST_FRIENDS` | — | 好友列表 API 地址 |
-| `API_ADD_FRIENDS` | — | 添加好友 API 地址 |
-| `API_DELETE_FRIENDS` | — | 删除好友 API 地址 |
-| `API_GET_RANK` | — | 排行榜 API 地址 |
-| `API_NOTIFICATION` | — | 通知 API 地址 |
-| `API_COMPOSE_AGGREGATE` | — | 聚合调用 API 地址 |
+| `RUST_LOG` | 全部 | 日志级别 |
+| `ACCOUNTS_SQL_ADDR` | entry, worker | PostgreSQL 连接字符串 |
+| `REDIS_ADDR` | entry, worker | Redis 连接字符串 |
+| `REDIS_STREAM_REFRESH_TTL` | entry, worker | Redis 流的过期时间（秒） |
 
-### Chilo 专用变量
+### 数据同步
+
+| 变量 | 使用者 | 说明 |
+|------|--------|------|
+| `RESOURCE_UPDATE_PERIOD` | entry, worker, chilo | 数据刷新周期（秒，默认 30） |
+| `RESOURCE_UPDATE_RETRIES` | entry, worker, chilo | 数据拉取最大重试次数（默认 5） |
+| `RESOURCES_SONG_URL` | entry, worker | 曲目列表 JSON 地址 |
+| `RESOURCES_APP_VERSION_USE_ONLINE` | worker | 是否在线获取 App 版本（默认 true） |
+| `RESOURCES_APP_VERSION_URL` | worker | App 版本 JSON 地址（在线时使用） |
+| `RESOURCES_APP_VERSION_DEFAULT` | worker | 离线时使用的 App 版本 |
+
+### 目标 API（worker）
 
 | 变量 | 说明 |
 |------|------|
-| `BIN_C1` | 常量 C1（十六进制，32字节长） |
-| `BIN_C2` | 常量 C2（十六进制，32字节长） |
+| `USE_ONLINE_PREFIX` | 是否在线获取 API 路径前缀（默认 true） |
+| `SCIRPOPHAGA_URL` | scirpophaga 数据 JSON 地址（提供 API 路径前缀） |
+| `API_PREFIX_AUTH` | 认证 API 路径前缀（离线时使用） |
+| `API_PREFIX_COMMON` | 通用 API 路径前缀（离线时使用） |
+| `API_CHILO` | chilo 服务地址 |
+| `API_ENDPOINT_LOGIN` | 登录 API 路径 |
+| `API_ENDPOINT_LIST_FRIENDS` | 好友列表 API 路径 |
+| `API_ENDPOINT_ADD_FRIENDS` | 添加好友 API 路径 |
+| `API_ENDPOINT_DELETE_FRIENDS` | 删除好友 API 路径 |
+| `API_ENDPOINT_GET_RANK` | 排行榜 API 路径 |
+| `API_ENDPOINT_NOTIFICATION` | 通知 API 路径 |
+| `API_ENDPOINT_COMPOSE_AGGREGATE` | 聚合调用 API 路径 |
+
+### entry 专用
+
+| 变量 | 说明 |
+|------|------|
+| `STAT_ENABLE` | 是否启用 `/v1/status` 接口 |
+
+### worker 调优
+
+| 变量 | 说明 |
+|------|------|
+| `WORKER_MAX_JOBS` | 每个 worker 最大并发任务数 |
+| `WORKER_MAX_RETRIES` | API 调用最大重试次数 |
+| `WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS` | 指数退避初始等待时间（毫秒） |
+| `WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER` | 指数退避乘数 |
+| `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS` | 指数退避最大等待时间（毫秒） |
+| `WORKER_ACCOUNT_LEASE_TIME_SECS` | 账号租约时长（秒） |
+| `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS` | 租约续期间隔（秒） |
+| `WORKER_JOB_MAX_WORK_TIME_SECS` | 任务最长运行时间（秒） |
+| `WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS` | 风控应对延迟（秒） |
+
+### chilo 专用
+
+| 变量 | 说明 |
+|------|------|
+| `USE_ONLINE_KEY` | 是否在线拉取密钥（默认 true） |
+| `SCIRPOPHAGA_URL` | 在线密钥来源（`USE_ONLINE_KEY=true` 时使用） |
+| `BIN_C2` | 离线密钥（十六进制，`USE_ONLINE_KEY=false` 时使用） |
+
+### mock 专用
+
+| 变量 | 说明 |
+|------|------|
+| `FAIL_CHANCE` | mock 随机失败概率（默认 0.3） |
 
 ---
 

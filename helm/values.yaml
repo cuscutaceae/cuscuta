@@ -1,108 +1,125 @@
 nameOverride: ""
 fullnameOverride: ""
 
-# -- PostgreSQL connection (external service, not managed by this chart)
+# -- PostgreSQL 连接（外部服务，不由本 chart 管理）
 postgresql:
-  # -- Use an external Secret for the database URL instead of the chart-owned Secret.
-  # When enabled, url below is ignored and no corresponding entry is created in the chart Secret.
+  # -- 使用外部 Secret 提供数据库 URL，而不是由 chart 自建 Secret。
+  # 启用后，下面的 url 将被忽略，且不会在 chart 的 Secret 中创建对应条目。
   secret:
     enabled: false
     name: "external-secret"
     key: "ACCOUNTS_SQL_ADDR"
 
-  # -- PostgreSQL connection URL (scheme: postgresql://user:pass@host:port/db)
+  # -- PostgreSQL 连接 URL（格式：postgresql://user:pass@host:port/db）
   url: ""
 
-# -- Redis connection (external service, not managed by this chart)
+# -- Redis 连接（外部服务，不由本 chart 管理）
 redis:
-  # -- Use an external Secret for the database URL instead of the chart-owned Secret.
-  # When enabled, url below is ignored and no corresponding entry is created in the chart Secret.
+  # -- 使用外部 Secret 提供 Redis URL，而不是由 chart 自建 Secret。
+  # 启用后，下面的 url 将被忽略，且不会在 chart 的 Secret 中创建对应条目。
   secret:
     enabled: false
     name: "external-secret"
     key: "REDIS_ADDR"
-  
-  # -- Redis connection URL (scheme: redis://host:port/db)
+
+  # -- Redis 连接 URL（格式：redis://host:port/db）
   url: ""
 
-# -- Container image configuration
+# -- 容器镜像配置
 image:
   repository: ghcr.io/cuscutaceae
-  tag: 0.1.2
+  tag: 0.1.14
   pullPolicy: IfNotPresent
 
-# -- Log level for all components (env: RUST_LOG)
+# -- 所有组件的日志级别（环境变量：RUST_LOG）
 rustLog: info
 
-# -- Redis stream TTL shared by entry and worker (env: REDIS_STREAM_REFRESH_TTL)
+# -- entry 与 worker 共享的 Redis 流 TTL（环境变量：REDIS_STREAM_REFRESH_TTL）
 redisStreamRefreshTtl: 300
 
-# -- ETA estimation configuration
+# -- ETA 预估配置（已弃用）
 eta:
-  # -- Enable ETA estimation (env: ETA_ENABLE)
+  # -- 是否启用 ETA 预估（环境变量：ETA_ENABLE）
   enabled: true
-  # -- Max ETA data points to retain (env: ETA_RECORD_TRIM)
+  # -- 保留的 ETA 数据点数量上限（环境变量：ETA_RECORD_TRIM）
   recordTrim: 15
-  # -- Max jobs to search for ETA estimation (env: ETA_SEARCH_LIMIT)
+  # -- ETA 预估搜索的最大任务数（环境变量：ETA_SEARCH_LIMIT）
   searchLimit: 10
 
-# -- Data sources
+# -- 数据源
 dataSource:
   base:
     appVersion:
+      # -- 是否在线获取 App 版本（环境变量：RESOURCES_APP_VERSION_USE_ONLINE）
       useOnlineVersion: true
+      # -- App 版本 JSON 地址（环境变量：RESOURCES_APP_VERSION_URL）
       url: ""
+      # -- 离线时使用的 App 版本（环境变量：RESOURCES_APP_VERSION_DEFAULT）
       versionDefault: ""
+    # -- 曲目列表 JSON 地址（环境变量：RESOURCES_SONG_URL）
     songUrl: ""
   scirpophaga:
+    # -- scirpophaga 数据 JSON 地址（环境变量：SCIRPOPHAGA_URL）
     url: ""
   update:
-    # -- Data update period for worker and entry (second)
+    # -- worker 与 entry 的数据更新周期（秒，环境变量：RESOURCE_UPDATE_PERIOD）
     dataUpdatePeriod: 60
+    # -- 数据拉取最大重试次数（环境变量：RESOURCE_UPDATE_RETRIES）
     dataUpdateRetries: 5
 
-# -- External target API endpoints (required for production; mock can be used for testing)
+# -- 外部目标 API 端点（生产环境必填；测试可使用 mock）
 api:
   prefix:
+    # -- 是否在线获取 API 路径前缀（环境变量：USE_ONLINE_PREFIX）
     useOnlinePrefix: true
+    # -- 认证 API 路径前缀（环境变量：API_PREFIX_AUTH）
     auth: ""
+    # -- 通用 API 路径前缀（环境变量：API_PREFIX_COMMON）
     common: ""
   path:
+    # -- 登录 API 路径（环境变量：API_ENDPOINT_LOGIN）
     login: ""
+    # -- 好友列表 API 路径（环境变量：API_ENDPOINT_LIST_FRIENDS）
     listFriends: ""
+    # -- 添加好友 API 路径（环境变量：API_ENDPOINT_ADD_FRIENDS）
     addFriends: ""
+    # -- 删除好友 API 路径（环境变量：API_ENDPOINT_DELETE_FRIENDS）
     deleteFriends: ""
+    # -- 排行榜 API 路径（环境变量：API_ENDPOINT_GET_RANK）
     getRank: ""
+    # -- 通知 API 路径（环境变量：API_ENDPOINT_NOTIFICATION）
     notification: ""
+    # -- 聚合调用 API 路径（环境变量：API_ENDPOINT_COMPOSE_AGGREGATE）
     compose: ""
 
-# -- Migration job
+# -- 数据库迁移 Job
 migration:
   enabled: true
-  # -- migrate/migrate image
+  # -- migrate/migrate 镜像
   image: migrate/migrate
   tag: latest
 
-# -- cuscuta-chilo (challenge generation service)
+# -- cuscuta-chilo（挑战生成服务）
 chilo:
   enabled: true
   replicas: 1
-  # -- Container port (fixed, do not modify)
+  # -- 容器端口（固定值，请勿修改）
   port: 8080
-  # -- Binary constants for the challenge algorithm
+  # -- 挑战算法的二进制常量
   constants:
-    # -- Whether to use online key fetching
+    # -- 是否在线拉取密钥（环境变量：USE_ONLINE_KEY）
     useOnlineKey: true
+    # -- 离线密钥 C2，十六进制（环境变量：BIN_C2）
     binC2: ""
   service:
-    # -- Service type
+    # -- Service 类型
     type: ClusterIP
 
-# -- cuscuta-entry (API gateway / job dispatcher)
+# -- cuscuta-entry（API 网关 / 任务分发器）
 entry:
-  # -- warning: entry deployment does NOT support scaling
+  # -- 警告：entry Deployment 不支持伸缩
   replicas: 1
-  # -- Container port (fixed, do not modify)
+  # -- 容器端口（固定值，请勿修改）
   port: 8081
   service:
     type: ClusterIP
@@ -115,39 +132,50 @@ entry:
           - path: /
             pathType: Prefix
   status:
+    # -- 是否启用 `/v1/status` 接口（环境变量：STAT_ENABLE）
     enabled: true
 
-# -- cuscuta-worker (job processor)
+# -- cuscuta-worker（任务处理器）
 worker:
   keda:
+    # -- 是否启用 KEDA 自动伸缩
     enabled: true
     pollingInterval: 10
     cooldownPeriod: 30
+    # -- worker 最大副本数
     maxReplicaCount: 50
     targetQueryValue: 1
-  # -- Container port (health checks only; fixed, do not modify)
+  # -- 容器端口（仅用于健康检查；固定值，请勿修改）
   port: 8080
-  # -- Worker tuning
+  # -- 每个 worker 最大并发任务数（环境变量：WORKER_MAX_JOBS）
   maxJobs: 8
+  # -- API 调用最大重试次数（环境变量：WORKER_MAX_RETRIES）
   maxRetries: 30
+  # -- 指数退避初始等待时间（毫秒，环境变量：WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS）
   exponentialBackoffBaseMillis: 10
+  # -- 指数退避乘数（环境变量：WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER）
   exponentialBackoffMultiplier: 2
+  # -- 指数退避最大等待时间（毫秒，环境变量：WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS）
   exponentialBackoffMaxDelayMillis: 500
+  # -- 账号租约时长（秒，环境变量：WORKER_ACCOUNT_LEASE_TIME_SECS）
   accountLeaseTimeSecs: 120
+  # -- 租约续期间隔（秒，环境变量：WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS）
   accountLeaseTimeRefreshGapSecs: 30
+  # -- 任务最长运行时间（秒，环境变量：WORKER_JOB_MAX_WORK_TIME_SECS）
   jobMaxWorkTimeSecs: 1200
+  # -- 风控应对延迟（秒，环境变量：WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS）
   emptyFriendsDelayTimeSecs: 10
 
-# -- cuscuta-mock (mock API server for testing; disable in production)
+# -- cuscuta-mock（用于测试的 mock API 服务；生产环境请禁用）
 mock:
   enabled: false
   replicas: 1
-  # -- Container port
+  # -- 容器端口
   port: 8080
   service:
     type: ClusterIP
 
-# -- Resource limits applied to all containers
+# -- 应用于所有容器的资源限制
 resources: {}
   # limits:
   #   cpu: 500m
