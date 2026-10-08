@@ -11,7 +11,10 @@ use std::sync::OnceLock;
 
 use axum::{Json, Router, extract::Query, http::StatusCode, response::IntoResponse, routing::get};
 use base64::Engine;
-use cuscuta_common::{data::read_parsed_env, quick_fetch::QuickFetch, scheduled_job::register_job};
+use cuscuta_common::{
+    batch_check_initialized, data::read_parsed_env, quick_fetch::QuickFetch,
+    scheduled_job::register_job,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::{net::TcpListener, sync::RwLock};
@@ -97,7 +100,8 @@ async fn generate(Query(form): Query<GenerateQuery>) -> impl IntoResponse {
     )
 }
 
-const fn check_ready() -> Option<String> {
+fn check_ready() -> Option<&'static str> {
+    batch_check_initialized!(C2);
     None
 }
 
