@@ -650,6 +650,7 @@ dependencies = [
  "axum",
  "base64",
  "chilo",
+ "cuscuta-common",
  "hex",
  "serde",
  "serde_json",

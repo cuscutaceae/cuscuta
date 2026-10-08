@@ -7,12 +7,26 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    api::fetch_env_as_json,
-    data::{Song, SongsResult, SongsWithHash},
+    api::read_env_url_and_fetch_json,
+    data::{Song, SongsResult, SongsWithHash, read_parsed_env},
     quick_fetch::QuickFetch,
 };
 
 type QuickFetchType<T> = OnceLock<RwLock<Option<T>>>;
+
+/// 默认的最大重试次数
+pub const DATA_RETRIES_DEFAULT: u64 = 5;
+
+/// 获取最大重试次数
+#[must_use]
+pub fn get_data_fetch_max_retries() -> u64 {
+    read_parsed_env::<u64>("RESOURCE_UPDATE_RETRIES").unwrap_or_else(|e| {
+        tracing::warn!(
+            "get_data_fetch_max_retries: failed to get max retries count ({e}), use default (5)"
+        );
+        DATA_RETRIES_DEFAULT
+    })
+}
 
 fn calc_song_list_hash(song_list: &[Song]) -> String {
     struct SongPart<'a> {
@@ -68,7 +82,7 @@ pub fn sync_song_list(
             async fn try_sync(
                 global_song_list: &QuickFetchType<Vec<SongsWithHash>>,
             ) -> Result<(usize, usize, String), String> {
-                let song_list: Vec<_> = fetch_env_as_json::<SongsResult>("RESOURCES_SONG_URL")
+                let song_list: Vec<_> = read_env_url_and_fetch_json::<SongsResult>("RESOURCES_SONG_URL")
                     .await
                     .map_err(|e| format!("failed to fetch song data from url: {e}"))
                     .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
@@ -79,6 +93,13 @@ pub fn sync_song_list(
                 let hash = calc_song_list_hash(&song_list);
                 global_song_list
                     .try_write(|songs_with_hash| {
+                        let needs_add = songs_with_hash
+                            .as_ref()
+                            .is_none_or(|it| it.first().is_none_or(|it| it.hash != hash));
+                        if !needs_add {
+                            tracing::info!("sync_song_list: hash did not change, discard update");
+                            return songs_with_hash;
+                        }
                         let new = SongsWithHash {
                             hash: hash.clone(),
                             songs: song_list.clone(),
@@ -98,12 +119,18 @@ pub fn sync_song_list(
                 tracing::trace!("song list sync");
                 return;
             }
-            tracing::info!("sync_song_list: trying sync song list");
-            match try_sync(global_song_list).await {
-                Ok((music_len, chart_len, hash)) => tracing::info!(
-                    "sync_song_list: song list initialized (music:{music_len}, charts:{chart_len}, hash: {hash})"
-                ),
-                Err(e) => tracing::error!("sync_song_list: failed to sync song list: {e}"),
+            let retries = get_data_fetch_max_retries();
+            for retry in 0..retries {
+                tracing::info!("sync_song_list: trying sync song list... {retry}/{retries}");
+                match try_sync(global_song_list).await {
+                    Ok((music_len, chart_len, hash)) => {
+                        tracing::info!(
+                            "sync_song_list: song list initialized (music:{music_len}, charts:{chart_len}, hash: {hash})"
+                        );
+                        return;
+                    }
+                    Err(e) => tracing::error!("sync_song_list: failed to sync song list: {e}"),
+                }
             }
         })
     }

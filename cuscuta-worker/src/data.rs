@@ -1,7 +1,9 @@
 use std::sync::OnceLock;
 
 use cuscuta_common::{
-    api::xxxxxx::XxxxxxUrl, data::{AppVersionData, SongsWithHash}, db::account::AccountRow,
+    api::xxxxxx::XxxxxxUrl,
+    data::{AppVersionData, SongsWithHash},
+    db::account::AccountRow,
 };
 use tokio::sync::RwLock;
 

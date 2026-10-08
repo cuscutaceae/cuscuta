@@ -2,10 +2,11 @@ use std::env;
 
 use chrono::{DateTime, Utc};
 use cuscuta_common::{
-    api::{fetch_env_as_json, xxxxxx::XxxxxxUrl},
+    api::{read_env_url_and_fetch_json, xxxxxx::XxxxxxUrl},
     data::{AppVersionData, ScirpophagaData, read_parsed_env},
     db::account::update_account_lease_time,
     quick_fetch::QuickFetch,
+    scheduled_job::tasks::get_data_fetch_max_retries,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -24,7 +25,7 @@ pub async fn sync_scirpophaga_data(_: &CancellationToken) {
         let use_online_prefix =
             env::var("USE_ONLINE_PREFIX").map_or(true, |it| it.parse::<bool>().unwrap_or(true));
         let scirpophaga_data = if use_online_prefix {
-            fetch_env_as_json("SCIRPOPHAGA_URL")
+            read_env_url_and_fetch_json("SCIRPOPHAGA_URL")
                 .await
                 .map_err(|e| format!("failed to fetch from SCIRPOPHAGA_URL: {e}"))?
         } else {
@@ -70,17 +71,17 @@ pub async fn sync_scirpophaga_data(_: &CancellationToken) {
             .map_err(|e| format!("failed to write SCIRPOPHAGA_DATA: {e}"))?;
         Ok(xxxxxx_url)
     }
-    if XXXXXX_URL.is_initialized() {
-        tracing::trace!("scirpophaga data sync");
-        return;
-    }
-    tracing::info!("sync_scirpophaga_data: trying sync scirpophaga data");
-    match try_sync().await {
-        Ok(data) => {
-            tracing::info!("sync_scirpophaga_data: scirpophaga data initialized: {data:?}",);
-        }
-        Err(e) => {
-            tracing::error!("sync_scirpophaga_data: failed to sync scirpophaga data: {e}");
+    let retries = get_data_fetch_max_retries();
+    for retry in 0..retries {
+        tracing::info!("sync_scirpophaga_data: trying sync scirpophaga data... {retry}/{retries}");
+        match try_sync().await {
+            Ok(data) => {
+                tracing::info!("sync_scirpophaga_data: scirpophaga data initialized: {data:?}",);
+                return;
+            }
+            Err(e) => {
+                tracing::error!("sync_scirpophaga_data: failed to sync scirpophaga data: {e}");
+            }
         }
     }
 }
@@ -90,7 +91,7 @@ pub async fn sync_app_version_data(_: &CancellationToken) {
         let use_online_version = env::var("RESOURCES_APP_VERSION_USE_ONLINE")
             .map_or(true, |it| it.parse::<bool>().unwrap_or(true));
         let app_version_data = if use_online_version {
-            fetch_env_as_json::<AppVersionData>("RESOURCES_APP_VERSION_URL")
+            read_env_url_and_fetch_json::<AppVersionData>("RESOURCES_APP_VERSION_URL")
                 .await
                 .map_err(|e| format!("failed to fetch bundle data from url: {e}"))?
         } else {
@@ -108,20 +109,20 @@ pub async fn sync_app_version_data(_: &CancellationToken) {
             .map_err(|e| format!("failed to write APP_VERSION_DATA: {e}"))?;
         Ok(app_version_data)
     }
-    if APP_VERSION_DATA.is_initialized() {
-        tracing::trace!("app version data sync");
-        return;
-    }
-    tracing::info!("sync_app_version_data: trying sync bundle data");
-    match try_sync().await {
-        Ok(app_version_data) => {
-            tracing::info!(
-                "sync_app_version_data: bundle data initialized: appVer:{}",
-                app_version_data.version,
-            );
-        }
-        Err(e) => {
-            tracing::error!("sync_app_version_data: failed to sync bundle data: {e}");
+    let retries = get_data_fetch_max_retries();
+    for retry in 0..retries {
+        tracing::info!("sync_app_version_data: trying sync bundle data... {retry}/{retries}");
+        match try_sync().await {
+            Ok(app_version_data) => {
+                tracing::info!(
+                    "sync_app_version_data: bundle data initialized: appVer:{}",
+                    app_version_data.version,
+                );
+                return;
+            }
+            Err(e) => {
+                tracing::error!("sync_app_version_data: failed to sync bundle data: {e}");
+            }
         }
     }
 }

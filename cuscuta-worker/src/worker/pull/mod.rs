@@ -221,6 +221,8 @@ fn pull_jobs(
     ))
 }
 
+type DiscoverResult<'a> = (Vec<Job>, SubQueue, &'a SongsWithHash);
+
 fn discover_sub_queue_for_jobs<'a>(
     jobs: &[Job],
     config: &Config,
@@ -228,7 +230,7 @@ fn discover_sub_queue_for_jobs<'a>(
     pod_uid: &str,
     sub_queues: &[SubQueue],
     songs_with_hash_pool: &'a [SongsWithHash],
-) -> Result<Option<(Vec<Job>, SubQueue, &'a SongsWithHash)>, Error> {
+) -> Result<Option<DiscoverResult<'a>>, Error> {
     for songs_with_hash in songs_with_hash_pool {
         for queue in sub_queues
             .iter()

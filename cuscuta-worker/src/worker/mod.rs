@@ -250,7 +250,7 @@ async fn internal_loop(
             &user_id,
             &token,
             &account_row,
-            &songs_with_hash,
+            songs_with_hash,
             *cursor,
             &config,
         )

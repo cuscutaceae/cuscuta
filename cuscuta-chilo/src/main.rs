@@ -5,18 +5,21 @@
 //! - `BIN_C1`
 //! - `BIN_C2`
 
-#![deny(clippy::nursery)]
-#![deny(clippy::pedantic)]
+mod loop_tasks;
 
-use std::{env, sync::OnceLock};
+use std::sync::OnceLock;
 
 use axum::{Json, Router, extract::Query, http::StatusCode, response::IntoResponse, routing::get};
 use base64::Engine;
+use cuscuta_common::{data::read_parsed_env, quick_fetch::QuickFetch, scheduled_job::register_job};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::RwLock};
+use tokio_util::sync::CancellationToken;
 
-static C2: OnceLock<Vec<u8>> = OnceLock::new();
+use crate::loop_tasks::sync_scirpophaga_data;
+
+static C2: OnceLock<RwLock<Option<Vec<u8>>>> = OnceLock::new();
 
 #[tokio::main]
 async fn main() {
@@ -24,7 +27,18 @@ async fn main() {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
     tracing::info!("starting...");
-    C2.set(read_hex("BIN_C2")).expect("failed to set C2");
+    let cancellation_token = CancellationToken::new();
+    let data_update_period = read_parsed_env::<u64>("RESOURCE_UPDATE_PERIOD").unwrap_or_else(|e| {
+        tracing::info!(
+            "pre_init: failed to read RESOURCE_UPDATE_PERIOD: {e}, set to default (30s)"
+        );
+        30
+    });
+    tokio::spawn(register_job(
+        cancellation_token.clone(),
+        data_update_period,
+        sync_scirpophaga_data,
+    ));
     let service = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
@@ -36,11 +50,6 @@ async fn main() {
     axum::serve(addr, service)
         .await
         .unwrap_or_else(|e| panic!("{e:?}"));
-}
-
-fn read_hex(var: &str) -> Vec<u8> {
-    hex::decode(env::var(var).unwrap_or_else(|_| panic!("var: {var} not declared")))
-        .unwrap_or_else(|_| panic!("failed to decode {var}"))
 }
 
 #[derive(Debug, Deserialize)]
@@ -68,13 +77,16 @@ async fn generate(Query(form): Query<GenerateQuery>) -> impl IntoResponse {
             }),
         );
     };
-    let result = chilo::generate(
-        C2.get()
-            .expect("C2 is not initialized, this should not happen"),
-        timestamp,
-        form.body.as_bytes(),
-        form.path.as_bytes(),
-    );
+    let Ok(c2) = C2.try_read(|it| it.clone()) else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(GenerateResult::Failed {
+                success: false,
+                message: "C2 is not ready".into(),
+            }),
+        );
+    };
+    let result = chilo::generate(&c2, timestamp, form.body.as_bytes(), form.path.as_bytes());
     let base64 = base64::prelude::BASE64_STANDARD.encode(result);
     (
         StatusCode::OK,

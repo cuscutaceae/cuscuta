@@ -114,6 +114,9 @@ impl From<SongRaw> for Option<Song> {
 }
 
 /// 读取环境变量，并parse
+///
+/// # Errors
+/// 一个字符串的简略描述信息，用于打印输出
 pub fn read_parsed_env<T>(key: &str) -> Result<T, String>
 where
     T: FromStr,

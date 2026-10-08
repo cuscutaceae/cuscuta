@@ -66,7 +66,7 @@ pub enum Error {
 /// - 当请求发送失败时，返回[`Error::Network`]
 /// - 当返回值不为2xx时，返回[`Error::BadStatus`]
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
-pub async fn fetch_env_as_json<T>(env: &str) -> Result<T, Error>
+pub async fn read_env_url_and_fetch_json<T>(env: &str) -> Result<T, Error>
 where
     T: DeserializeOwned,
 {
