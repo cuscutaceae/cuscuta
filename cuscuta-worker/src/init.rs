@@ -11,7 +11,7 @@ use cuscuta_common::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    config::{Environment, fetch_env},
+    config::fetch_env,
     data::{ACCOUNT_ROW, APP_VERSION_DATA, XXXXXX_URL},
     db::{
         self,

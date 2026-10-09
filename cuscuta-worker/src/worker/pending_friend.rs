@@ -13,12 +13,9 @@ use cuscuta_common::{
 };
 use redis::{Client, Connection, TypedCommands};
 
-use crate::{
-    config::Environment,
-    worker::{
-        Error,
-        friend_modify::{ExpectedModify, try_modify_remote_friend},
-    },
+use crate::worker::{
+    Error,
+    friend_modify::{ExpectedModify, try_modify_remote_friend},
 };
 
 #[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]

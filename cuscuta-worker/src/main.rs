@@ -26,8 +26,6 @@ mod init;
 mod loop_tasks;
 mod worker;
 
-use std::env;
-
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use cuscuta_common::{
     batch_check_initialized,

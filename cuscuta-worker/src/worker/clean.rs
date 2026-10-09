@@ -13,13 +13,10 @@ use cuscuta_common::{
 };
 use redis::{Client, TypedCommands};
 
-use crate::{
-    config::Environment,
-    worker::{
-        Error,
-        friend_modify::{ExpectedModify, try_modify_remote_friend},
-        update_job_track_info,
-    },
+use crate::worker::{
+    Error,
+    friend_modify::{ExpectedModify, try_modify_remote_friend},
+    update_job_track_info,
 };
 
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]

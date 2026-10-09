@@ -15,10 +15,7 @@ use cuscuta_common::{
 use reqwest::StatusCode;
 use tokio::time::sleep;
 
-use crate::{
-    api_compat::xxxxxx_safe_call_ex_worker,
-    config::{Environment, fetch_env},
-};
+use crate::{api_compat::xxxxxx_safe_call_ex_worker, config::fetch_env};
 
 #[derive(Debug)]
 enum FriendModifyError {

@@ -73,7 +73,6 @@ pub mod auto {
 
     use crate::{
         api_compat::xxxxxx_safe_call_ex_worker,
-        config::Environment,
         db::{
             account::{perform_login, update_account_info},
             postgresql::try_open_transaction,

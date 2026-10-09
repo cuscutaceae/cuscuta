@@ -12,7 +12,7 @@ use cuscuta_common::{
 };
 use redis::{Client, TypedCommands};
 
-use crate::{api_compat::xxxxxx_safe_call_worker, config::Environment, worker::Error};
+use crate::{api_compat::xxxxxx_safe_call_worker, worker::Error};
 
 pub fn process_job_with_result(jobs: &mut [Job], scores: &[SongScore]) -> Vec<(String, SongScore)> {
     let mut job_links = Vec::new();

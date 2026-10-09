@@ -1,5 +1,3 @@
-use std::env;
-
 use reqwest::{RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
 

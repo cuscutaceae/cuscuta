@@ -1,5 +1,3 @@
-use std::env;
-
 use chrono::{DateTime, Utc};
 use cuscuta_common::{
     api::{fetch_json, xxxxxx::XxxxxxUrl},

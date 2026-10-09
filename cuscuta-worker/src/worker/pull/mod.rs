@@ -19,7 +19,7 @@ use redis::{
 };
 
 use crate::{
-    config::{Environment, fetch_env},
+    config::fetch_env,
     worker::{Error, update_job_track_info},
 };
 

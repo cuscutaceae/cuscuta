@@ -35,7 +35,7 @@ use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    config::{Environment, fetch_env},
+    config::fetch_env,
     data::{ACCOUNT_ROW, APP_VERSION_DATA, SONG_LIST, WORKER_ID, XXXXXX_URL},
     db::redis::REDIS_CLIENT,
     worker::{

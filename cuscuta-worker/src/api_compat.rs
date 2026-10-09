@@ -4,7 +4,7 @@ use cuscuta_common::api::{
 };
 use reqwest::StatusCode;
 
-use crate::config::{Environment, fetch_env};
+use crate::config::fetch_env;
 
 #[allow(clippy::cast_possible_truncation)]
 pub async fn xxxxxx_safe_call_ex_worker<'a, F, R, T, Fut>(
