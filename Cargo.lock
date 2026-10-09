@@ -645,7 +645,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-chilo"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "axum",
  "base64",
@@ -662,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-common"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "axum",
  "base64",
@@ -685,7 +685,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-entry"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "anyhow",
  "axum",
@@ -710,7 +710,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-mock"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "anyhow",
  "axum",
@@ -729,7 +729,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-test"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "cuscuta-common",
  "redis",
@@ -739,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "cuscuta-worker"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "anyhow",
  "axum",
@@ -764,7 +764,7 @@ dependencies = [
 
 [[package]]
 name = "cuscutactl"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "anyhow",
  "base64",
