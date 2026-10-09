@@ -14,7 +14,7 @@ use serde::Deserialize;
 
 static ENV: OnceLock<Environment> = OnceLock::new();
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Environment {
     pub redis_addr: String,
     pub accounts_sql_addr: String,
@@ -96,6 +96,11 @@ pub fn init_env() -> Result<&'static Environment, envy::Error> {
 
 pub fn fetch_env() -> &'static Environment {
     cuscuta_common::config::fetch_env(&ENV)
+}
+
+#[cfg(test)]
+pub fn load_env(env: Environment) {
+    ENV.get_or_init(|| env);
 }
 
 #[cfg(test)]

@@ -15,7 +15,7 @@ use cuscuta_test::{
 };
 
 use crate::{
-    config::Environment,
+    config::{Environment, load_env},
     worker::pull::{scan_sub_queue_and_pull_job, valid_jobs},
 };
 
@@ -31,6 +31,7 @@ async fn pull_job_test() {
     let mut current_jobs = Vec::new();
     let mut cursor = 0;
     let config = Environment::mock();
+    load_env(config.clone());
     let ClientWrap(client, _container) = redis_client_image!();
     let first_jobs_count = config.worker_max_jobs + 2;
 
