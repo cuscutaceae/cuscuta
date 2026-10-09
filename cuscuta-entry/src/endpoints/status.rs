@@ -1,13 +1,10 @@
 use axum::{Json, http, response::IntoResponse};
-use cuscuta_common::{
-    db::log::{WorkerStatus, status::search_worker_status},
-    quick_fetch::QuickFetch,
-};
+use cuscuta_common::db::log::{WorkerStatus, status::search_worker_status};
 use reqwest::StatusCode;
 use serde::Serialize;
 
 use crate::{
-    data::CONFIG,
+    config::fetch_env,
     db::redis::REDIS_CLIENT,
     endpoints::{Error, ErrorType},
 };
@@ -27,17 +24,14 @@ enum StatResult<'a> {
 }
 
 pub async fn status() -> impl IntoResponse {
-    async fn op<'a>() -> Result<StatResult<'a>, Error> {
+    fn op<'a>() -> Result<StatResult<'a>, Error> {
         let redis_client = REDIS_CLIENT
             .get()
             .ok_or(Error::NotReady(ErrorType::RedisNotReady))?;
-        let config = CONFIG
-            .read_spinning(std::clone::Clone::clone)
-            .await
-            .map_err(|_| Error::NotReady(ErrorType::ConfigNotReady))?;
+        let config = fetch_env();
         let worker_status = search_worker_status(redis_client)
             .map_err(|e| Error::RedisExtend(ErrorType::FailedScanRedis, e))?;
-        if !config.enable_stat {
+        if !config.stat_enable {
             return Err(Error::BadRequest(ErrorType::BadRequestNotEnabled));
         }
         Ok(StatResult::Success {
@@ -45,7 +39,7 @@ pub async fn status() -> impl IntoResponse {
             worker_status: worker_status.into_iter().map(|it| it.1).collect(),
         })
     }
-    match op().await {
+    match op() {
         Ok(x) => (
             StatusCode::OK,
             [(http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")],

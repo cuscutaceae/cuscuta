@@ -15,7 +15,10 @@ use cuscuta_common::{
 use reqwest::StatusCode;
 use tokio::time::sleep;
 
-use crate::{api_compat::xxxxxx_safe_call_ex_worker, data::Config};
+use crate::{
+    api_compat::xxxxxx_safe_call_ex_worker,
+    config::{Environment, fetch_env},
+};
 
 #[derive(Debug)]
 enum FriendModifyError {
@@ -35,7 +38,6 @@ pub enum WaitForResultError {
 
 #[allow(clippy::too_many_arguments)]
 pub async fn try_modify_remote_friend(
-    config: &Config,
     xxxxxx_url: &XxxxxxUrl,
     bundle_data: &AppVersionData,
     user_id: &str,
@@ -61,7 +63,6 @@ pub async fn try_modify_remote_friend(
     loop {
         let result = try_modify_friend(
             xxxxxx_url,
-            config,
             bundle_data,
             user_id,
             token,
@@ -101,7 +102,6 @@ pub async fn try_modify_remote_friend(
                 tracing::warn!("triggered friend modify waiting");
                 match wait_for_result(
                     xxxxxx_url,
-                    config,
                     bundle_data,
                     user_id,
                     token,
@@ -130,7 +130,7 @@ pub async fn try_modify_remote_friend(
 #[allow(clippy::too_many_arguments)]
 async fn wait_for_result(
     xxxxxx_url: &XxxxxxUrl,
-    config: &Config,
+
     bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
@@ -138,6 +138,7 @@ async fn wait_for_result(
     cached_friend_list: &[FriendInfo],
     expects: either::Either<usize, &HashSet<i64>>,
 ) -> Result<Vec<FriendInfo>, WaitForResultError> {
+    let config = fetch_env();
     let cached_previous_ids = cached_friend_list
         .iter()
         .map(|it| it.user_id)
@@ -151,7 +152,6 @@ async fn wait_for_result(
         ))
         .await;
         let result = xxxxxx_safe_call_ex_worker(
-            config,
             |it| it != StatusCode::TOO_MANY_REQUESTS,
             || {
                 api_list_friend(
@@ -192,7 +192,7 @@ async fn wait_for_result(
 #[allow(clippy::too_many_arguments)]
 async fn try_modify_friend(
     xxxxxx_url: &XxxxxxUrl,
-    config: &Config,
+
     bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
@@ -203,7 +203,6 @@ async fn try_modify_friend(
     let result = match &expect_modify {
         ExpectedModify::Add { friend_code } => {
             xxxxxx_safe_call_ex_worker(
-                config,
                 |it| it != StatusCode::TOO_MANY_REQUESTS,
                 || {
                     api_add_friend(
@@ -221,7 +220,6 @@ async fn try_modify_friend(
         ExpectedModify::Remove { friend_id } => {
             let friend_id_str = friend_id.to_string();
             xxxxxx_safe_call_ex_worker(
-                config,
                 |it| it != StatusCode::TOO_MANY_REQUESTS,
                 || {
                     api_delete_friend(

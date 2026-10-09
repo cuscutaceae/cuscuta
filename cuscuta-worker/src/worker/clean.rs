@@ -14,7 +14,7 @@ use cuscuta_common::{
 use redis::{Client, TypedCommands};
 
 use crate::{
-    data::Config,
+    config::Environment,
     worker::{
         Error,
         friend_modify::{ExpectedModify, try_modify_remote_friend},
@@ -31,7 +31,7 @@ pub async fn clean_jobs(
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
-    config: &Config,
+
     xxxxxx_url: &XxxxxxUrl,
 ) -> Result<(), Error> {
     let pending_friends_code = get_pending_friends_code(jobs);
@@ -102,7 +102,6 @@ pub async fn clean_jobs(
             && !deleted_friends_code.contains(&finished_job.essential.friend_code)
         {
             match try_modify_remote_friend(
-                config,
                 xxxxxx_url,
                 bundle_data,
                 user_id,

@@ -13,6 +13,7 @@ tracing = { workspace = true }
 rand = { workspace = true }
 redis = { workspace = true }
 reqwest = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
 thiserror = { workspace = true }
@@ -21,6 +22,7 @@ tokio-util = { workspace = true }
 gethostname = "1.1.0"
 either = "1.19.0"
 futures = { workspace = true }
+envy = { workspace = true }
 
 [dev-dependencies]
 testcontainers = "0.27.3"

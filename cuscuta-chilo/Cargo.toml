@@ -15,6 +15,7 @@ tokio = { workspace = true, features = ["signal"] }
 tokio-util = { workspace = true }
 chilo = { git = "https://github.com/cuscutaceae/chilo", tag = "0.2.0" }
 cuscuta-common = { path = "../cuscuta-common" }
+envy={workspace = true}
 
 [lints]
 workspace = true

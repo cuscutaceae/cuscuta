@@ -13,13 +13,14 @@ use crate::{
 /// a marco that call xxxxxx api with chilo call
 #[macro_export]
 macro_rules! auto_chilo {
-    ($fun:ident, $path: expr, $body: expr, $($tt:tt)*) => { async {
+    ($fun:ident, $path: expr, $body: expr, $url: expr, $($tt:tt)*) => { async {
         #[allow(unused_imports)]
         use $crate::api::{Error, xxxxxx, chilo::{self, ChiloResult}};
         use chrono::Utc;
         use axum::http::StatusCode;
         let timestamp = Utc::now().timestamp_millis().to_string();
         let chilo_result = chilo::chilo_generate(
+            &$url.chilo,
             &timestamp,
             $path,
             $body,
@@ -29,7 +30,7 @@ macro_rules! auto_chilo {
             Ok(chilo_result) => {
                 match chilo_result {
                     ChiloResult::Success { value } => {
-                        xxxxxx::$fun($($tt)* &value).await
+                        xxxxxx::$fun($url, $($tt)* &value).await
                     },
                     ChiloResult::Failed { message } => Err(Error::BadStatus {
                         status_code: StatusCode::INTERNAL_SERVER_ERROR,

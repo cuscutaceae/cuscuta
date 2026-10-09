@@ -7,7 +7,8 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    data::{CONFIG, SONG_LIST},
+    config::fetch_env,
+    data::SONG_LIST,
     db::{account::count_active_account, postgresql::try_open_transaction, redis::REDIS_CLIENT},
     endpoints::{Error, ErrorType},
 };
@@ -73,10 +74,7 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
     if !input_check(&form.friend_code) {
         return Err(Error::BadRequest(ErrorType::BadRequestFriendCode));
     }
-    let config = CONFIG
-        .read_spinning(std::clone::Clone::clone)
-        .await
-        .map_err(|_| Error::NotReady(ErrorType::ConfigNotReady))?;
+    let config = fetch_env();
     let redis_client = REDIS_CLIENT
         .get()
         .ok_or(Error::NotReady(ErrorType::RedisNotReady))?;

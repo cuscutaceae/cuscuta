@@ -15,7 +15,7 @@ use cuscuta_test::{
 };
 
 use crate::{
-    data::Config,
+    config::Environment,
     worker::pull::{scan_sub_queue_and_pull_job, valid_jobs},
 };
 
@@ -30,7 +30,7 @@ async fn pull_job_test() {
     let worker_id = "mock_id";
     let mut current_jobs = Vec::new();
     let mut cursor = 0;
-    let config = Config::mock();
+    let config = Environment::mock();
     let ClientWrap(client, _container) = redis_client_image!();
     let first_jobs_count = config.worker_max_jobs + 2;
 
@@ -51,7 +51,6 @@ async fn pull_job_test() {
         &client,
         &mut current_jobs,
         &mut cursor,
-        &config,
         &Vec::<SongsWithHash>::mock(),
         worker_id,
     )
@@ -92,7 +91,6 @@ async fn pull_job_test() {
         &client,
         &mut current_jobs,
         &mut cursor,
-        &config,
         &Vec::<SongsWithHash>::mock(),
         worker_id,
     )

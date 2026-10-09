@@ -19,6 +19,7 @@
 //!
 
 mod api_compat;
+mod config;
 mod data;
 mod db;
 mod init;
@@ -30,7 +31,6 @@ use std::env;
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use cuscuta_common::{
     batch_check_initialized,
-    data::read_parsed_env,
     db::account::try_release_account,
     quick_fetch::QuickFetch,
     scheduled_job::{
@@ -43,13 +43,14 @@ use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, SONG_LIST, XXXXXX_URL},
+    config::init_env,
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, SONG_LIST, XXXXXX_URL},
     db::{
         postgresql::{POSTGRESQL_POOL, try_open_transaction},
         redis::REDIS_CLIENT,
     },
     init::cuscuta_init,
-    loop_tasks::{sync_app_version_data, sync_config, sync_scirpophaga_data, update_lease_time},
+    loop_tasks::{sync_app_version_data, sync_scirpophaga_data, update_lease_time},
     worker::{resume_state, worker_loop},
 };
 
@@ -59,6 +60,8 @@ async fn main() {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
     tracing::info!("starting...");
+    tracing::info!("reading config...");
+    let env = init_env().expect("failed to read env");
     let halt_token = CancellationToken::new();
     let service = Router::new()
         .route("/healthz", get(healthz))
@@ -67,12 +70,7 @@ async fn main() {
         .await
         .expect("failed to bind 0.0.0.0:8080");
     tracing::info!("listening in 0.0.0.0:8080...");
-    let data_update_period = read_parsed_env::<u64>("RESOURCE_UPDATE_PERIOD").unwrap_or_else(|e| {
-        tracing::info!(
-            "pre_init: failed to read RESOURCE_UPDATE_PERIOD: {e}, set to default (30s)"
-        );
-        30
-    });
+    let data_update_period = env.resource_update_period;
     tokio::spawn(register_individual_job(
         halt_token.clone(),
         CancellationToken::new(),
@@ -82,14 +80,13 @@ async fn main() {
     tokio::spawn(register_job_future(
         halt_token.clone(),
         10,
-        open_redis_client(&REDIS_CLIENT),
+        open_redis_client(&REDIS_CLIENT, env),
     ));
     tokio::spawn(register_job_future(
         halt_token.clone(),
         10,
-        open_postgresql_client(&POSTGRESQL_POOL),
+        open_postgresql_client(&POSTGRESQL_POOL, env),
     ));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
     tokio::spawn(register_job(
         halt_token.clone(),
         data_update_period,
@@ -98,7 +95,7 @@ async fn main() {
     tokio::spawn(register_job_future(
         halt_token.clone(),
         data_update_period,
-        sync_song_list(&SONG_LIST),
+        sync_song_list(&SONG_LIST, env),
     ));
     tokio::spawn(register_job(
         halt_token.clone(),
@@ -107,10 +104,7 @@ async fn main() {
     ));
     tokio::spawn(register_job(
         halt_token.clone(),
-        env::var("WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS")
-            .map_err(|_| ())
-            .and_then(|it| it.parse().map_err(|_| ()))
-            .unwrap_or(30),
+        env.worker_account_lease_time_refresh_gap_secs,
         update_lease_time,
     ));
     tokio::spawn(start_loop(halt_token.clone()));
@@ -190,7 +184,6 @@ fn check_ready() -> Option<&'static str> {
         return Some("redis client is not initialized");
     }
     batch_check_initialized!(
-        CONFIG,
         APP_VERSION_DATA,
         XXXXXX_URL,
         SONG_LIST,

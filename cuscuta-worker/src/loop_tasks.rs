@@ -2,76 +2,62 @@ use std::env;
 
 use chrono::{DateTime, Utc};
 use cuscuta_common::{
-    api::{read_env_url_and_fetch_json, xxxxxx::XxxxxxUrl},
-    data::{AppVersionData, ScirpophagaData, read_parsed_env},
+    api::{fetch_json, xxxxxx::XxxxxxUrl},
+    data::{AppVersionData, ScirpophagaData},
     db::account::update_account_lease_time,
     quick_fetch::QuickFetch,
-    scheduled_job::tasks::get_data_fetch_max_retries,
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, Config, XXXXXX_URL},
+    config::fetch_env,
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, XXXXXX_URL},
     db::postgresql::try_open_transaction,
 };
 
 pub async fn sync_scirpophaga_data(_: &CancellationToken) {
-    fn try_get_env_var(env: &str) -> Result<String, String> {
-        env::var(env)
-            .map_err(|e| format!("failed to fetch env var: {env}: {e}"))
-            .map(|it| format!("/{}", it.trim_start_matches('/')))
-    }
     async fn try_sync() -> Result<XxxxxxUrl, String> {
-        let use_online_prefix =
-            env::var("USE_ONLINE_PREFIX").map_or(true, |it| it.parse::<bool>().unwrap_or(true));
-        let scirpophaga_data = if use_online_prefix {
-            read_env_url_and_fetch_json("SCIRPOPHAGA_URL")
-                .await
-                .map_err(|e| format!("failed to fetch from SCIRPOPHAGA_URL: {e}"))?
+        let config = fetch_env();
+        let scirpophaga_data = if config.use_online_prefix {
+            fetch_json(
+                &config
+                    .scirpophaga_url
+                    .clone()
+                    .expect("USE_ONLINE_PREFIX is true, but SCIRPOPHAGA_URL is not set"),
+            )
+            .await
+            .map_err(|e| format!("failed to fetch from SCIRPOPHAGA_URL: {e}"))?
         } else {
             ScirpophagaData {
                 c2: "useless".to_owned(),
-                common_path: env::var("API_PREFIX_COMMON")
-                    .map_err(|e| format!("failed to read API_PREFIX_COMMON: {e}"))?,
-                auth_path: env::var("API_PREFIX_AUTH")
-                    .map_err(|e| format!("failed to read API_PREFIX_AUTH: {e}"))?,
+                common_path: config
+                    .api_prefix_common
+                    .clone()
+                    .expect("USE_ONLINE_PREFIX is false, but API_PREFIX_COMMON is not set"),
+                auth_path: config
+                    .api_prefix_auth
+                    .clone()
+                    .expect("USE_ONLINE_PREFIX is false, but API_PREFIX_AUTH is not set"),
             }
         };
         let common_prefix = scirpophaga_data.common_path.trim_end_matches('/');
         let auth_prefix = scirpophaga_data.auth_path.trim_end_matches('/');
         let xxxxxx_url = XxxxxxUrl {
-            login: format!("{auth_prefix}{}", try_get_env_var("API_ENDPOINT_LOGIN")?),
-            list_friend: format!(
-                "{common_prefix}{}",
-                try_get_env_var("API_ENDPOINT_LIST_FRIENDS")?
-            ),
-            add_friend: format!(
-                "{common_prefix}{}",
-                try_get_env_var("API_ENDPOINT_ADD_FRIENDS")?
-            ),
-            delete_friend: format!(
-                "{common_prefix}{}",
-                try_get_env_var("API_ENDPOINT_DELETE_FRIENDS")?
-            ),
-            get_rank: format!(
-                "{common_prefix}{}",
-                try_get_env_var("API_ENDPOINT_GET_RANK")?
-            ),
-            get_notification: format!(
-                "{common_prefix}{}",
-                try_get_env_var("API_ENDPOINT_NOTIFICATION")?
-            ),
-            compose: format!(
-                "{common_prefix}{}",
-                try_get_env_var("API_ENDPOINT_COMPOSE_AGGREGATE")?
-            ),
+            login: format!("{auth_prefix}{}", config.api_endpoint_login),
+            list_friend: format!("{common_prefix}{}", config.api_endpoint_list_friends),
+            add_friend: format!("{common_prefix}{}", config.api_endpoint_add_friends),
+            delete_friend: format!("{common_prefix}{}", config.api_endpoint_delete_friends),
+            get_rank: format!("{common_prefix}{}", config.api_endpoint_get_rank),
+            get_notification: format!("{common_prefix}{}", config.api_endpoint_notification),
+            compose: format!("{common_prefix}{}", config.api_endpoint_compose_aggregate),
+            chilo: config.api_chilo.clone(),
         };
         XXXXXX_URL
             .try_write(|_| xxxxxx_url.clone().into())
             .map_err(|e| format!("failed to write SCIRPOPHAGA_DATA: {e}"))?;
         Ok(xxxxxx_url)
     }
-    let retries = get_data_fetch_max_retries();
+    let retries = fetch_env().resource_update_retries;
     for retry in 0..retries {
         tracing::info!("sync_scirpophaga_data: trying sync scirpophaga data... {retry}/{retries}");
         match try_sync().await {
@@ -88,15 +74,17 @@ pub async fn sync_scirpophaga_data(_: &CancellationToken) {
 
 pub async fn sync_app_version_data(_: &CancellationToken) {
     async fn try_sync() -> Result<AppVersionData, String> {
-        let use_online_version = env::var("RESOURCES_APP_VERSION_USE_ONLINE")
-            .map_or(true, |it| it.parse::<bool>().unwrap_or(true));
-        let app_version_data = if use_online_version {
-            read_env_url_and_fetch_json::<AppVersionData>("RESOURCES_APP_VERSION_URL")
-                .await
-                .map_err(|e| format!("failed to fetch bundle data from url: {e}"))?
+        let config = fetch_env();
+        let app_version_data = if config.resources_app_version_use_online {
+            fetch_json::<AppVersionData>(&config.resources_app_version_url.clone().expect(
+                "RESOURCES_APP_VERSION_USE_ONLINE is true but RESOURCES_APP_VERSION_URL is not set",
+            ))
+            .await
+            .map_err(|e| format!("failed to fetch bundle data from url: {e}"))?
         } else {
-            let version_number = env::var("RESOURCES_APP_VERSION_DEFAULT")
-                .map_err(|e| format!("failed to read env: RESOURCES_APP_VERSION_DEFAULT: {e}"))?;
+            let version_number = config.resources_app_version_default.clone().expect(
+                "RESOURCES_APP_VERSION_USE_ONLINE is false but RESOURCES_APP_VERSION_DEFAULT is not set",
+            );
             if version_number.is_empty() {
                 return Err("invalid version number: empty string".to_owned());
             }
@@ -109,7 +97,7 @@ pub async fn sync_app_version_data(_: &CancellationToken) {
             .map_err(|e| format!("failed to write APP_VERSION_DATA: {e}"))?;
         Ok(app_version_data)
     }
-    let retries = get_data_fetch_max_retries();
+    let retries = fetch_env().resource_update_retries;
     for retry in 0..retries {
         tracing::info!("sync_app_version_data: trying sync bundle data... {retry}/{retries}");
         match try_sync().await {
@@ -127,47 +115,6 @@ pub async fn sync_app_version_data(_: &CancellationToken) {
     }
 }
 
-pub async fn sync_config(_: &CancellationToken) {
-    fn try_sync() -> Result<(), String> {
-        let config = Config {
-            worker_max_jobs: read_parsed_env("WORKER_MAX_JOBS")?,
-            worker_max_retry_count: read_parsed_env("WORKER_MAX_RETRIES")?,
-            worker_exponential_backoff_base_millis: read_parsed_env(
-                "WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS",
-            )?,
-            worker_exponential_backoff_multiplier: read_parsed_env(
-                "WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER",
-            )?,
-            worker_exponential_backoff_max_delay_millis: read_parsed_env(
-                "WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS",
-            )?,
-            redis_stream_refresh_ttl: read_parsed_env("REDIS_STREAM_REFRESH_TTL")?,
-            worker_account_lease_time_secs: read_parsed_env("WORKER_ACCOUNT_LEASE_TIME_SECS")?,
-            _worker_account_lease_time_refresh_gap_secs: read_parsed_env(
-                "WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS",
-            )?,
-            worker_job_max_work_time_secs: read_parsed_env("WORKER_JOB_MAX_WORK_TIME_SECS")?,
-            worker_empty_friends_delay_time_secs: read_parsed_env(
-                "WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS",
-            )?,
-        };
-        CONFIG
-            .try_write(move |_| config.into())
-            .map_err(|e| format!("failed to write CONFIG: {e}"))?;
-        Ok(())
-    }
-    if CONFIG.is_initialized() {
-        tracing::trace!("config sync");
-        return;
-    }
-    tracing::info!("sync_config: trying sync config");
-    if let Err(e) = try_sync() {
-        tracing::error!("sync_config: failed to sync config: {e}");
-        return;
-    }
-    tracing::info!("sync_config: config initialized");
-}
-
 pub async fn update_lease_time(_: &CancellationToken) {
     async fn try_update() -> Result<Option<DateTime<Utc>>, String> {
         let transaction = try_open_transaction()
@@ -177,10 +124,7 @@ pub async fn update_lease_time(_: &CancellationToken) {
             .read_spinning(std::clone::Clone::clone)
             .await
             .map_err(|e| format!("failed to fetch account_row, is account not logged yet? {e}"))?;
-        let config = CONFIG
-            .read_spinning(std::clone::Clone::clone)
-            .await
-            .map_err(|e| format!("failed to read config: {e}"))?;
+        let config = fetch_env();
         let lease_time = update_account_lease_time(
             transaction,
             &account_row,

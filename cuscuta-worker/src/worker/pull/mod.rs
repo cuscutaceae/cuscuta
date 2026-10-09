@@ -19,7 +19,7 @@ use redis::{
 };
 
 use crate::{
-    data::Config,
+    config::{Environment, fetch_env},
     worker::{Error, update_job_track_info},
 };
 
@@ -28,7 +28,7 @@ pub async fn scan_sub_queue_and_pull_job<'a>(
     redis_client: &Client,
     current_jobs: &mut Vec<Job>,
     cursor: &mut usize,
-    config: &Config,
+
     songs_with_hash_pool: &'a [SongsWithHash],
     worker_id: &str,
 ) -> Result<Option<(SubQueue, &'a SongsWithHash)>, Error> {
@@ -39,14 +39,7 @@ pub async fn scan_sub_queue_and_pull_job<'a>(
             .find(|it| it.hash == s.hash)
             .expect("should have matched songs");
         (
-            pull_jobs(
-                current_jobs,
-                &s,
-                config,
-                redis_client,
-                worker_id,
-                songs_with_hash,
-            )?,
+            pull_jobs(current_jobs, &s, redis_client, worker_id, songs_with_hash)?,
             s,
             songs_with_hash,
         )
@@ -59,7 +52,6 @@ pub async fn scan_sub_queue_and_pull_job<'a>(
         })?;
         let Some((jobs, sub_queue, songs_with_hash)) = discover_sub_queue_for_jobs(
             current_jobs,
-            config,
             redis_client,
             worker_id,
             &sub_queues,
@@ -148,12 +140,13 @@ fn fetch_redis_jobs(
 fn pull_jobs(
     jobs: &[Job],
     sub_queue: &SubQueue,
-    config: &Config,
+
     redis_client: &Client,
     pod_uid: &str,
     songs_with_hash: &SongsWithHash,
 ) -> Result<Option<Vec<Job>>, Error> {
     // TODO: 添加无GROUP找不到的错误处理（跳过）
+    let config = fetch_env();
     let valid_jobs = valid_jobs(jobs);
     let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
     let max_jobs = config.worker_max_jobs.try_into().expect("wait... what?");
@@ -225,7 +218,7 @@ type DiscoverResult<'a> = (Vec<Job>, SubQueue, &'a SongsWithHash);
 
 fn discover_sub_queue_for_jobs<'a>(
     jobs: &[Job],
-    config: &Config,
+
     redis_client: &Client,
     pod_uid: &str,
     sub_queues: &[SubQueue],
@@ -236,9 +229,7 @@ fn discover_sub_queue_for_jobs<'a>(
             .iter()
             .filter(|it| it.hash == songs_with_hash.hash)
         {
-            let Some(jobs) =
-                pull_jobs(jobs, queue, config, redis_client, pod_uid, songs_with_hash)?
-            else {
+            let Some(jobs) = pull_jobs(jobs, queue, redis_client, pod_uid, songs_with_hash)? else {
                 continue;
             };
             if jobs.is_empty() {
