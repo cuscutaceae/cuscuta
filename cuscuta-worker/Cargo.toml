@@ -19,7 +19,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["signal"] }
 tokio-util = { workspace = true }
 gethostname = "1.1.0"
-either = "1.18.0"
+either = "1.19.0"
 futures = "0.3.34"
 
 [dev-dependencies]
