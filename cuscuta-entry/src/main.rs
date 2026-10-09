@@ -16,10 +16,12 @@ mod endpoints;
 mod init;
 mod loop_tasks;
 
+use std::env;
+
 use crate::{
     data::{CONFIG, SONG_LIST},
     db::{postgresql::POSTGRESQL_POOL, redis::REDIS_CLIENT},
-    endpoints::{query::query, status::stat},
+    endpoints::{query::query, status::status},
     enqueue::enqueue,
     loop_tasks::sync_config,
 };
@@ -34,6 +36,7 @@ use cuscuta_common::{
 
 use axum::{
     Json, Router,
+    http::HeaderValue,
     response::IntoResponse,
     routing::{get, post},
 };
@@ -45,7 +48,10 @@ use reqwest::StatusCode;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
-use tower_http::trace::{self, TraceLayer};
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    trace::{self, TraceLayer},
+};
 use tracing::Level;
 
 use crate::{endpoints::enqueue, init::cuscuta_init};
@@ -61,12 +67,16 @@ async fn main() {
         .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
         .on_request(trace::DefaultOnRequest::new().level(Level::INFO))
         .on_response(trace::DefaultOnResponse::new().level(Level::INFO));
+    let cors_layer = CorsLayer::new()
+        .allow_origin(AllowOrigin::list(parse_cors_origins()))
+        .allow_credentials(true);
     let service = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/v1/enqueue", post(enqueue).layer(trace_layer.clone()))
         .route("/v1/query", get(query).layer(trace_layer.clone()))
-        .route("/v1/status", get(stat));
+        .route("/v1/status", get(status))
+        .layer(cors_layer);
     let addr = TcpListener::bind("0.0.0.0:8081")
         .await
         .expect("failed to bind 0.0.0.0:8081");
@@ -103,6 +113,18 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal(halt_token))
         .await
         .unwrap_or_else(|e| panic!("{e:?}"));
+}
+
+fn parse_cors_origins() -> Vec<HeaderValue> {
+    let raw = env::var("CORS_ALLOW_ORIGINS").unwrap_or_default();
+    raw.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            s.parse::<HeaderValue>()
+                .unwrap_or_else(|e| panic!("CORS origin {s:?} error: {e}"))
+        })
+        .collect()
 }
 
 fn check_ready() -> Option<&'static str> {

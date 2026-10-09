@@ -1,4 +1,4 @@
-use axum::{Json, response::IntoResponse};
+use axum::{Json, http, response::IntoResponse};
 use cuscuta_common::{
     db::log::{WorkerStatus, status::search_worker_status},
     quick_fetch::QuickFetch,
@@ -26,7 +26,7 @@ enum StatResult<'a> {
     },
 }
 
-pub async fn stat() -> impl IntoResponse {
+pub async fn status() -> impl IntoResponse {
     async fn op<'a>() -> Result<StatResult<'a>, Error> {
         let redis_client = REDIS_CLIENT
             .get()
@@ -46,9 +46,14 @@ pub async fn stat() -> impl IntoResponse {
         })
     }
     match op().await {
-        Ok(x) => (StatusCode::OK, Json(x)),
+        Ok(x) => (
+            StatusCode::OK,
+            [(http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")],
+            Json(x),
+        ),
         Err(e) => (
             e.get_status_code(),
+            [(http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")],
             Json(StatResult::Failed {
                 success: false,
                 code: e.get_error_type() as i64,

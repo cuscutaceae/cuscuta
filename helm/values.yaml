@@ -131,6 +131,8 @@ entry:
         paths:
           - path: /
             pathType: Prefix
+  cors:
+    allowOrigins: ""
   status:
     # -- 是否启用 `/v1/status` 接口（环境变量：STAT_ENABLE）
     enabled: true

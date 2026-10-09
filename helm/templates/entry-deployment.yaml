@@ -50,6 +50,8 @@ spec:
               value: {{ .Values.dataSource.update.dataUpdatePeriod | quote }}
             - name: RESOURCE_UPDATE_RETRIES
               value: {{ .Values.dataSource.update.dataUpdateRetries | quote }}
+            - name: CORS_ALLOW_ORIGINS
+              value: {{ .Values.entry.cors.allowOrigins | quote }}
           livenessProbe:
             httpGet:
               path: /healthz
