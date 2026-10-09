@@ -6,10 +6,10 @@ version.workspace = true
 [lib]
 
 [dependencies]
-testcontainers = "0.27.3"
 cuscuta-common = { path = "../cuscuta-common" }
-tokio = { workspace = true, features = ["macros"] }
 redis = { workspace = true }
+testcontainers = "0.27.3"
+tokio = { workspace = true, features = ["macros"] }
 
 [lints]
 workspace = true

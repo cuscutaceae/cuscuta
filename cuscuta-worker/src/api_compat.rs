@@ -4,11 +4,10 @@ use cuscuta_common::api::{
 };
 use reqwest::StatusCode;
 
-use crate::data::Config;
+use crate::config::fetch_env;
 
 #[allow(clippy::cast_possible_truncation)]
 pub async fn xxxxxx_safe_call_ex_worker<'a, F, R, T, Fut>(
-    config: &Config,
     fail_cond: T,
     f: F,
 ) -> Result<R, api::Error>
@@ -18,8 +17,9 @@ where
     F: Fn() -> Fut,
     T: Fn(StatusCode) -> bool,
 {
+    let config = fetch_env();
     xxxxxx_safe_call_ex(
-        config.worker_max_retry_count,
+        config.worker_max_retries,
         config.worker_exponential_backoff_base_millis,
         config.worker_exponential_backoff_multiplier,
         config.worker_exponential_backoff_max_delay_millis,
@@ -30,14 +30,15 @@ where
 }
 
 #[allow(clippy::cast_possible_truncation)]
-pub async fn xxxxxx_safe_call_worker<'a, F, R, Fut>(config: &Config, f: F) -> Result<R, api::Error>
+pub async fn xxxxxx_safe_call_worker<'a, F, R, Fut>(f: F) -> Result<R, api::Error>
 where
     Fut: Future<Output = Result<R, api::Error>> + 'a + Send,
     R: Send + 'a,
     F: Fn() -> Fut,
 {
+    let config = fetch_env();
     xxxxxx_safe_call(
-        config.worker_max_retry_count,
+        config.worker_max_retries,
         config.worker_exponential_backoff_base_millis,
         config.worker_exponential_backoff_multiplier,
         config.worker_exponential_backoff_max_delay_millis,

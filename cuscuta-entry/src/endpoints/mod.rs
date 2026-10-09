@@ -9,7 +9,6 @@ pub mod status;
 #[derive(Debug, Clone, Copy)]
 enum ErrorType {
     RedisNotReady = -101,
-    ConfigNotReady = -102,
     SongListNotReady = -103,
 
     FailedTransactionOpenDb = -201,

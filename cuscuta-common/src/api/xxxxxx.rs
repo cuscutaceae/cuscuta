@@ -299,6 +299,9 @@ pub struct XxxxxxUrl {
 
     /// 聚合调用 Url
     pub compose: String,
+
+    /// chilo Url
+    pub chilo: String,
 }
 
 /// 通过xxxxxx api登录

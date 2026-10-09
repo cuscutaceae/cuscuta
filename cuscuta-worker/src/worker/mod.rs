@@ -35,7 +35,8 @@ use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, Config, SONG_LIST, WORKER_ID, XXXXXX_URL},
+    config::fetch_env,
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, SONG_LIST, WORKER_ID, XXXXXX_URL},
     db::redis::REDIS_CLIENT,
     worker::{
         clean::clean_jobs,
@@ -123,7 +124,6 @@ struct Args<'a> {
     account_row: AccountRow,
     user_id: String,
     token: String,
-    config: Config,
     bundle_data: AppVersionData,
     xxxxxx_url: XxxxxxUrl,
     songs_with_hash_pool: Vec<SongsWithHash>,
@@ -147,12 +147,6 @@ async fn get_args<'a>() -> Result<Args<'a>, Error> {
         .map(|(id, token)| (id.to_string(), token))
         .ok_or(Error::NotReady {
             message: "user is not login".to_string(),
-        })?;
-    let config = CONFIG
-        .read_spinning(std::clone::Clone::clone)
-        .await
-        .map_err(|e| Error::NotReady {
-            message: format!("config ({e})"),
         })?;
     let bundle_data = APP_VERSION_DATA
         .read_spinning(std::clone::Clone::clone)
@@ -178,7 +172,6 @@ async fn get_args<'a>() -> Result<Args<'a>, Error> {
         account_row,
         user_id,
         token,
-        config,
         bundle_data,
         xxxxxx_url,
         songs_with_hash_pool,
@@ -196,7 +189,6 @@ async fn internal_loop(
         account_row,
         user_id,
         token,
-        config,
         bundle_data,
         xxxxxx_url,
         songs_with_hash_pool,
@@ -205,7 +197,6 @@ async fn internal_loop(
         redis_client,
         current_jobs,
         cursor,
-        &config,
         &songs_with_hash_pool,
         worker_id,
     )
@@ -232,7 +223,6 @@ async fn internal_loop(
         return Ok(());
     }
     try_add_friends(
-        &config,
         &xxxxxx_url,
         &bundle_data,
         redis_client,
@@ -255,13 +245,12 @@ async fn internal_loop(
             &account_row,
             songs_with_hash,
             *cursor,
-            &config,
         )
         .await?
     };
     let linked_result = process_job_with_result(current_jobs, &rank_list);
     write_result_to_redis(redis_client, &linked_result)?;
-    refresh_redis_ttl(current_jobs, redis_client, &config)?;
+    refresh_redis_ttl(current_jobs, redis_client)?;
     clean_jobs(
         current_jobs,
         friends,
@@ -270,7 +259,6 @@ async fn internal_loop(
         &user_id,
         &token,
         &account_row,
-        &config,
         &xxxxxx_url,
     )
     .await?;
@@ -281,7 +269,8 @@ async fn internal_loop(
     Ok(())
 }
 
-fn refresh_redis_ttl(jobs: &[Job], redis_client: &Client, config: &Config) -> Result<(), Error> {
+fn refresh_redis_ttl(jobs: &[Job], redis_client: &Client) -> Result<(), Error> {
+    let config = fetch_env();
     let mut pipe = redis::pipe();
     for job in jobs {
         pipe.expire(
@@ -323,14 +312,11 @@ where
 
 pub async fn resume_state(worker_result: WorkerResult) {
     // TODO: complete error handling here
-    async fn resume_jobs(worker_result: WorkerResult) -> Result<(), Error> {
+    fn resume_jobs(worker_result: WorkerResult) -> Result<(), Error> {
         let redis_client = REDIS_CLIENT.get().ok_or(Error::NotReady {
             message: "redis client".to_string(),
         })?;
-        let redis_stream_refresh_ttl = CONFIG
-            .read_spinning(|it| it.redis_stream_refresh_ttl)
-            .await
-            .unwrap_or(300);
+        let redis_stream_refresh_ttl = fetch_env().redis_stream_refresh_ttl;
         let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
         for job in worker_result.jobs {
             tracing::info!("resuming_jobs: reenqueueing job: {job:?}");
@@ -366,7 +352,7 @@ pub async fn resume_state(worker_result: WorkerResult) {
         }
         Ok(())
     }
-    if let Err(e) = resume_jobs(worker_result).await {
+    if let Err(e) = resume_jobs(worker_result) {
         tracing::error!("resuming: failed to resume jobs: {e}");
     }
 }

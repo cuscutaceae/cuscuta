@@ -8,6 +8,7 @@
 //! - `SCIRPOPHAGA_URL`（在线密钥来源，`USE_ONLINE_KEY=true` 时使用）
 //! - `BIN_C2`（离线密钥，十六进制，`USE_ONLINE_KEY=false` 时使用）
 
+mod config;
 mod loop_tasks;
 
 use std::sync::OnceLock;
@@ -15,15 +16,14 @@ use std::sync::OnceLock;
 use axum::{Json, Router, extract::Query, http::StatusCode, response::IntoResponse, routing::get};
 use base64::Engine;
 use cuscuta_common::{
-    batch_check_initialized, data::read_parsed_env, quick_fetch::QuickFetch,
-    scheduled_job::register_job,
+    batch_check_initialized, quick_fetch::QuickFetch, scheduled_job::register_job,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::{net::TcpListener, sync::RwLock};
 use tokio_util::sync::CancellationToken;
 
-use crate::loop_tasks::sync_scirpophaga_data;
+use crate::{config::init_env, loop_tasks::sync_scirpophaga_data};
 
 static C2: OnceLock<RwLock<Option<Vec<u8>>>> = OnceLock::new();
 
@@ -33,16 +33,12 @@ async fn main() {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
     tracing::info!("starting...");
+    tracing::info!("reading config...");
+    let env = init_env().expect("failed to read env");
     let cancellation_token = CancellationToken::new();
-    let data_update_period = read_parsed_env::<u64>("RESOURCE_UPDATE_PERIOD").unwrap_or_else(|e| {
-        tracing::info!(
-            "pre_init: failed to read RESOURCE_UPDATE_PERIOD: {e}, set to default (30s)"
-        );
-        30
-    });
     tokio::spawn(register_job(
         cancellation_token.clone(),
-        data_update_period,
+        env.resource_update_period,
         sync_scirpophaga_data,
     ));
     let service = Router::new()

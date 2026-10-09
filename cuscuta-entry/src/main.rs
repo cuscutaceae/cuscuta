@@ -10,21 +10,20 @@
 //! - `RESOURCE_UPDATE_RETRIES`（数据拉取最大重试次数，默认 5）
 //! - `RESOURCES_SONG_URL`
 
+mod config;
 mod data;
 mod db;
 mod endpoints;
 mod init;
-mod loop_tasks;
 
 use crate::{
-    data::{CONFIG, SONG_LIST},
+    config::{Environment, init_env},
+    data::SONG_LIST,
     db::{postgresql::POSTGRESQL_POOL, redis::REDIS_CLIENT},
-    endpoints::{query::query, status::stat},
+    endpoints::{query::query, status::status},
     enqueue::enqueue,
-    loop_tasks::sync_config,
 };
 use cuscuta_common::{
-    data::read_parsed_env,
     quick_fetch::QuickFetch,
     scheduled_job::{
         register_job_future,
@@ -34,18 +33,20 @@ use cuscuta_common::{
 
 use axum::{
     Json, Router,
+    http::HeaderValue,
     response::IntoResponse,
     routing::{get, post},
 };
-use cuscuta_common::{
-    batch_check_initialized,
-    scheduled_job::{register_individual_job, register_job},
-};
+use cuscuta_common::{batch_check_initialized, scheduled_job::register_individual_job};
+use itertools::Itertools;
 use reqwest::StatusCode;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
-use tower_http::trace::{self, TraceLayer};
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    trace::{self, TraceLayer},
+};
 use tracing::Level;
 
 use crate::{endpoints::enqueue, init::cuscuta_init};
@@ -56,27 +57,9 @@ async fn main() {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
     tracing::info!("starting...");
+    tracing::info!("reading config...");
+    let env = init_env().expect("failed to read env");
     let halt_token = CancellationToken::new();
-    let trace_layer = TraceLayer::new_for_http()
-        .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
-        .on_request(trace::DefaultOnRequest::new().level(Level::INFO))
-        .on_response(trace::DefaultOnResponse::new().level(Level::INFO));
-    let service = Router::new()
-        .route("/healthz", get(healthz))
-        .route("/readyz", get(readyz))
-        .route("/v1/enqueue", post(enqueue).layer(trace_layer.clone()))
-        .route("/v1/query", get(query).layer(trace_layer.clone()))
-        .route("/v1/status", get(stat));
-    let addr = TcpListener::bind("0.0.0.0:8081")
-        .await
-        .expect("failed to bind 0.0.0.0:8081");
-    tracing::info!("listening in 0.0.0.0:8081...");
-    let data_update_period = read_parsed_env::<u64>("RESOURCE_UPDATE_PERIOD").unwrap_or_else(|e| {
-        tracing::info!(
-            "pre_init: failed to read RESOURCE_UPDATE_PERIOD: {e}, set to default (30s)"
-        );
-        30
-    });
     tokio::spawn(register_individual_job(
         halt_token.clone(),
         CancellationToken::new(),
@@ -86,30 +69,71 @@ async fn main() {
     tokio::spawn(register_job_future(
         halt_token.clone(),
         10,
-        open_redis_client(&REDIS_CLIENT),
+        open_redis_client(&REDIS_CLIENT, env),
     ));
     tokio::spawn(register_job_future(
         halt_token.clone(),
         10,
-        open_postgresql_client(&POSTGRESQL_POOL),
+        open_postgresql_client(&POSTGRESQL_POOL, env),
     ));
     tokio::spawn(register_job_future(
         halt_token.clone(),
-        data_update_period,
-        sync_song_list(&SONG_LIST),
+        env.resource_update_period,
+        sync_song_list(&SONG_LIST, env),
     ));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+        .on_request(trace::DefaultOnRequest::new().level(Level::INFO))
+        .on_response(trace::DefaultOnResponse::new().level(Level::INFO));
+    let cors_layer = parse_cors_origins(env);
+    let service = Router::new()
+        .route("/healthz", get(healthz))
+        .route("/readyz", get(readyz))
+        .route("/v1/enqueue", post(enqueue).layer(trace_layer.clone()))
+        .route("/v1/query", get(query).layer(trace_layer.clone()))
+        .route("/v1/status", get(status))
+        .layer(cors_layer);
+    let addr = TcpListener::bind("0.0.0.0:8081")
+        .await
+        .expect("failed to bind 0.0.0.0:8081");
+    tracing::info!("listening in 0.0.0.0:8081...");
     axum::serve(addr, service)
         .with_graceful_shutdown(shutdown_signal(halt_token))
         .await
         .unwrap_or_else(|e| panic!("{e:?}"));
 }
 
+fn parse_cors_origins(env: &Environment) -> CorsLayer {
+    let layer = CorsLayer::new();
+    let has_wildcard = env.cors_allow_origins.split(',').contains("*");
+    if has_wildcard {
+        tracing::warn!(
+            "cors_origins_parse: cors_allow_origins contains wildcard, so allow_credentials is now false"
+        );
+    }
+    layer
+        .allow_origin(if has_wildcard {
+            AllowOrigin::any()
+        } else {
+            AllowOrigin::list(
+                env.cors_allow_origins
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| {
+                        s.parse::<HeaderValue>()
+                            .unwrap_or_else(|e| panic!("CORS origin {s:?} error: {e}"))
+                    }),
+            )
+        })
+        .allow_credentials(!has_wildcard)
+}
+
 fn check_ready() -> Option<&'static str> {
     if REDIS_CLIENT.get().is_none() {
         return Some("redis client is not initialized");
     }
-    batch_check_initialized!(CONFIG, SONG_LIST, POSTGRESQL_POOL);
+    batch_check_initialized!(SONG_LIST, POSTGRESQL_POOL);
     None
 }
 

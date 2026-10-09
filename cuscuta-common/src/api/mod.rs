@@ -1,5 +1,3 @@
-use std::env;
-
 use reqwest::{RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
 
@@ -47,31 +45,20 @@ pub enum Error {
         /// 错误描述
         message: String,
     },
-
-    /// 环境变量未配置或配置无效
-    #[error("failed to read env::var: {error}:{message}")]
-    Env {
-        /// 环境变量错误
-        error: env::VarError,
-
-        /// 错误描述
-        message: String,
-    },
 }
 
-/// 从环境变量中读取URL，并获取JSON数据
+/// 从URL中获取JSON数据
 ///
 /// # Errors
-/// - 当环境变量配置无效时，返回[`Error::Env`]
 /// - 当请求发送失败时，返回[`Error::Network`]
 /// - 当返回值不为2xx时，返回[`Error::BadStatus`]
 /// - 当Json反序列化失败时，返回[`Error::Decode`]
-pub async fn read_env_url_and_fetch_json<T>(env: &str) -> Result<T, Error>
+pub async fn fetch_json<T>(url: &str) -> Result<T, Error>
 where
     T: DeserializeOwned,
 {
     reqwest::Client::new()
-        .get(try_get_env_var(env)?)
+        .get(url)
         .send()
         .await
         .map_err(Error::Network)?
@@ -87,13 +74,6 @@ where
         .map_err(|e| Error::Decode {
             message: format!("failed to decode json: {e}"),
         })
-}
-
-fn try_get_env_var(var: &str) -> Result<String, Error> {
-    env::var(var).map_err(|error| Error::Env {
-        error,
-        message: var.to_string(),
-    })
 }
 
 trait ErrorForStatusWithResponse

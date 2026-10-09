@@ -13,17 +13,13 @@ use cuscuta_common::{
 };
 use redis::{Client, Connection, TypedCommands};
 
-use crate::{
-    data::Config,
-    worker::{
-        Error,
-        friend_modify::{ExpectedModify, try_modify_remote_friend},
-    },
+use crate::worker::{
+    Error,
+    friend_modify::{ExpectedModify, try_modify_remote_friend},
 };
 
 #[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 pub async fn try_add_friends(
-    config: &Config,
     xxxxxx_url: &XxxxxxUrl,
     bundle_data: &AppVersionData,
     redis_client: &Client,
@@ -63,7 +59,6 @@ pub async fn try_add_friends(
         }
 
         let friends_new = match try_modify_remote_friend(
-            config,
             xxxxxx_url,
             bundle_data,
             user_id,

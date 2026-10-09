@@ -1,5 +1,3 @@
-use std::{env, str::FromStr};
-
 use serde::{Deserialize, Deserializer};
 
 /// xxxxxx的数据版本信息
@@ -111,18 +109,4 @@ impl From<SongRaw> for Option<Song> {
             difficulties: it,
         })
     }
-}
-
-/// 读取环境变量，并parse
-///
-/// # Errors
-/// 一个字符串的简略描述信息，用于打印输出
-pub fn read_parsed_env<T>(key: &str) -> Result<T, String>
-where
-    T: FromStr,
-{
-    env::var(key)
-        .map_err(|e| format!("failed to read {key}: {e}"))?
-        .parse::<T>()
-        .map_err(|_| format!("failed to read {key}: failed to parse"))
 }

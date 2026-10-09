@@ -12,7 +12,7 @@ use cuscuta_common::{
 };
 use redis::{Client, TypedCommands};
 
-use crate::{api_compat::xxxxxx_safe_call_worker, data::Config, worker::Error};
+use crate::{api_compat::xxxxxx_safe_call_worker, worker::Error};
 
 pub fn process_job_with_result(jobs: &mut [Job], scores: &[SongScore]) -> Vec<(String, SongScore)> {
     let mut job_links = Vec::new();
@@ -69,7 +69,6 @@ pub async fn gather_rank_list<'a>(
     account_row: &'a AccountRow,
     songs_with_hash: &'a SongsWithHash,
     cursor: usize,
-    config: &Config,
 ) -> Result<Vec<SongScore>, Error> {
     let Some(song) = songs_with_hash.songs.get(cursor) else {
         return Ok(Vec::new());
@@ -77,7 +76,7 @@ pub async fn gather_rank_list<'a>(
     let mut result = Vec::new();
     for difficulty in &song.difficulties {
         let rating_class = difficulty.rating_class.to_string();
-        let rank_list = xxxxxx_safe_call_worker(config, || {
+        let rank_list = xxxxxx_safe_call_worker(|| {
             api_get_rank_list(
                 xxxxxx_url,
                 bundle_data,

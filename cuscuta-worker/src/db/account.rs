@@ -73,7 +73,6 @@ pub mod auto {
 
     use crate::{
         api_compat::xxxxxx_safe_call_ex_worker,
-        data::Config,
         db::{
             account::{perform_login, update_account_info},
             postgresql::try_open_transaction,
@@ -105,7 +104,7 @@ pub mod auto {
     /// Warn: God function
     pub async fn check_and_update_token(
         xxxxxx_url: &XxxxxxUrl,
-        config: &Config,
+
         bundle_data: &AppVersionData,
         account_row: &AccountRow,
         force_login: bool,
@@ -142,7 +141,6 @@ pub mod auto {
         Ok((
             current_row.clone(),
             xxxxxx_safe_call_ex_worker(
-                config,
                 |status| status != StatusCode::TOO_MANY_REQUESTS,
                 || {
                     api_list_friend(

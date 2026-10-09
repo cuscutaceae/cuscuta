@@ -1,4 +1,4 @@
-use std::{env, pin::Pin, sync::OnceLock};
+use std::{pin::Pin, sync::OnceLock};
 
 use redis::TypedCommands;
 use sha2::Digest;
@@ -7,26 +7,16 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    api::read_env_url_and_fetch_json,
-    data::{Song, SongsResult, SongsWithHash, read_parsed_env},
+    api::fetch_json,
+    config::{
+        IntoPostgresqlUrlAddress, IntoRedisUrlAddress, IntoResourcesUpdatePeriodAndRetries,
+        IntoSongUrlAddress,
+    },
+    data::{Song, SongsResult, SongsWithHash},
     quick_fetch::QuickFetch,
 };
 
 type QuickFetchType<T> = OnceLock<RwLock<Option<T>>>;
-
-/// 默认的最大重试次数
-pub const DATA_RETRIES_DEFAULT: u64 = 5;
-
-/// 获取最大重试次数
-#[must_use]
-pub fn get_data_fetch_max_retries() -> u64 {
-    read_parsed_env::<u64>("RESOURCE_UPDATE_RETRIES").unwrap_or_else(|e| {
-        tracing::warn!(
-            "get_data_fetch_max_retries: failed to get max retries count ({e}), use default (5)"
-        );
-        DATA_RETRIES_DEFAULT
-    })
-}
 
 fn calc_song_list_hash(song_list: &[Song]) -> String {
     struct SongPart<'a> {
@@ -74,20 +64,26 @@ fn calc_song_list_hash(song_list: &[Song]) -> String {
 }
 
 /// 同步歌曲列表
-pub fn sync_song_list(
+pub fn sync_song_list<T>(
     global_song_list: &'static QuickFetchType<Vec<SongsWithHash>>,
-) -> impl Fn(&CancellationToken) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
-    |_| {
-        Box::pin(async {
+    config: &T,
+) -> impl Fn(&CancellationToken) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>
+where
+    T: IntoSongUrlAddress + IntoResourcesUpdatePeriodAndRetries,
+{
+    move |_| {
+        let song_list_url = config.song_list_url_address().to_string();
+        let max_retries = config.resource_update_retries();
+        Box::pin(async move {
             async fn try_sync(
                 global_song_list: &QuickFetchType<Vec<SongsWithHash>>,
+                song_list_url: &str,
             ) -> Result<(usize, usize, String), String> {
-                let song_list: Vec<_> =
-                    read_env_url_and_fetch_json::<SongsResult>("RESOURCES_SONG_URL")
-                        .await
-                        .map_err(|e| format!("failed to fetch song data from url: {e}"))
-                        .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
-                        .collect();
+                let song_list: Vec<_> = fetch_json::<SongsResult>(song_list_url)
+                    .await
+                    .map_err(|e| format!("failed to fetch song data from url: {e}"))
+                    .map(|it| it.songs.into_iter().filter_map(Option::<Song>::from))?
+                    .collect();
                 let music_len = song_list.len();
                 let chart_len = song_list.iter().fold(0, |v, it| v + it.difficulties.len());
                 tracing::info!("sync_song_list: hashing");
@@ -120,10 +116,9 @@ pub fn sync_song_list(
                 tracing::trace!("song list sync");
                 return;
             }
-            let retries = get_data_fetch_max_retries();
-            for retry in 0..retries {
-                tracing::info!("sync_song_list: trying sync song list... {retry}/{retries}");
-                match try_sync(global_song_list).await {
+            for retry in 0..max_retries {
+                tracing::info!("sync_song_list: trying sync song list... {retry}/{max_retries}");
+                match try_sync(global_song_list, &song_list_url).await {
                     Ok((music_len, chart_len, hash)) => {
                         tracing::info!(
                             "sync_song_list: song list initialized (music:{music_len}, charts:{chart_len}, hash: {hash})"
@@ -138,20 +133,24 @@ pub fn sync_song_list(
 }
 
 /// 打开Postgresql pool
-pub fn open_postgresql_client(
+pub fn open_postgresql_client<T>(
     global_postgresql_pool: &'static QuickFetchType<sqlx::PgPool>,
-) -> impl Fn(&CancellationToken) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
-    |_| {
-        Box::pin(async {
+    config: &T,
+) -> impl Fn(&CancellationToken) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>
+where
+    T: IntoPostgresqlUrlAddress,
+{
+    move |_| {
+        let addr = config.postgresql_address().to_string();
+        Box::pin(async move {
             async fn try_connect(
                 global_postgresql_pool: &QuickFetchType<sqlx::PgPool>,
+                addr: &str,
             ) -> Result<(), String> {
-                let addr = env::var("ACCOUNTS_SQL_ADDR")
-                    .map_err(|e| format!("failed to read ACCOUNTS_SQL_ADDR: {e}"))?;
                 tracing::debug!("postgresql_open: {addr}");
                 let x = PgPoolOptions::new()
                     .max_connections(5)
-                    .connect(addr.as_str())
+                    .connect(addr)
                     .await
                     .map_err(|e| format!("failed to connect to postgresql server: {e}"))?;
                 global_postgresql_pool
@@ -163,7 +162,7 @@ pub fn open_postgresql_client(
                 return;
             }
             tracing::debug!("postgresql_open: trying to connect to postgresql server...");
-            if let Err(e) = try_connect(global_postgresql_pool).await {
+            if let Err(e) = try_connect(global_postgresql_pool, &addr).await {
                 tracing::error!("postgresql_open: failed to connect to postgresql server: {e}");
                 return;
             }
@@ -173,13 +172,20 @@ pub fn open_postgresql_client(
 }
 
 /// 打开redis client
-pub fn open_redis_client(
+pub fn open_redis_client<T>(
     global_redis_client: &'static OnceLock<redis::Client>,
-) -> impl Fn(&CancellationToken) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
-    |_| {
-        Box::pin(async {
-            fn try_connect(global_redis_client: &OnceLock<redis::Client>) -> Result<(), String> {
-                let addr = env::var("REDIS_ADDR").map_err(|_| "failed to read env: REDIS_ADDR")?;
+    config: &T,
+) -> impl Fn(&CancellationToken) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>
+where
+    T: IntoRedisUrlAddress,
+{
+    move |_| {
+        let addr = config.redis_address().to_string();
+        Box::pin(async move {
+            fn try_connect(
+                global_redis_client: &OnceLock<redis::Client>,
+                addr: &str,
+            ) -> Result<(), String> {
                 tracing::debug!("redis_open: redis: {addr}");
                 let redis = redis::Client::open(addr)
                     .map_err(|e| format!("failed to open redis client(phase 1): {e}"))?;
@@ -197,7 +203,7 @@ pub fn open_redis_client(
                 return;
             }
             tracing::debug!("redis_open: trying to connect to redis server...");
-            if let Err(e) = try_connect(global_redis_client) {
+            if let Err(e) = try_connect(global_redis_client, &addr) {
                 tracing::error!("redis_open: failed to connect to redis server: {e}");
                 return;
             }

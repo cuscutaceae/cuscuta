@@ -21,6 +21,9 @@ pub mod quick_fetch;
 /// 定时操作相关
 pub mod scheduled_job;
 
+/// 通用配置相关
+pub mod config;
+
 /// 为有参数的枚举类型添加数字转换
 #[macro_export]
 macro_rules! castable_enum_with_arg {
