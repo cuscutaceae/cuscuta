@@ -1,12 +1,12 @@
 [workspace]
 members = [
-    "cuscuta-common",
-    "cuscuta-entry",
-    "cuscuta-worker",
-    "cuscuta-chilo",
-    "cuscuta-mock",
-    "cuscutactl",
-    "cuscuta-test",
+  "cuscuta-chilo",
+  "cuscuta-common",
+  "cuscuta-entry",
+  "cuscuta-mock",
+  "cuscuta-test",
+  "cuscuta-worker",
+  "cuscutactl",
 ]
 resolver = "2"
 
@@ -19,6 +19,8 @@ axum = "0.8.9"
 base64 = "0.22.1"
 chrono = { version = "0.4.45", features = ["serde"] }
 comfy-table = "7.2"
+envy = "0.4.2"
+futures = "0.3.34"
 hex = "0.4.3"
 rand = "0.10.3"
 redis = { version = "1.7.1", features = ["streams"] }
@@ -32,8 +34,6 @@ tokio = { version = "1.53.2", features = ["rt-multi-thread"] }
 tokio-util = "0.7.19"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-envy = "0.4.2"
-futures = "0.3.34"
 
 [workspace.lints.rust]
 missing_docs = "deny"

@@ -9,6 +9,7 @@ edition = "2024"
 axum = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
+envy = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 redis = { workspace = true }
@@ -18,11 +19,10 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 sqlx = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
 tokio = { workspace = true, features = ["signal", "macros"] }
 tokio-util = { workspace = true }
+tracing = { workspace = true }
 urlencoding = "2.1.3"
-envy = { workspace = true }
 
 [dev-dependencies]
 cuscuta-test = { path = "../cuscuta-test" }
