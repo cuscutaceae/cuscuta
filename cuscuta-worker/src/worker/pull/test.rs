@@ -23,7 +23,7 @@ use crate::{
 #[allow(clippy::cast_possible_truncation)]
 async fn pull_job_test() {
     // 算了还是写一点注释吧我怕以后看不懂了( •̀ ω •́ )✧
-    let hash = "0000000";
+    let hash = "0000000000000000";
     let friend_code = "123456789";
     let job_base_timestamp = 1_784_475_024;
     let queue_timestamp = "1784475024";

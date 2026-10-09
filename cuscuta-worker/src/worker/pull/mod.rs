@@ -231,10 +231,9 @@ fn discover_sub_queue_for_jobs<'a>(
     sub_queues: &[SubQueue],
     songs_with_hash_pool: &'a [SongsWithHash],
 ) -> Result<Option<DiscoverResult<'a>>, Error> {
-    for songs_with_hash in songs_with_hash_pool {
+    for songs_with_hash in songs_with_hash_pool.iter().rev() {
         for queue in sub_queues
             .iter()
-            .rev()
             .filter(|it| it.hash == songs_with_hash.hash)
         {
             let Some(jobs) =
