@@ -12,7 +12,7 @@ pub struct JobTrackTag {
     /// Job 当前队列状态
     pub status: JobTrackQueueStatus,
 
-    /// 将 `last_job_id` 改为 `job_ids` ，统计使用过的 `job_id` 数目，就可统计出重试次数
+    /// 统计使用过的 `job_id` 数目，就可统计出重试次数
     pub job_ids: Vec<String>,
 
     /// 任务的的分片队列信息

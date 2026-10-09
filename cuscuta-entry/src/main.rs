@@ -1,16 +1,14 @@
-//! cuscuta的entry
+//! cuscuta 的 entry。
 //!
 //! # 依赖环境变量
-//! cuscuta-entry使用环境变量注入参数，这个crate依赖的环境变量有：
+//! cuscuta-entry 使用环境变量注入参数，这个 crate 依赖的环境变量有：
 //! - `REDIS_STREAM_REFRESH_TTL`
-//! - `GITHUB_BUNDLE_REPOSITORY`
-//! - `GITHUB_BUNDLE_PATH`
-//! - `GITHUB_BUNDLE_TOKEN`
-//! - `GITHUB_SONG_REPOSITORY`
-//! - `GITHUB_SONG_PATH`
-//! - `GITHUB_SONG_TOKEN`
 //! - `REDIS_ADDR`
 //! - `ACCOUNTS_SQL_ADDR`
+//! - `STAT_ENABLE`
+//! - `RESOURCE_UPDATE_PERIOD`（数据刷新周期，单位秒，默认 30）
+//! - `RESOURCE_UPDATE_RETRIES`（数据拉取最大重试次数，默认 5）
+//! - `RESOURCES_SONG_URL`
 
 mod data;
 mod db;
@@ -19,13 +17,20 @@ mod init;
 mod loop_tasks;
 
 use crate::{
-    data::{BUNDLE_DATA, CONFIG, SONG_LIST},
+    data::{CONFIG, SONG_LIST},
     db::{postgresql::POSTGRESQL_POOL, redis::REDIS_CLIENT},
-    endpoints::query::query,
+    endpoints::{query::query, status::stat},
     enqueue::enqueue,
     loop_tasks::sync_config,
 };
-use cuscuta_common::quick_fetch::QuickFetch;
+use cuscuta_common::{
+    data::read_parsed_env,
+    quick_fetch::QuickFetch,
+    scheduled_job::{
+        register_job_future,
+        tasks::{open_postgresql_client, open_redis_client, sync_song_list},
+    },
+};
 
 use axum::{
     Json, Router,
@@ -43,11 +48,7 @@ use tokio_util::sync::CancellationToken;
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
 
-use crate::{
-    endpoints::enqueue,
-    init::cuscuta_init,
-    loop_tasks::{open_postgresql_client, open_redis_client, sync_bundle_data, sync_song_list},
-};
+use crate::{endpoints::enqueue, init::cuscuta_init};
 
 #[tokio::main]
 async fn main() {
@@ -64,21 +65,39 @@ async fn main() {
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/v1/enqueue", post(enqueue).layer(trace_layer.clone()))
-        .route("/v1/query", get(query).layer(trace_layer));
+        .route("/v1/query", get(query).layer(trace_layer.clone()))
+        .route("/v1/status", get(stat));
     let addr = TcpListener::bind("0.0.0.0:8081")
         .await
         .expect("failed to bind 0.0.0.0:8081");
     tracing::info!("listening in 0.0.0.0:8081...");
+    let data_update_period = read_parsed_env::<u64>("RESOURCE_UPDATE_PERIOD").unwrap_or_else(|e| {
+        tracing::info!(
+            "pre_init: failed to read RESOURCE_UPDATE_PERIOD: {e}, set to default (30s)"
+        );
+        30
+    });
     tokio::spawn(register_individual_job(
         halt_token.clone(),
         CancellationToken::new(),
         10,
         cuscuta_init,
     ));
-    tokio::spawn(register_job(halt_token.clone(), 10, open_redis_client));
-    tokio::spawn(register_job(halt_token.clone(), 10, open_postgresql_client));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_bundle_data));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_song_list));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        open_redis_client(&REDIS_CLIENT),
+    ));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        open_postgresql_client(&POSTGRESQL_POOL),
+    ));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        data_update_period,
+        sync_song_list(&SONG_LIST),
+    ));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
     axum::serve(addr, service)
         .with_graceful_shutdown(shutdown_signal(halt_token))
@@ -90,7 +109,7 @@ fn check_ready() -> Option<&'static str> {
     if REDIS_CLIENT.get().is_none() {
         return Some("redis client is not initialized");
     }
-    batch_check_initialized!(CONFIG, BUNDLE_DATA, SONG_LIST, POSTGRESQL_POOL);
+    batch_check_initialized!(CONFIG, SONG_LIST, POSTGRESQL_POOL);
     None
 }
 

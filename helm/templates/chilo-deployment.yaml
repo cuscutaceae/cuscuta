@@ -25,16 +25,19 @@ spec:
           env:
             - name: RUST_LOG
               value: {{ .Values.rustLog | quote }}
-            - name: BIN_C1
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "cuscuta.fullname" . }}-secret
-                  key: BIN_C1
             - name: BIN_C2
               valueFrom:
                 secretKeyRef:
                   name: {{ include "cuscuta.fullname" . }}-secret
                   key: BIN_C2
+            - name: USE_ONLINE_KEY
+              value: {{ .Values.chilo.constants.useOnlineKey | quote }}
+            - name: SCIRPOPHAGA_URL
+              value: {{ .Values.dataSource.scirpophaga.url | quote }}
+            - name: RESOURCE_UPDATE_PERIOD
+              value: {{ .Values.dataSource.update.dataUpdatePeriod | quote }}
+            - name: RESOURCE_UPDATE_RETRIES
+              value: {{ .Values.dataSource.update.dataUpdateRetries | quote }}
           livenessProbe:
             httpGet:
               path: /healthz

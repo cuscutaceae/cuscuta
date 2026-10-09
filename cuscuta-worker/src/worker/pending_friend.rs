@@ -3,12 +3,11 @@
 use std::collections::HashMap;
 
 use cuscuta_common::{
-    api::xxxxxx::{FriendDelta, FriendInfo, calc_friend_delta},
-    data::BundleData,
+    api::xxxxxx::{FriendDelta, FriendInfo, XxxxxxUrl, calc_friend_delta},
+    data::AppVersionData,
     db::{
         account::AccountRow,
         job::{Job, JobState},
-        log::WorkerEventType,
         redis::job_result_friend_info_redis_key,
     },
 };
@@ -20,13 +19,13 @@ use crate::{
         Error,
         friend_modify::{ExpectedModify, try_modify_remote_friend},
     },
-    worker_write_event,
 };
 
 #[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 pub async fn try_add_friends(
     config: &Config,
-    bundle_data: &BundleData,
+    xxxxxx_url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     redis_client: &Client,
     user_id: &str,
     token: &str,
@@ -65,6 +64,7 @@ pub async fn try_add_friends(
 
         let friends_new = match try_modify_remote_friend(
             config,
+            xxxxxx_url,
             bundle_data,
             user_id,
             token,
@@ -94,17 +94,9 @@ pub async fn try_add_friends(
             FriendDelta::Add(it) => it,
             FriendDelta::Remove(info) => {
                 tracing::warn!("pending_friends: friend conflict detected(remove): {info:?}");
-                worker_write_event!(
-                    WorkerEventType::Warn,
-                    format!("friend conflict detected: lesser : {info:?}")
-                );
                 continue;
             }
             FriendDelta::Same => {
-                worker_write_event!(
-                    WorkerEventType::Warn,
-                    "friend conflict detected: Same".to_string()
-                );
                 tracing::warn!("pending_friends: friends keep same, may triggered something");
                 continue;
             }

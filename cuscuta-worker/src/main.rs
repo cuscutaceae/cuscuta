@@ -1,30 +1,21 @@
-//! cuscuta的worker
+//! cuscuta 的 worker。
 //!
 //! # 依赖环境变量
-//! cuscuta-worker使用环境变量注入参数，这个crate依赖的环境变量有：
-//! - `WORKER_MAX_JOBS`
-//! - `WORKER_MAX_RETRIES`
-//! - `WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS`
-//! - `WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER`
-//! - `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS`
-//! - `WORKER_ACCOUNT_LEASE_TIME_SECS`
-//! - `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS`
-//! - `WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS`
-//! - `REDIS_STREAM_REFRESH_TTL`
-//! - `GITHUB_BUNDLE_REPOSITORY`
-//! - `GITHUB_BUNDLE_PATH`
-//! - `GITHUB_BUNDLE_TOKEN`
-//! - `GITHUB_SONG_REPOSITORY`
-//! - `GITHUB_SONG_PATH`
-//! - `GITHUB_SONG_TOKEN`
-//! - `REDIS_ADDR`
-//! - `ACCOUNTS_SQL_ADDR`
-//! - `API_CHILO`
-//! - `API_LOGIN`
-//! - `API_LIST_FRIENDS`
-//! - `API_ADD_FRIENDS`
-//! - `API_DELETE_FRIENDS`
-//! - `API_GET_RANK`
+//! cuscuta-worker 使用环境变量注入参数，这个 crate 依赖的环境变量有：
+//! - 基础设施：`REDIS_ADDR`、`ACCOUNTS_SQL_ADDR`
+//! - 数据同步：`RESOURCE_UPDATE_PERIOD`（默认 30 秒）、`RESOURCE_UPDATE_RETRIES`（默认 5）、
+//!   `RESOURCES_SONG_URL`、`RESOURCES_APP_VERSION_USE_ONLINE`（默认 true）、
+//!   `RESOURCES_APP_VERSION_URL`、`RESOURCES_APP_VERSION_DEFAULT`
+//! - 目标 API：`USE_ONLINE_PREFIX`（默认 true）、`SCIRPOPHAGA_URL`、
+//!   `API_PREFIX_AUTH`、`API_PREFIX_COMMON`、`API_CHILO`、
+//!   `API_ENDPOINT_LOGIN`、`API_ENDPOINT_LIST_FRIENDS`、`API_ENDPOINT_ADD_FRIENDS`、
+//!   `API_ENDPOINT_DELETE_FRIENDS`、`API_ENDPOINT_GET_RANK`、
+//!   `API_ENDPOINT_NOTIFICATION`、`API_ENDPOINT_COMPOSE_AGGREGATE`
+//! - 任务调优：`WORKER_MAX_JOBS`、`WORKER_MAX_RETRIES`、
+//!   `WORKER_EXPONENTIAL_BACKOFF_BASE_MILLIS`、`WORKER_EXPONENTIAL_BACKOFF_MULTIPLIER`、
+//!   `WORKER_EXPONENTIAL_BACKOFF_MAX_DELAY_MILLIS`、`WORKER_ACCOUNT_LEASE_TIME_SECS`、
+//!   `WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS`、`WORKER_JOB_MAX_WORK_TIME_SECS`、
+//!   `WORKER_EMPTY_FRIENDS_DELAY_TIME_SECS`、`REDIS_STREAM_REFRESH_TTL`
 //!
 
 mod api_compat;
@@ -39,25 +30,26 @@ use std::env;
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use cuscuta_common::{
     batch_check_initialized,
+    data::read_parsed_env,
     db::account::try_release_account,
     quick_fetch::QuickFetch,
-    scheduled_job::{register_individual_job, register_job},
+    scheduled_job::{
+        register_individual_job, register_job, register_job_future,
+        tasks::{open_postgresql_client, open_redis_client, sync_song_list},
+    },
 };
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, SONG_LIST},
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, SONG_LIST, XXXXXX_URL},
     db::{
         postgresql::{POSTGRESQL_POOL, try_open_transaction},
         redis::REDIS_CLIENT,
     },
     init::cuscuta_init,
-    loop_tasks::{
-        open_postgresql_client, open_redis_client, sync_bundle_data, sync_config, sync_song_list,
-        update_lease_time,
-    },
+    loop_tasks::{sync_app_version_data, sync_config, sync_scirpophaga_data, update_lease_time},
     worker::{resume_state, worker_loop},
 };
 
@@ -75,17 +67,44 @@ async fn main() {
         .await
         .expect("failed to bind 0.0.0.0:8080");
     tracing::info!("listening in 0.0.0.0:8080...");
+    let data_update_period = read_parsed_env::<u64>("RESOURCE_UPDATE_PERIOD").unwrap_or_else(|e| {
+        tracing::info!(
+            "pre_init: failed to read RESOURCE_UPDATE_PERIOD: {e}, set to default (30s)"
+        );
+        30
+    });
     tokio::spawn(register_individual_job(
         halt_token.clone(),
         CancellationToken::new(),
         10,
         cuscuta_init,
     ));
-    tokio::spawn(register_job(halt_token.clone(), 10, open_redis_client));
-    tokio::spawn(register_job(halt_token.clone(), 10, open_postgresql_client));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        open_redis_client(&REDIS_CLIENT),
+    ));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        10,
+        open_postgresql_client(&POSTGRESQL_POOL),
+    ));
     tokio::spawn(register_job(halt_token.clone(), 10, sync_config));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_bundle_data));
-    tokio::spawn(register_job(halt_token.clone(), 10, sync_song_list));
+    tokio::spawn(register_job(
+        halt_token.clone(),
+        data_update_period,
+        sync_app_version_data,
+    ));
+    tokio::spawn(register_job_future(
+        halt_token.clone(),
+        data_update_period,
+        sync_song_list(&SONG_LIST),
+    ));
+    tokio::spawn(register_job(
+        halt_token.clone(),
+        data_update_period,
+        sync_scirpophaga_data,
+    ));
     tokio::spawn(register_job(
         halt_token.clone(),
         env::var("WORKER_ACCOUNT_LEASE_TIME_REFRESH_GAP_SECS")
@@ -113,7 +132,7 @@ async fn start_loop(cancellation_token: CancellationToken) {
         worker_loop_result.jobs.len(),
         worker_loop_result.cursor
     );
-    resume_state(worker_loop_result);
+    resume_state(worker_loop_result).await;
     cancellation_token.cancel();
 }
 
@@ -150,7 +169,8 @@ async fn shutdown_signal(cancellation_token: CancellationToken) {
 async fn halt_progress() {
     async fn reset_account_state() -> Result<(), String> {
         let account_row = ACCOUNT_ROW
-            .try_read(std::clone::Clone::clone)
+            .read_spinning(std::clone::Clone::clone)
+            .await
             .map_err(|e| format!("failed to fetch account: {e}"))?;
         let transaction = try_open_transaction()
             .await
@@ -169,7 +189,14 @@ fn check_ready() -> Option<&'static str> {
     if REDIS_CLIENT.get().is_none() {
         return Some("redis client is not initialized");
     }
-    batch_check_initialized!(CONFIG, BUNDLE_DATA, SONG_LIST, ACCOUNT_ROW, POSTGRESQL_POOL);
+    batch_check_initialized!(
+        CONFIG,
+        APP_VERSION_DATA,
+        XXXXXX_URL,
+        SONG_LIST,
+        ACCOUNT_ROW,
+        POSTGRESQL_POOL
+    );
     None
 }
 

@@ -4,6 +4,7 @@ use reqwest::StatusCode;
 
 pub mod enqueue;
 pub mod query;
+pub mod status;
 
 #[derive(Debug, Clone, Copy)]
 enum ErrorType {
@@ -22,6 +23,7 @@ enum ErrorType {
     BadRequestBase64 = -500,
     BadRequestTokenCheckFailed = -501,
     BadRequestFriendCode = -502,
+    BadRequestNotEnabled = -503,
 }
 
 impl Display for ErrorType {

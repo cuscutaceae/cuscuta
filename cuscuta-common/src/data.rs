@@ -1,15 +1,47 @@
-use serde::Deserialize;
+use std::{env, str::FromStr};
+
+use serde::{Deserialize, Deserializer};
 
 /// xxxxxx的数据版本信息
-#[derive(Debug, Deserialize, Clone)]
-pub struct BundleData {
-    /// bundle的版本
-    #[serde(rename = "versionNumber")]
-    pub version_number: String,
+#[derive(Debug, Clone)]
+pub struct AppVersionData {
+    /// App的版本
+    pub version: String,
+}
 
-    /// 应用的版本
-    #[serde(rename = "applicationVersionNumber")]
-    pub application_version_number: String,
+impl<'de> Deserialize<'de> for AppVersionData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // 先反序列化成中间结构，再取出 a
+        #[derive(Deserialize)]
+        struct Wrapper {
+            value: InnerRaw,
+        }
+        #[derive(Deserialize)]
+        struct InnerRaw {
+            version: String,
+        }
+
+        let w = Wrapper::deserialize(deserializer)?;
+        Ok(Self {
+            version: w.value.version,
+        })
+    }
+}
+
+/// scirpophaga 的输出JSON数据格式
+#[derive(Debug, Deserialize, Clone)]
+pub struct ScirpophagaData {
+    /// c2 常量
+    pub c2: String,
+
+    /// 一般API路径前缀
+    pub common_path: String,
+
+    /// 认证API路径前缀
+    pub auth_path: String,
 }
 
 /// 曲目的难度信息
@@ -41,7 +73,7 @@ pub struct SongRaw {
 }
 
 /// 曲目信息
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Song {
     /// 曲目的数字id
     pub idx: i32,
@@ -51,6 +83,16 @@ pub struct Song {
 
     /// 曲目的难度信息
     pub difficulties: Vec<Difficulty>,
+}
+
+/// 曲目列表信息
+#[derive(Debug, Clone)]
+pub struct SongsWithHash {
+    /// 曲目列表的Hash
+    pub hash: String,
+
+    /// 曲目列表
+    pub songs: Vec<Song>,
 }
 
 /// 曲目信息的适配数据模型（顶层）
@@ -69,4 +111,18 @@ impl From<SongRaw> for Option<Song> {
             difficulties: it,
         })
     }
+}
+
+/// 读取环境变量，并parse
+///
+/// # Errors
+/// 一个字符串的简略描述信息，用于打印输出
+pub fn read_parsed_env<T>(key: &str) -> Result<T, String>
+where
+    T: FromStr,
+{
+    env::var(key)
+        .map_err(|e| format!("failed to read {key}: {e}"))?
+        .parse::<T>()
+        .map_err(|_| format!("failed to read {key}: failed to parse"))
 }

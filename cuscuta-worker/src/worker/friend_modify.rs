@@ -4,19 +4,18 @@ use cuscuta_common::{
     api::{
         self,
         auto_chilo_xxxxxx::{api_add_friend, api_delete_friend, api_list_friend},
-        xxxxxx::FriendInfo,
+        xxxxxx::{FriendInfo, XxxxxxUrl},
     },
-    data::BundleData,
+    data::AppVersionData,
     db::{
         account::AccountRow,
         job::{JobFailure, JobFailureResuming, JobFailureType},
-        log::WorkerEventType,
     },
 };
 use reqwest::StatusCode;
 use tokio::time::sleep;
 
-use crate::{api_compat::xxxxxx_safe_call_ex_worker, data::Config, worker_write_event};
+use crate::{api_compat::xxxxxx_safe_call_ex_worker, data::Config};
 
 #[derive(Debug)]
 enum FriendModifyError {
@@ -34,9 +33,11 @@ pub enum WaitForResultError {
     Api(api::Error),
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn try_modify_remote_friend(
     config: &Config,
-    bundle_data: &BundleData,
+    xxxxxx_url: &XxxxxxUrl,
+    bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
@@ -59,6 +60,7 @@ pub async fn try_modify_remote_friend(
     );
     loop {
         let result = try_modify_friend(
+            xxxxxx_url,
             config,
             bundle_data,
             user_id,
@@ -93,15 +95,12 @@ pub async fn try_modify_remote_friend(
                         JobFailureResuming::Drop,
                     )
                 };
-                worker_write_event!(
-                    WorkerEventType::Warn,
-                    format!("failed to modify friend: {e:?}",)
-                );
                 return Err(failure_info);
             }
             Err(FriendModifyError::Wait) => {
-                worker_write_event!(WorkerEventType::Warn, "triggered friend modify waiting");
+                tracing::warn!("triggered friend modify waiting");
                 match wait_for_result(
+                    xxxxxx_url,
                     config,
                     bundle_data,
                     user_id,
@@ -128,9 +127,11 @@ pub async fn try_modify_remote_friend(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn wait_for_result(
+    xxxxxx_url: &XxxxxxUrl,
     config: &Config,
-    bundle_data: &BundleData,
+    bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
@@ -152,7 +153,15 @@ async fn wait_for_result(
         let result = xxxxxx_safe_call_ex_worker(
             config,
             |it| it != StatusCode::TOO_MANY_REQUESTS,
-            || api_list_friend(bundle_data, &account_row.account_email, user_id, token),
+            || {
+                api_list_friend(
+                    xxxxxx_url,
+                    bundle_data,
+                    &account_row.account_email,
+                    user_id,
+                    token,
+                )
+            },
         )
         .await
         .map(|it| it.friends)
@@ -180,9 +189,11 @@ async fn wait_for_result(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn try_modify_friend(
+    xxxxxx_url: &XxxxxxUrl,
     config: &Config,
-    bundle_data: &BundleData,
+    bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
@@ -196,6 +207,7 @@ async fn try_modify_friend(
                 |it| it != StatusCode::TOO_MANY_REQUESTS,
                 || {
                     api_add_friend(
+                        xxxxxx_url,
                         bundle_data,
                         &account_row.account_email,
                         user_id,
@@ -213,6 +225,7 @@ async fn try_modify_friend(
                 |it| it != StatusCode::TOO_MANY_REQUESTS,
                 || {
                     api_delete_friend(
+                        xxxxxx_url,
                         bundle_data,
                         &account_row.account_email,
                         user_id,
@@ -233,13 +246,7 @@ async fn try_modify_friend(
             } = &e
             {
                 tracing::warn!(
-                    "try_modify_friends: failed to call api: HTTP {status_code} {message}"
-                );
-                worker_write_event!(
-                    WorkerEventType::Warn,
-                    format!(
-                        "failed to modify friend: HTTP {status_code}: {extra_error_code:?}: {message}"
-                    )
+                    "try_modify_friends: failed to call api: HTTP {status_code} {extra_error_code:?} {message}"
                 );
             } else {
                 tracing::warn!("try_modify_friends: unexpected error: {e}");

@@ -7,8 +7,11 @@ mod pull;
 use std::time::Duration;
 
 use cuscuta_common::{
-    api::{self, xxxxxx::FriendInfo},
-    data::{BundleData, Song},
+    api::{
+        self,
+        xxxxxx::{FriendInfo, XxxxxxUrl},
+    },
+    data::{AppVersionData, SongsWithHash},
     db::{
         self,
         account::AccountRow,
@@ -19,7 +22,7 @@ use cuscuta_common::{
                 JobTrackQueueStatus, JobTrackTag, batch_write_job_tracking_tag, fetch_job_track_tag,
             },
         },
-        log::{WorkerEventType, status::update_worker_status},
+        log::status::update_worker_status,
         redis::{
             job_result_friend_info_redis_key, job_result_tracking_redis_key,
             job_result_value_redis_key,
@@ -32,7 +35,7 @@ use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    data::{ACCOUNT_ROW, BUNDLE_DATA, CONFIG, Config, SONG_LIST, WORKER_ID},
+    data::{ACCOUNT_ROW, APP_VERSION_DATA, CONFIG, Config, SONG_LIST, WORKER_ID, XXXXXX_URL},
     db::redis::REDIS_CLIENT,
     worker::{
         clean::clean_jobs,
@@ -40,7 +43,6 @@ use crate::{
         pending_gather::{gather_rank_list, process_job_with_result, write_result_to_redis},
         pull::scan_sub_queue_and_pull_job,
     },
-    worker_write_event,
 };
 
 #[derive(Debug)]
@@ -88,7 +90,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
     WORKER_ID.get_or_init(|| worker_id.clone());
     while !cancellation_token.is_cancelled() {
         if let Err(e) = internal_loop(&mut current_jobs, &mut cursor, &mut friends).await {
-            worker_write_event!(WorkerEventType::Warn, format!("worker loop failed: {e}"));
+            tracing::error!("worker loop failed: {e}");
             if let Error::Api(api_error) = &e {
                 match api_error {
                     api::Error::Network(_) => {}
@@ -111,10 +113,7 @@ pub async fn worker_loop(cancellation_token: &CancellationToken) -> WorkerResult
         cursor,
         error: None,
     };
-    worker_write_event!(
-        WorkerEventType::Fatal,
-        format!("worker down: {worker_result:?}")
-    );
+    tracing::error!("worker down: {worker_result:?}");
     worker_result
 }
 
@@ -125,11 +124,12 @@ struct Args<'a> {
     user_id: String,
     token: String,
     config: Config,
-    bundle_data: BundleData,
-    song_list: Vec<Song>,
+    bundle_data: AppVersionData,
+    xxxxxx_url: XxxxxxUrl,
+    songs_with_hash_pool: Vec<SongsWithHash>,
 }
 
-fn get_args<'a>() -> Result<Args<'a>, Error> {
+async fn get_args<'a>() -> Result<Args<'a>, Error> {
     let worker_id = WORKER_ID.get().ok_or(Error::NotReady {
         message: "worker_id... what?".to_string(),
     })?;
@@ -137,7 +137,8 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
         message: "redis client".to_string(),
     })?;
     let account_row = ACCOUNT_ROW
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| Error::NotReady {
             message: format!("account row ({e})"),
         })?;
@@ -148,19 +149,28 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
             message: "user is not login".to_string(),
         })?;
     let config = CONFIG
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| Error::NotReady {
             message: format!("config ({e})"),
         })?;
-    let bundle_data = BUNDLE_DATA
-        .try_read(std::clone::Clone::clone)
+    let bundle_data = APP_VERSION_DATA
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| Error::NotReady {
             message: format!("bundle data ({e})"),
         })?;
-    let song_list = SONG_LIST
-        .try_read(std::clone::Clone::clone)
+    let songs_with_hash_pool = SONG_LIST
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|e| Error::NotReady {
             message: format!("song list ({e})"),
+        })?;
+    let xxxxxx_url = XXXXXX_URL
+        .read_spinning(std::clone::Clone::clone)
+        .await
+        .map_err(|e| Error::NotReady {
+            message: format!("xxxxxx_url ({e})"),
         })?;
     Ok(Args {
         worker_id,
@@ -170,7 +180,8 @@ fn get_args<'a>() -> Result<Args<'a>, Error> {
         token,
         config,
         bundle_data,
-        song_list,
+        xxxxxx_url,
+        songs_with_hash_pool,
     })
 }
 
@@ -187,14 +198,15 @@ async fn internal_loop(
         token,
         config,
         bundle_data,
-        song_list,
-    } = get_args()?;
-    let Some(current_segments) = scan_sub_queue_and_pull_job(
+        xxxxxx_url,
+        songs_with_hash_pool,
+    } = get_args().await?;
+    let Some((current_segments, songs_with_hash)) = scan_sub_queue_and_pull_job(
         redis_client,
         current_jobs,
         cursor,
         &config,
-        &song_list,
+        &songs_with_hash_pool,
         worker_id,
     )
     .await?
@@ -221,6 +233,7 @@ async fn internal_loop(
     }
     try_add_friends(
         &config,
+        &xxxxxx_url,
         &bundle_data,
         redis_client,
         &user_id,
@@ -235,11 +248,12 @@ async fn internal_loop(
         vec![]
     } else {
         gather_rank_list(
+            &xxxxxx_url,
             &bundle_data,
             &user_id,
             &token,
             &account_row,
-            &song_list,
+            songs_with_hash,
             *cursor,
             &config,
         )
@@ -257,6 +271,7 @@ async fn internal_loop(
         &token,
         &account_row,
         &config,
+        &xxxxxx_url,
     )
     .await?;
     *cursor += 1;
@@ -306,14 +321,15 @@ where
     batch_write_job_tracking_tag(redis_client, &[info]).map_err(Error::RedisExtend)
 }
 
-pub fn resume_state(worker_result: WorkerResult) {
+pub async fn resume_state(worker_result: WorkerResult) {
     // TODO: complete error handling here
-    fn resume_jobs(worker_result: WorkerResult) -> Result<(), Error> {
+    async fn resume_jobs(worker_result: WorkerResult) -> Result<(), Error> {
         let redis_client = REDIS_CLIENT.get().ok_or(Error::NotReady {
             message: "redis client".to_string(),
         })?;
         let redis_stream_refresh_ttl = CONFIG
-            .try_read(|it| it.redis_stream_refresh_ttl)
+            .read_spinning(|it| it.redis_stream_refresh_ttl)
+            .await
             .unwrap_or(300);
         let mut connection = redis_client.get_connection().map_err(Error::Redis)?;
         for job in worker_result.jobs {
@@ -350,7 +366,7 @@ pub fn resume_state(worker_result: WorkerResult) {
         }
         Ok(())
     }
-    if let Err(e) = resume_jobs(worker_result) {
+    if let Err(e) = resume_jobs(worker_result).await {
         tracing::error!("resuming: failed to resume jobs: {e}");
     }
 }

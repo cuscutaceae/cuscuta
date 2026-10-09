@@ -190,13 +190,14 @@ async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoR
     }
     let generated_user_id = generate_user_id(&form.friend_code);
     if LOGIN_ACCOUNTS
-        .try_read(|map| {
+        .read_spinning(|map| {
             let account = map.get(i_header).expect("should success");
             account
                 .friends
                 .iter()
                 .any(|friend| friend.user_id.to_string() == generated_user_id)
         })
+        .await
         .expect("should success")
     {
         tracing::info!(
@@ -265,7 +266,7 @@ async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoR
         );
     }
     LOGIN_ACCOUNTS
-        .try_read(|it| {
+        .read_spinning(|it| {
             let account = it.get(i_header).expect("should success");
             tracing::info!(
                 "add_friend: i: {i_header}, target: {}, real_len: {}",
@@ -282,6 +283,7 @@ async fn add_friend(headers: HeaderMap, form: Form<FriendAddForm>) -> impl IntoR
                 }),
             )
         })
+        .await
         .expect("should success")
 }
 
@@ -360,7 +362,7 @@ async fn remove_friend(headers: HeaderMap, form: Form<FriendRemoveForm>) -> impl
         );
     }
     LOGIN_ACCOUNTS
-        .try_read(|it| {
+        .read_spinning(|it| {
             if let Some(account) = it.get(i_header) {
                 if contains_key {
                     tracing::info!("remove_friend: i: {i_header}, target: {}", form.friend_id);
@@ -400,6 +402,7 @@ async fn remove_friend(headers: HeaderMap, form: Form<FriendRemoveForm>) -> impl
                 )
             }
         })
+        .await
         .expect("should success")
 }
 
@@ -436,7 +439,7 @@ async fn list_friend(headers: HeaderMap) -> impl IntoResponse {
         )
     } else {
         LOGIN_ACCOUNTS
-            .try_read(|it| {
+            .read_spinning(|it| {
                 let Some(account) = it.get(i_header) else {
                     return (
                         StatusCode::BAD_REQUEST,
@@ -460,6 +463,7 @@ async fn list_friend(headers: HeaderMap) -> impl IntoResponse {
                     }),
                 )
             })
+            .await
             .expect("should success")
     }
 }
@@ -490,7 +494,7 @@ async fn get_rank_list(
     let i_header = i_header.to_str().expect("should success");
     create_empty_default_account(i_header);
     LOGIN_ACCOUNTS
-        .try_read(|it| {
+        .read_spinning(|it| {
             // let mut output_vec = Vec::<RankListResult>::new();
             let Some(account) = it.get(i_header) else {
                 return (
@@ -535,6 +539,7 @@ async fn get_rank_list(
                 }),
             )
         })
+        .await
         .expect("should success")
 }
 

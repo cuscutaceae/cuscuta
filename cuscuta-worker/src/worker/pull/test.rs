@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use cuscuta_common::{
-    data::Song,
+    data::SongsWithHash,
     db::{
         job::{Job, JobEssential, SubQueue},
         redis::{job_sub_queue_redis_key, sub_queue_postfix},
@@ -23,7 +23,7 @@ use crate::{
 #[allow(clippy::cast_possible_truncation)]
 async fn pull_job_test() {
     // 算了还是写一点注释吧我怕以后看不懂了( •̀ ω •́ )✧
-    let hash = "0000000";
+    let hash = "0000000000000000";
     let friend_code = "123456789";
     let job_base_timestamp = 1_784_475_024;
     let queue_timestamp = "1784475024";
@@ -47,12 +47,12 @@ async fn pull_job_test() {
     }
 
     // 空本地队列首次pull测试
-    let sub_queue = scan_sub_queue_and_pull_job(
+    let (sub_queue, _) = scan_sub_queue_and_pull_job(
         &client,
         &mut current_jobs,
         &mut cursor,
         &config,
-        &Vec::<Song>::mock(),
+        &Vec::<SongsWithHash>::mock(),
         worker_id,
     )
     .await
@@ -88,12 +88,12 @@ async fn pull_job_test() {
         queue_timestamp,
     )
     .expect("failed to enqueue fake jobs");
-    let sub_queue = scan_sub_queue_and_pull_job(
+    let (sub_queue, _) = scan_sub_queue_and_pull_job(
         &client,
         &mut current_jobs,
         &mut cursor,
         &config,
-        &Vec::<Song>::mock(),
+        &Vec::<SongsWithHash>::mock(),
         worker_id,
     )
     .await

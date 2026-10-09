@@ -49,7 +49,7 @@ pub fn fetch_unit_eta(redis_client: &Client, limit: usize) -> Result<Option<f64>
     let sd = (result
         .iter()
         .fold(0f64, |i, it| (*it - avg).mul_add(*it - avg, i))
-        / (result.len() as f64 - 1.0))
+        / (result.len() as f64))
         .sqrt();
     let filtered: Vec<_> = result
         .iter()

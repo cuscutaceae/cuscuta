@@ -3,7 +3,7 @@ pub mod mock {
     use crate::mock::SimpleMockable;
     use cuscuta_common::{
         api::xxxxxx::FriendInfo,
-        data::{Difficulty, Song},
+        data::{Difficulty, Song, SongsWithHash},
         db::job::{Job, JobEssential, JobFailure, JobFailureResuming, JobFailureType, SubQueue},
     };
 
@@ -31,9 +31,9 @@ pub mod mock {
         }
     }
 
-    impl SimpleMockable for Vec<Song> {
+    impl SimpleMockable for Vec<SongsWithHash> {
         fn mock() -> Self {
-            vec![
+            let songs = vec![
                 Song {
                     idx: 0,
                     id: "mock0".to_owned(),
@@ -76,7 +76,11 @@ pub mod mock {
                         },
                     ],
                 },
-            ]
+            ];
+            vec![SongsWithHash {
+                hash: "0000000000000000".to_owned(),
+                songs,
+            }]
         }
     }
 

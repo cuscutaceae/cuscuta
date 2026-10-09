@@ -2,38 +2,33 @@ openapi: 3.0.1
 info:
   title: cuscuta
   description: 'cuscuta-entry 的 API 文档'
-  version: 0.1.0
-tags: []
+  version: 0.1.14
 paths:
   /v1/enqueue:
     post:
       summary: 任务入列
-      deprecated: false
       description: 输入好友码，将任务加入队列
-      tags: []
-      parameters: []
       requestBody:
+        required: true
         content:
           application/x-www-form-urlencoded:
             schema:
               type: object
               properties:
                 friend_code:
-                  description: 好友码
-                  example: '123456789'
                   type: string
+                  description: 好友码（9 位数字）
+                  example: '123456789'
                 info_only:
                   type: boolean
                   description: 是否仅获取玩家信息
-                  example: 'false'
+                  example: false
               required:
                 - friend_code
                 - info_only
-            examples: {}
-        required: true
       responses:
         '200':
-          description: ''
+          description: 入列成功
           content:
             application/json:
               schema:
@@ -41,56 +36,59 @@ paths:
                 properties:
                   success:
                     type: boolean
-                    title: 成功标志
                   query_token:
                     type: string
-                    title: 用于查询的token
+                    description: 用于查询的 token
                 required:
                   - success
                   - query_token
-          headers: {}
-        '500':
-          description: ''
+              example:
+                success: true
+                query_token: MTIzNDU2Nzg5LTE3NjAwMDAwMDA=
+        '400':
+          description: 好友码格式错误
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    title: 成功标志
-                  code:
-                    type: integer
-                    title: 失败码
-                  message:
-                    type: string
-                    title: 失败信息
-                required:
-                  - success
-                  - code
-                  - message
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                code: -502
+                message: 'bad request:-502'
+        '418':
+          description: 没有可用的 worker（无活跃账号）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                code: -400
+                message: 'service unavailable: 0x000:-400'
+        '500':
+          description: 服务未就绪或数据库/Redis 错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
               example:
                 success: false
                 code: -101
-                message: 'service unavailable: 0x020'
-          headers: {}
-      security: []
+                message: 'service unavailable: 0x020:-101'
   /v1/query:
     get:
       summary: 查询任务
-      deprecated: false
-      description: 使用token，查询任务的完成情况
-      tags: []
+      description: 使用 enqueue 返回的 query_token 查询任务完成情况
       parameters:
         - name: token
           in: query
-          description: 查询token
-          required: false
+          required: true
+          description: 查询 token（即 enqueue 返回的 query_token）
           schema:
             type: string
       responses:
         '200':
-          description: ''
+          description: 任务已完成
           content:
             application/json:
               schema:
@@ -98,52 +96,23 @@ paths:
                 properties:
                   success:
                     type: boolean
-                    title: 成功标志
                   pending:
                     type: boolean
-                    title: 成功标志
                   friend_info:
-                    $ref: '#/components/schemas/%E5%A5%BD%E5%8F%8B%E4%BF%A1%E6%81%AF'
-                    title: 好友信息
+                    allOf:
+                      - $ref: '#/components/schemas/FriendInfo'
+                    nullable: true
                   result:
                     type: array
                     items:
-                      $ref: >-
-                        #/components/schemas/%E5%88%86%E6%95%B0%E4%BF%A1%E6%81%AF
-                    title: 查询结果
+                      $ref: '#/components/schemas/SongScore'
                 required:
                   - success
                   - pending
                   - friend_info
                   - result
-              example:
-                success: true
-                pending: false
-                friend_info:
-                  name: shiyingla
-                  user_id: 7534870
-                  rating: -1
-                  character: 4
-                  is_char_uncapped: true
-                  is_char_uncapped_override: false
-                result:
-                  - song_id: altersist
-                    user_id: 987654321
-                    difficulty: 4
-                    score: 6718632442086092000
-                    score_below_max: 6390768444971588000
-                    shiny_perfect_count: -5314590532015043000
-                    perfect_count: -3556461597065652000
-                    near_count: -3871817977925547500
-                    miss_count: -5145629102212833000
-                    clear_type: 4574658129167467500
-                    best_clear_type: -190992820226022660
-                    health: -3728756331947260400
-                    time_played: 7181322008420690000
-                    name: a_friend_987654321
-          headers: {}
         '206':
-          description: ''
+          description: 任务仍在进行
           content:
             application/json:
               schema:
@@ -151,32 +120,27 @@ paths:
                 properties:
                   success:
                     type: boolean
-                    title: 成功标志
                   pending:
                     type: boolean
-                    title: 正在查询标志
                   total_jobs:
                     type: integer
-                    title: 总任务数
-                    description: 任务的总分片数
+                    description: 任务总分片数
                   finished_jobs:
                     type: integer
-                    title: 完成任务数
-                    description: 已经完成的分片数
+                    description: 已完成的分片数
                   pending_jobs:
                     type: integer
-                    title: 执行任务数
-                    description: 已被worker消费，正在执行的分片数
+                    description: 已被 worker 消费、正在执行的分片数
                   queueing_jobs:
                     type: integer
-                    title: 排队任务数
-                    description: 未被worker消费，仍在队列等待的分片数
+                    description: 仍在队列等待的分片数
                   friend_info:
-                    $ref: '#/components/schemas/%E5%A5%BD%E5%8F%8B%E4%BF%A1%E6%81%AF'
-                    title: 好友信息
+                    allOf:
+                      - $ref: '#/components/schemas/FriendInfo'
+                    nullable: true
                   eta:
                     type: number
-                    title: 估算剩余时间
+                    description: 估算剩余时间（当前实现固定返回 0）
                     nullable: true
                 required:
                   - success
@@ -187,49 +151,25 @@ paths:
                   - queueing_jobs
                   - friend_info
                   - eta
-              example:
-                success: true
-                pending: true
-                total_jobs: 5
-                finished_jobs: 0
-                pending_jobs: 1
-                queueing_jobs: 4
-                friend_info:
-                  name: a_friend_123456789
-                  user_id: 123456789
-                  rating: 1234
-                  character: 0
-                  is_char_uncapped: true
-                  is_char_uncapped_override: true
-                eta: null
-          headers: {}
         '400':
-          description: ''
+          description: token 非法或校验失败
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    title: 成功标志
-                  code:
-                    type: integer
-                    title: 失败码
-                  message:
-                    type: string
-                    title: 失败信息
-                required:
-                  - success
-                  - code
-                  - message
-              example:
-                success: false
-                code: -500
-                message: bad request
-          headers: {}
+                $ref: '#/components/schemas/Error'
         '500':
-          description: ''
+          description: 任务失败或服务错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/status:
+    get:
+      summary: 查询 worker 状态
+      description: 查询集群中 worker 的工作状态
+      responses:
+        '200':
+          description: 查询成功
           content:
             application/json:
               schema:
@@ -237,83 +177,107 @@ paths:
                 properties:
                   success:
                     type: boolean
-                    title: 成功标志
-                  code:
-                    type: integer
-                    title: 失败码
-                  message:
-                    type: string
-                    title: 失败信息
+                  worker_status:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkerStatus'
                 required:
                   - success
-                  - code
-                  - message
+                  - worker_status
+        '400':
+          description: status 接口未启用（STAT_ENABLE 为 false）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
               example:
                 success: false
-                code: -101
-                message: 'service unavailable: 0x020'
-          headers: {}
-      security: []
+                code: -503
+                message: 'bad request:-503'
+        '500':
+          description: 服务未就绪或 Redis 错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
-    分数信息:
+    Error:
       type: object
+      title: 失败响应
+      properties:
+        success:
+          type: boolean
+        code:
+          type: integer
+          format: int64
+        message:
+          type: string
+      required:
+        - success
+        - code
+        - message
+    SongScore:
+      type: object
+      title: 分数信息
       properties:
         song_id:
           type: string
-          title: 曲目ID
         user_id:
           type: integer
-          title: 用户ID
+          format: int64
         difficulty:
           type: integer
-          title: 难度序号
+          format: int64
         score:
-          type: number
-          title: 分数
+          type: integer
+          format: int64
         score_below_max:
-          type: number
+          type: integer
+          format: int64
         shiny_perfect_count:
           type: integer
-          title: 大P数
+          format: int64
         perfect_count:
           type: integer
-          title: 小P数
+          format: int64
         near_count:
           type: integer
-          title: Far数
+          format: int64
         miss_count:
           type: integer
-          title: Lost数
+          format: int64
         clear_type:
-          type: number
-          title: 通关类型
+          type: integer
+          format: int64
         best_clear_type:
           type: integer
-          title: 最佳通关类型
+          format: int64
         health:
           type: integer
+          format: int64
         time_played:
-          type: number
+          type: integer
+          format: int64
         name:
           type: string
-          title: 玩家名
-    好友信息:
+          description: 玩家名
+    FriendInfo:
       type: object
+      title: 好友信息
       properties:
         name:
           type: string
-          title: 好友名
         user_id:
           type: integer
-          title: 用户ID
+          format: int64
         rating:
           type: integer
-          title: 好友PTT
-          description: 实际值为本值/100
+          format: int64
+          description: 实际显示评级为 rating/10.0
         character:
           type: integer
-          title: 好友搭档
+          format: int64
         is_char_uncapped:
           type: boolean
         is_char_uncapped_override:
@@ -325,6 +289,228 @@ components:
         - character
         - is_char_uncapped
         - is_char_uncapped_override
-      nullable: true
-  securitySchemes: {}
-servers: []
+    WorkerStatus:
+      type: object
+      title: worker 状态
+      properties:
+        last_active_timestamp:
+          type: integer
+          format: int64
+          description: 最后一次活跃的时间戳（毫秒）
+        cursor:
+          type: integer
+          description: 当前工作指针
+        sub_queue:
+          allOf:
+            - $ref: '#/components/schemas/SubQueue'
+          nullable: true
+          description: 当前工作分片
+        jobs:
+          type: array
+          description: 当前任务
+          items:
+            $ref: '#/components/schemas/Job'
+      required:
+        - last_active_timestamp
+        - cursor
+        - sub_queue
+        - jobs
+    SubQueue:
+      type: object
+      title: 任务分片
+      properties:
+        name:
+          type: string
+        hash:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+        segment:
+          type: object
+          description: 该分片占有的分块（from 到 to）
+          properties:
+            start:
+              type: integer
+            end:
+              type: integer
+          required:
+            - start
+            - end
+      required:
+        - name
+        - hash
+        - timestamp
+        - segment
+    Job:
+      type: object
+      title: 任务
+      properties:
+        job_id:
+          type: string
+          description: 任务在 Redis 队列中的 id
+        essential:
+          $ref: '#/components/schemas/JobEssential'
+        sub_queue:
+          $ref: '#/components/schemas/SubQueue'
+        state:
+          $ref: '#/components/schemas/JobState'
+      required:
+        - job_id
+        - essential
+        - sub_queue
+        - state
+    JobEssential:
+      type: object
+      title: 任务关键信息
+      properties:
+        friend_code:
+          type: string
+          description: 查询对象的好友码
+        timestamp:
+          type: string
+          description: 任务入列时的时间戳
+        cursor_start:
+          type: integer
+          format: int32
+        cursor_length:
+          type: integer
+          format: int32
+        retry_count:
+          type: integer
+          format: int32
+        job_uid:
+          type: string
+          description: 任务的唯一 ID
+      required:
+        - friend_code
+        - timestamp
+        - cursor_start
+        - cursor_length
+        - retry_count
+        - job_uid
+    JobState:
+      title: 任务状态
+      description: 任务内部状态（序列化为带标签的枚举，Cleaned 直接序列化为字符串）
+      oneOf:
+        - type: string
+          enum:
+            - Cleaned
+        - type: object
+          properties:
+            Pulled:
+              type: object
+              properties:
+                start_timestamp:
+                  type: integer
+                  format: int64
+              required:
+                - start_timestamp
+          required:
+            - Pulled
+        - type: object
+          properties:
+            Pending:
+              type: object
+              properties:
+                friend_info:
+                  $ref: '#/components/schemas/FriendInfo'
+                current_length:
+                  type: integer
+                start_timestamp:
+                  type: integer
+                  format: int64
+              required:
+                - friend_info
+                - current_length
+                - start_timestamp
+          required:
+            - Pending
+        - type: object
+          properties:
+            Finished:
+              type: object
+              properties:
+                friend_info:
+                  $ref: '#/components/schemas/FriendInfo'
+                start_timestamp:
+                  type: integer
+                  format: int64
+              required:
+                - friend_info
+                - start_timestamp
+          required:
+            - Finished
+        - type: object
+          properties:
+            Failed:
+              type: object
+              properties:
+                friend_info:
+                  allOf:
+                    - $ref: '#/components/schemas/FriendInfo'
+                  nullable: true
+                start_timestamp:
+                  type: integer
+                  format: int64
+                failure_info:
+                  $ref: '#/components/schemas/JobFailure'
+              required:
+                - friend_info
+                - start_timestamp
+                - failure_info
+          required:
+            - Failed
+    JobFailure:
+      type: object
+      title: 任务失败信息
+      properties:
+        fail_type:
+          $ref: '#/components/schemas/JobFailureType'
+        resume_strategy:
+          $ref: '#/components/schemas/JobFailureResuming'
+        timestamp_millis:
+          type: integer
+          format: int64
+      required:
+        - fail_type
+        - resume_strategy
+        - timestamp_millis
+    JobFailureResuming:
+      type: string
+      title: 任务失败恢复策略
+      enum:
+        - Drop
+        - NoOp
+    JobFailureType:
+      title: 任务失败类型
+      description: 失败原因（单元变体直接序列化为字符串，带参数变体序列化为对象）
+      oneOf:
+        - type: string
+          enum:
+            - FriendNotFound
+            - Reenqueued
+        - type: object
+          properties:
+            TargetKeyNotFound:
+              type: string
+          required:
+            - TargetKeyNotFound
+        - type: object
+          properties:
+            ApiError:
+              type: string
+          required:
+            - ApiError
+        - type: object
+          properties:
+            XxxxxxApiError:
+              type: array
+              description: 第一个元素为 HTTP 状态码，第二个元素为可选的 API 错误码
+              items:
+                type: integer
+                format: int64
+              minItems: 2
+              maxItems: 2
+          required:
+            - XxxxxxApiError

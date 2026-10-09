@@ -1,7 +1,7 @@
 use chrono::Utc;
 use cuscuta_common::{
-    api::xxxxxx::FriendInfo,
-    data::BundleData,
+    api::xxxxxx::{FriendInfo, XxxxxxUrl},
+    data::AppVersionData,
     db::{
         account::AccountRow,
         job::{
@@ -9,7 +9,6 @@ use cuscuta_common::{
             eta::record_eta,
             track::{JobTrackQueueStatus, JobTrackTag},
         },
-        log::WorkerEventType,
     },
 };
 use redis::{Client, TypedCommands};
@@ -21,7 +20,6 @@ use crate::{
         friend_modify::{ExpectedModify, try_modify_remote_friend},
         update_job_track_info,
     },
-    worker_write_event,
 };
 
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
@@ -29,11 +27,12 @@ pub async fn clean_jobs(
     jobs: &mut Vec<Job>,
     friends: &mut Vec<FriendInfo>,
     redis_client: &Client,
-    bundle_data: &BundleData,
+    bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
     account_row: &AccountRow,
     config: &Config,
+    xxxxxx_url: &XxxxxxUrl,
 ) -> Result<(), Error> {
     let pending_friends_code = get_pending_friends_code(jobs);
     let mut deleted_friends_code = Vec::<String>::new();
@@ -104,6 +103,7 @@ pub async fn clean_jobs(
         {
             match try_modify_remote_friend(
                 config,
+                xxxxxx_url,
                 bundle_data,
                 user_id,
                 token,
@@ -139,18 +139,10 @@ pub async fn clean_jobs(
             continue;
         }
         if let JobState::Failed { failure_info, .. } = &finished_job.state {
-            worker_write_event!(
-                WorkerEventType::Warn,
-                format!("job finished with error: {failure_info:?}")
-            );
             tracing::warn!(
                 "job: {finished_job:?} finished with error: {finished_job:?} : {failure_info:?}"
             );
         } else {
-            worker_write_event!(
-                WorkerEventType::Trace,
-                format!("job finished: {finished_job:?}")
-            );
             tracing::info!("job: {finished_job:?} finished");
         }
 

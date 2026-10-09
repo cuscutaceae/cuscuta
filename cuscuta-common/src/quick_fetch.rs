@@ -26,6 +26,17 @@ pub trait QuickFetch<T> {
     where
         F: FnOnce(&T) -> U;
 
+    /// 自旋地重复读取
+    ///
+    /// # Errors
+    /// 参见[`Error`]
+    /// 不会返回[`Error::TryLock`]
+    fn read_spinning<U, F>(&self, f: F) -> impl Future<Output = Result<U>>
+    where
+        T: Send + Sync,
+        U: Send,
+        F: Send + Fn(&T) -> U;
+
     /// 尝试获取引用。并写入回调函数的返回值
     ///
     /// 当返回值为`Some(T)`时，更新变量；反之，则不更新
@@ -51,6 +62,20 @@ impl<T> QuickFetch<T> for OnceLock<RwLock<Option<T>>> {
             .map_err(Error::TryLock)?
             .as_ref()
             .ok_or(Error::NotInitialize)?))
+    }
+
+    async fn read_spinning<U, F>(&self, f: F) -> Result<U>
+    where
+        T: Send + Sync,
+        U: Send,
+        F: Send + Fn(&T) -> U,
+    {
+        loop {
+            if let Ok(guard) = self.get_or_init(|| RwLock::new(Option::None)).try_read() {
+                return Ok(f(guard.as_ref().ok_or(Error::NotInitialize)?));
+            }
+            tokio::task::yield_now().await;
+        }
     }
 
     #[allow(clippy::significant_drop_tightening)]

@@ -74,7 +74,8 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
         return Err(Error::BadRequest(ErrorType::BadRequestFriendCode));
     }
     let config = CONFIG
-        .try_read(std::clone::Clone::clone)
+        .read_spinning(std::clone::Clone::clone)
+        .await
         .map_err(|_| Error::NotReady(ErrorType::ConfigNotReady))?;
     let redis_client = REDIS_CLIENT
         .get()
@@ -82,12 +83,19 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
     let transaction = try_open_transaction()
         .await
         .map_err(|e| Error::DbExtend(ErrorType::FailedTransactionOpenDb, e))?;
-    let song_list_len = SONG_LIST
-        .try_read(|it| {
-            it.iter()
-                .map(|song| song.difficulties.len())
-                .collect::<Vec<_>>()
+    let (song_list_len, hash) = SONG_LIST
+        .read_spinning(|it| {
+            let songs_with_hash = it.first().expect("should have one element as least!");
+            (
+                songs_with_hash
+                    .songs
+                    .iter()
+                    .map(|song| song.difficulties.len())
+                    .collect::<Vec<_>>(),
+                songs_with_hash.hash.clone(),
+            )
         })
+        .await
         .map_err(|_| Error::NotReady(ErrorType::SongListNotReady))?;
     let active_account_count = count_active_account(transaction)
         .await
@@ -114,7 +122,7 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
         let (queue_name, exist) = target_queue.map_or_else(
             || {
                 (
-                    sub_queue_postfix("00000000", &timestamp, range.start, range.end),
+                    sub_queue_postfix(&hash, &timestamp, range.start, range.end),
                     false,
                 )
             },
@@ -148,7 +156,7 @@ async fn op(form: EnqueueBody) -> anyhow::Result<String, Error> {
     }
     batch_write_job_tracking_tag(redis_client, &job_track_tags)
         .map_err(|e| Error::RedisExtend(ErrorType::FailedEnqueueRedis, e))?;
-    Ok(base64::prelude::BASE64_STANDARD.encode(format!("{}-{}", form.friend_code, timestamp)))
+    Ok(base64::prelude::BASE64_URL_SAFE.encode(format!("{}-{}", form.friend_code, timestamp)))
 }
 
 fn input_check(input: &str) -> bool {
