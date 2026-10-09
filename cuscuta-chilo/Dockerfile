@@ -18,9 +18,8 @@ RUN mkdir -p cuscuta-mock/src && echo "//! Dummy \nfn main() {}" > cuscuta-mock/
 RUN mkdir -p cuscuta-test/src && echo "//! Dummy \nfn main() {}" > cuscuta-test/src/lib.rs
 RUN mkdir -p cuscutactl/src && echo "//! Dummy \nfn main() {}" > cuscutactl/src/main.rs
 RUN apt-get update && apt-get install -y ca-certificates clang cmake pkg-config
-# Pre-build to cache dependencies
-RUN cargo build --release -p cuscuta-chilo
 # Copy real source and rebuild
+COPY cuscuta-common/src cuscuta-common/src
 COPY cuscuta-chilo/src cuscuta-chilo/src
 RUN touch cuscuta-chilo/src/main.rs
 RUN cargo build --release -p cuscuta-chilo
