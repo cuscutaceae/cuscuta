@@ -23,6 +23,7 @@ tokio = { workspace = true, features = ["signal"] }
 tokio-util = { workspace = true }
 tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["trace", "cors"] }
+envy = { workspace = true }
 
 [lints]
 workspace = true
