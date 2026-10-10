@@ -33,7 +33,7 @@ pub enum WaitForResultError {
     Api(api::Error),
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub async fn try_modify_remote_friend(
     xxxxxx_url: &XxxxxxUrl,
     bundle_data: &AppVersionData,
@@ -79,8 +79,32 @@ pub async fn try_modify_remote_friend(
                     ..
                 } = &e
                 {
-                    if *status_code == 404 {
+                    if status_code.is_client_error() {
                         JobFailure::new(JobFailureType::FriendNotFound, JobFailureResuming::Drop)
+                    } else if status_code.is_server_error() && *status_code != 500 {
+                        tracing::warn!("triggered friend {status_code} modify waiting");
+                        match wait_for_result(
+                            xxxxxx_url,
+                            bundle_data,
+                            user_id,
+                            token,
+                            account_row,
+                            cached_friend_list,
+                            expects,
+                        )
+                        .await
+                        {
+                            Ok(result) => return Ok(result),
+                            Err(err) => match err {
+                                WaitForResultError::LoopAgain => {
+                                    continue;
+                                }
+                                WaitForResultError::Api(err) => JobFailure::new(
+                                    JobFailureType::ApiError(err.to_string()),
+                                    JobFailureResuming::Drop,
+                                ),
+                            },
+                        }
                     } else {
                         JobFailure::new(
                             JobFailureType::XxxxxxApiError(status_code.as_u16(), *extra_error_code),
@@ -127,7 +151,6 @@ pub async fn try_modify_remote_friend(
 #[allow(clippy::too_many_arguments)]
 async fn wait_for_result(
     xxxxxx_url: &XxxxxxUrl,
-
     bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
@@ -189,7 +212,6 @@ async fn wait_for_result(
 #[allow(clippy::too_many_arguments)]
 async fn try_modify_friend(
     xxxxxx_url: &XxxxxxUrl,
-
     bundle_data: &AppVersionData,
     user_id: &str,
     token: &str,
