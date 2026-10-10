@@ -132,6 +132,7 @@ entry:
           - path: /
             pathType: Prefix
   cors:
+    # -- 跨域请求放行的 Origin （环境变量：CORS_ALLOW_ORIGINS）
     allowOrigins: ""
   status:
     # -- 是否启用 `/v1/status` 接口（环境变量：STAT_ENABLE）

@@ -144,6 +144,7 @@ services:
       RESOURCE_UPDATE_PERIOD: 60
       RESOURCE_UPDATE_RETRIES: 5
       # Config
+      CORS_ALLOW_ORIGINS: "*"
       REDIS_STREAM_REFRESH_TTL: 300
       STAT_ENABLE: "true"
     ports:

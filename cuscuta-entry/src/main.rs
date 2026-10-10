@@ -105,10 +105,14 @@ async fn main() {
 
 fn parse_cors_origins(env: &Environment) -> CorsLayer {
     let layer = CorsLayer::new();
-    let has_wildcard = env.cors_allow_origins.split(',').contains("*");
+    let Some(cors_allow_origins) = env.cors_allow_origins.clone() else {
+        tracing::warn!("cors_origins_parse: CORS_ALLOW_ORIGINS is not set, deny all");
+        return layer;
+    };
+    let has_wildcard = cors_allow_origins.split(',').contains("*");
     if has_wildcard {
         tracing::warn!(
-            "cors_origins_parse: cors_allow_origins contains wildcard, so allow_credentials is now false"
+            "cors_origins_parse: CORS_ALLOW_ORIGINS contains wildcard, so allow_credentials is now false"
         );
     }
     layer
@@ -116,7 +120,7 @@ fn parse_cors_origins(env: &Environment) -> CorsLayer {
             AllowOrigin::any()
         } else {
             AllowOrigin::list(
-                env.cors_allow_origins
+                cors_allow_origins
                     .split(',')
                     .map(str::trim)
                     .filter(|s| !s.is_empty())

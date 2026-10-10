@@ -22,7 +22,7 @@ pub struct Environment {
     pub redis_addr: String,
     pub accounts_sql_addr: String,
     pub resources_song_url: String,
-    pub cors_allow_origins: String,
+    pub cors_allow_origins: Option<String>,
 }
 
 impl IntoResourcesUpdatePeriodAndRetries for Environment {
