@@ -112,10 +112,6 @@ where
                     .map_err(|e| format!("failed to write SONG_LIST: {e}"))?;
                 Ok((music_len, chart_len, hash))
             }
-            if global_song_list.is_initialized() {
-                tracing::trace!("song list sync");
-                return;
-            }
             for retry in 0..max_retries {
                 tracing::info!("sync_song_list: trying sync song list... {retry}/{max_retries}");
                 match try_sync(global_song_list, &song_list_url).await {
